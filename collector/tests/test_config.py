@@ -21,7 +21,20 @@ def test_load_real_config():
     assert cfg.max_news == 15
     ids = [s.id for s in cfg.series]
     assert "us-cpi-yoy" in ids and "ez-hicp-yoy" in ids
+    assert "us-ppi-yoy" in ids and "us-core-ppi-yoy" in ids
+    assert "us-jobless-claims" in ids and "us-housing-starts" in ids
+    assert "us-indpro-yoy" in ids
     assert cfg.calendar_map[0].match == "Core CPI"  # order preserved
+    cal_usd = [m for m in cfg.calendar_map if m.country == "USD"]
+    by_match = {m.match: m.series for m in cal_usd}
+    assert by_match["Core PPI"] == "us-core-ppi-yoy"
+    assert by_match["PPI"] == "us-ppi-yoy"
+    assert by_match["Initial Jobless Claims"] == "us-jobless-claims"
+    assert by_match["Housing Starts"] == "us-housing-starts"
+    assert by_match["Industrial Production"] == "us-indpro-yoy"
+    assert cal_usd.index(next(m for m in cal_usd if m.match == "Core PPI")) < cal_usd.index(
+        next(m for m in cal_usd if m.match == "PPI")
+    )
     assert cfg.feeds[0].name == "FT"
     assert cfg.cadences["etf"] == 86400
     assert cfg.etfdb_catalog_url.endswith("/pyetfdb_scraper/data/etfdb.json")

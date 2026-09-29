@@ -43,8 +43,13 @@ cb_rates:          # policy rates for the WORLD BONDS matrix; country must match
 series:            # macro click-through charts; transform per changes.apply_transform
   - { id: us-cpi-yoy,       name: "US CPI YoY %",            fred: CPIAUCSL,           unit: "%",   transform: yoy }
   - { id: us-core-cpi-yoy,  name: "US Core CPI YoY %",       fred: CPILFESL,           unit: "%",   transform: yoy }
+  - { id: us-ppi-yoy,       name: "US PPI YoY %",            fred: PPIACO,             unit: "%",   transform: yoy }
+  - { id: us-core-ppi-yoy,  name: "US Core PPI YoY %",       fred: PPILFE,             unit: "%",   transform: yoy }
   - { id: us-pce-yoy,       name: "US PCE YoY %",            fred: PCEPI,              unit: "%",   transform: yoy }
   - { id: us-nfp,           name: "US Non-Farm Payrolls Δk", fred: PAYEMS,             unit: "k",   transform: diff }
+  - { id: us-jobless-claims, name: "US Initial Jobless Claims", fred: ICSA,             unit: "k",   transform: none }
+  - { id: us-housing-starts, name: "US Housing Starts SAAR",  fred: HOUST,              unit: "k",   transform: none }
+  - { id: us-indpro-yoy,    name: "US Industrial Production YoY %", fred: INDPRO,       unit: "%",   transform: yoy }
   - { id: us-unemployment,  name: "US Unemployment %",       fred: UNRATE,             unit: "%",   transform: none }
   - { id: us-gdp,           name: "US Real GDP QoQ SAAR %",  fred: A191RL1Q225SBEA,    unit: "%",   transform: none }
   - { id: us-retail,        name: "US Retail Sales MoM %",   fred: RSAFS,              unit: "%",   transform: pct_prev }
@@ -187,8 +192,13 @@ cycle_tabs:        # layout only; rows reference cycle_series ids
 calendar_map:      # first match wins — keep Core before CPI
   - { country: USD, match: "Core CPI",     series: us-core-cpi-yoy }
   - { country: USD, match: "CPI",          series: us-cpi-yoy }
+  - { country: USD, match: "Core PPI",     series: us-core-ppi-yoy }
+  - { country: USD, match: "PPI",          series: us-ppi-yoy }
   - { country: USD, match: "Core PCE",     series: us-pce-yoy }
   - { country: USD, match: "Non-Farm",     series: us-nfp }
+  - { country: USD, match: "Initial Jobless Claims", series: us-jobless-claims }
+  - { country: USD, match: "Housing Starts", series: us-housing-starts }
+  - { country: USD, match: "Industrial Production", series: us-indpro-yoy }
   - { country: USD, match: "Unemployment", series: us-unemployment }
   - { country: USD, match: "GDP",          series: us-gdp }
   - { country: USD, match: "Retail Sales", series: us-retail }
