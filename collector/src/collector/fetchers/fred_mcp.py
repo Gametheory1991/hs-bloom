@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import os
 from urllib.parse import urlsplit
 
@@ -12,6 +13,17 @@ from mcp.client.streamable_http import streamable_http_client
 from mcp.types import CallToolResult
 
 from collector.http import USER_AGENT
+
+
+class _SuppressMCPDetails(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        return "/mcp/" not in record.pathname.replace("\\", "/")
+
+
+# The SDK logs raw upstream payloads, including from its shared session via
+# the root logger. Keep those out of logs; fetchers report sanitized failures.
+for _logger_name in ("", "mcp.client.streamable_http", "client"):
+    logging.getLogger(_logger_name).addFilter(_SuppressMCPDetails())
 
 
 def endpoint() -> str:

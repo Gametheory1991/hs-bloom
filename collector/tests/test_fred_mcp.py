@@ -1,4 +1,5 @@
 import json
+import logging
 from datetime import date
 from pathlib import Path
 
@@ -47,6 +48,8 @@ def mcp_server(monkeypatch):
                 "capabilities": {"tools": {}},
                 "serverInfo": {"name": "test-fred", "version": "1.0"},
             }
+            if state.get("bad_initialize"):
+                result = {"protocolVersion": {"sensitive": "test-key"}}
         elif message["method"] == "tools/list":
             result = {
                 "tools": [{
@@ -137,6 +140,26 @@ async def test_timeout_is_sanitized(monkeypatch):
     monkeypatch.setattr(fred_mcp, "streamable_http_client", fail)
     with pytest.raises(RuntimeError, match="FRED MCP request failed"):
         await fred_mcp.fetch_observations("DGS10", "test-key")
+
+
+async def test_sdk_payload_logs_are_suppressed(mcp_server, caplog):
+    mcp_server["bad_initialize"] = True
+    with caplog.at_level(logging.DEBUG):
+        with pytest.raises(RuntimeError, match="FRED MCP request failed"):
+            await fred.fetch_series("DGS10", "test-key", no_direct_api)
+    assert "test-key" not in caplog.text
+    assert "Raw result" not in caplog.text
+
+
+def test_shared_session_logging_is_suppressed(caplog):
+    record = logging.LogRecord(
+        "root", logging.WARNING, "/site-packages/mcp/shared/session.py",
+        383, "sensitive upstream data", (), None,
+    )
+    logging.getLogger().handle(record)
+    logging.getLogger("collector").warning("safe collector error")
+    assert "sensitive" not in caplog.text
+    assert "safe collector error" in caplog.text
 
 
 @pytest.mark.parametrize("url", [
