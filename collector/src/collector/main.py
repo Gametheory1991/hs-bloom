@@ -12,6 +12,7 @@ from fastapi.staticfiles import StaticFiles
 
 from collector.api import create_app
 from collector.config import load_config
+from collector.fetchers.fred_mcp import endpoint
 from collector.http import get_bytes, get_text, post_json
 from collector.newsletter import load_smtp_cfg
 from collector.scheduler import register_jobs
@@ -23,7 +24,7 @@ log = logging.getLogger(__name__)
 def build() -> tuple[FastAPI, AsyncIOScheduler]:
     cfg = load_config(os.environ.get("CONFIG_PATH", "../config.yaml"))
     store = Store(cfg.db_path)
-    if not os.environ.get("FRED_API_KEY"):
+    if not os.environ.get("FRED_API_KEY") and not endpoint():
         log.warning("FRED_API_KEY not set; FRED-backed macro series and the US bond yield will fail")
     app = create_app(store, cfg)
     scheduler = AsyncIOScheduler(timezone="UTC")

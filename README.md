@@ -105,6 +105,46 @@ UI_PORT=9090 docker compose up --build
 and any error. `GET /api/insights` returns the current automated digest and
 newsletter delivery state.
 
+### Connect to FRED MCP
+
+Set `FRED_MCP_URL` in `.env` to use a trusted FRED MCP server with **Streamable
+HTTP** instead of the direct FRED API. This applies to all existing FRED-backed
+macro history, US bond yields, policy rates, and market-cycle series; no chart
+or series configuration changes are needed.
+
+```bash
+FRED_MCP_URL=https://your-trusted-fred-mcp-server.example/mcp
+FRED_MCP_OBSERVATIONS_TOOL=get_series_observations
+```
+
+Restart the collector after changing these settings. With Docker Compose, run
+`docker compose up -d --build` to rebuild and apply the updated environment.
+On Render, set the same environment variables in the service settings.
+
+The collector initializes an MCP session and calls the observations tool with
+`{"series_id": "<configured FRED id>"}`. The server must return the complete
+history as a FRED-style JSON object containing an `observations` array of
+`date`/`value` entries, either as structured content or a JSON text block.
+FRED missing values (`"."`) are skipped as usual. Servers with other tool
+names can use `FRED_MCP_OBSERVATIONS_TOOL`; other argument/output schemas,
+stdio, and legacy SSE transports are not supported.
+
+`FRED_API_KEY`, when set, is sent in the `X-FRED-API-Key` header. A server that
+already holds its own FRED key does not require a local one. Set the optional
+`FRED_MCP_TOKEN` for servers requiring bearer authentication. These credentials
+remain server-side and are never sent to the dashboard browser.
+
+Only configure a server you trust with your credentials. HTTPS is required
+except for loopback HTTP (`localhost`, `127.0.0.1`, or `::1`); credentials in
+URLs and redirects are not supported. Requests time out after 30 seconds.
+MCP failures follow the existing per-series isolation/stale-data behavior and
+are reported without upstream error details to avoid leaking credentials.
+Macro history and bond source labels show `fred-mcp`; the combined cycle job
+retains its `cycle` label in `/healthz`.
+
+Leave `FRED_MCP_URL` blank to retain direct FRED API access. There is no silent
+fallback to the direct API when an MCP request fails.
+
 ### Gmail newsletter delivery
 
 Set these in `/home/runner/work/os-bloom/os-bloom/.env` to enable real email

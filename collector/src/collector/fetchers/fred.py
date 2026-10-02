@@ -5,10 +5,15 @@ import json
 from datetime import date
 
 from collector.config import SeriesCfg
+from collector.fetchers import fred_mcp
 from collector.http import GetText
 from collector.store import Store
 
 BASE = "https://api.stlouisfed.org/fred/series/observations"
+
+
+def source_name() -> str:
+    return "fred-mcp" if fred_mcp.endpoint() else "fred"
 
 
 def parse_observations(text: str) -> list[tuple[date, float]]:
@@ -21,6 +26,13 @@ def parse_observations(text: str) -> list[tuple[date, float]]:
 
 
 async def fetch_series(fred_id: str, api_key: str, get_text: GetText) -> list[tuple[date, float]]:
+    if fred_mcp.endpoint():
+        try:
+            return parse_observations(await fred_mcp.fetch_observations(fred_id, api_key))
+        except Exception:
+            raise RuntimeError(
+                "FRED MCP request failed; check endpoint, credentials and observations tool"
+            ) from None
     params = {"series_id": fred_id, "api_key": api_key, "file_type": "json"}
     return parse_observations(await get_text(BASE, params=params))
 
@@ -42,4 +54,4 @@ async def fetch_macro_history(
             errors.append(f"{cfg.id}: {exc}")
     if errors:
         raise RuntimeError(f"{len(errors)}/{len(series)} macro series failed: {'; '.join(errors)}")
-    return "fred"
+    return source_name()

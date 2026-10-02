@@ -31,7 +31,7 @@ async def _daily_series(
 ) -> tuple[list, str] | None:
     """(closes, source) via the keyless-source chain, or None if unconfigured."""
     if cfg.fred:
-        return await fred.fetch_series(cfg.fred, fred_api_key, get_text), "fred"
+        return await fred.fetch_series(cfg.fred, fred_api_key, get_text), fred.source_name()
     if getattr(cfg, "bundesbank", None):
         return await bundesbank.fetch_series(cfg.bundesbank, get_text), "bundesbank"
     if getattr(cfg, "ecb", None):
