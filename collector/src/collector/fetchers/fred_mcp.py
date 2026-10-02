@@ -30,6 +30,12 @@ def endpoint() -> str:
     return os.environ.get("FRED_MCP_URL", "").strip()
 
 
+async def _reject_redirects(response: httpx.Response) -> None:
+    # The SDK follows some redirects independently of HTTPX's client setting.
+    if 300 <= response.status_code < 400:
+        raise RuntimeError("FRED MCP redirects are not supported")
+
+
 def observations_json(result: CallToolResult) -> str:
     if result.isError:
         raise ValueError("FRED MCP observations tool failed")
@@ -77,7 +83,8 @@ async def fetch_observations(fred_id: str, api_key: str) -> str:
     try:
         async with asyncio.timeout(30):
             async with httpx.AsyncClient(
-                headers=headers, timeout=30, follow_redirects=False
+                headers=headers, timeout=30, follow_redirects=False,
+                event_hooks={"response": [_reject_redirects]},
             ) as client:
                 async with streamable_http_client(url, http_client=client) as (read, write, _):
                     async with ClientSession(read, write) as session:

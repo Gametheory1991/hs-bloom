@@ -34,7 +34,10 @@ def mcp_server(monkeypatch):
     def respond(request):
         state["requests"].append(request)
         if state["status"] != 200:
-            return httpx.Response(state["status"], text="sensitive upstream error")
+            return httpx.Response(
+                state["status"], text="sensitive upstream error",
+                headers={"Location": "/redirected?api_key=test-key"},
+            )
         if request.method == "GET":
             return httpx.Response(405)
         if request.method == "DELETE":
@@ -129,6 +132,17 @@ async def test_transport_failure_does_not_fallback(mcp_server, status):
     mcp_server["status"] = status
     with pytest.raises(RuntimeError, match="FRED MCP request failed"):
         await fred.fetch_series("DGS10", "test-key", no_direct_api)
+
+
+@pytest.mark.parametrize("status", [301, 302, 303, 307, 308])
+async def test_sdk_redirects_rejected_before_following(mcp_server, caplog, status):
+    mcp_server["status"] = status
+    with caplog.at_level(logging.DEBUG):
+        with pytest.raises(RuntimeError, match="FRED MCP request failed"):
+            await fred.fetch_series("DGS10", "test-key", no_direct_api)
+    assert len(mcp_server["requests"]) == 1
+    assert "redirected" not in caplog.text
+    assert "test-key" not in caplog.text
 
 
 async def test_timeout_is_sanitized(monkeypatch):
