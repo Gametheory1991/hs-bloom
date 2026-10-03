@@ -210,8 +210,10 @@ async def fetch_hyperscaler(cfg: Config, store: Store,
     equities = [_equity_card(store, label, ticker, sid)
                 for label, ticker, _cik, sid in ISSUERS]
     note = (
-        "Single-name bond spreads/CDS and short interest have no free feed "
+        "Single-name bond spreads/CDS have no free feed "
         "(S3, S&P Global, Markit are paid); sector HY/IG OAS shown as proxy. "
+        "short interest is FINRA's free twice-monthly consolidated file, "
+        "shown per card. "
         "Holder flows covered quarterly by the 13F watchlist. "
         "Tranche fields are parsed best-effort from prospectus text."
     )

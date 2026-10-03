@@ -99,6 +99,8 @@ async def fetch_cycle(
 ) -> str:
     errors: list[str] = []
     for cfg in series:
+        if cfg.external:
+            continue  # a dedicated job owns cycle:<id> for these
         try:
             pts = await _fetch_one(cfg, fred_api_key, get_text, get_bytes, store, today)
             if cfg.valid_range:
