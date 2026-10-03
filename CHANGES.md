@@ -1,3 +1,118 @@
+## 2026-10-03 — UI+data batch: central-bank watch, command palette, alert-tuning UI, briefcheck view (subagent)
+
+**Central-bank watch tab (`central`).** New `ui/js/panels/central.js` + TABS/nav/mount
+wiring: (a) FOMC meeting calendar 2026–2027 with day-countdowns to each decision
+day — dates vendored as statics, VERIFIED 2026-10-03 against
+https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm ("Last Update:
+September 16, 2026"): 2026 → Jan 27-28, Mar 17-18*, Apr 28-29, Jun 16-17*,
+Jul 28-29, Sep 15-16*, Oct 27-28, Dec 8-9*; 2027 → Jan 26-27, Mar 16-17*,
+Apr 27-28, Jun 8-9*, Jul 27-28, Sep 14-15*, Oct 26-27, Dec 7-8* (* = with SEP);
+(b) implied Fed-funds path from the SOFR 3M futures strip — 7 new config.yaml
+cycle series (`sofr-v26` … `sofr-h28`, Yahoo `SR3V26.CME` … `SR3H28.CME`, ALL
+verified live 2026-10-03; implied 3M = 100 − price), rendered as a small SVG
+path chart + table. Refreshed on the 15-min cadence. Contract codes roll:
+strip covers Oct-26 → Mar-28 and must be re-coded as expiries pass.
+Fed speaker calendar SKIPPED — no free machine-readable source verifies.
+
+**Command palette (`ui/js/palette.js`).** Cmd+K / Ctrl+K (or `/` when not
+typing) opens a fuzzy-search overlay across tabs, panels, and series; Enter
+navigates (`#/tab`), up/down + Esc work, click selects. The index is built
+live by main.js from the nav DOM + dashboard cycle series + scorecard rows +
+futures list — nothing hardcoded. Styles in terminal.css, mobile-compact.
+
+**Alert-tuning UI (`ui/js/panels/alerts.js`, `#panel-alerts` on mkt tab).**
+Lists alert types from `GET /api/alerts/config` (anomaly, trend) with a
+threshold-multiplier input (0.1–10) and mute toggle each; changes PUT to
+`/api/alerts/config` immediately with transient saved ✓ / error state.
+
+**Briefcheck view (`ui/js/panels/briefcheck.js`, `#panel-briefcheck` on mkt
+tab).** Reads `GET /api/briefcheck`; shows checked count, timestamp, and the
+mismatch table (metric, briefing vs terminal, deviation); 404 renders a quiet
+"no cross-check yet" empty state. Refreshed on the 15-min cadence.
+
+**Market internals SKIPPED (data).** No free machine-readable source for NYSE
+advance/decline, new highs/lows, or up/down volume (TRIN) verifies live
+2026-10-03: Nasdaq exposes no public advance/decline endpoint; NYSE/WSJ/
+MarketWatch are JS-walled; the TradingView scanner endpoint is unreachable
+from the build network (connection timeout); CNN's Fear & Greed JSON API
+bot-blocks ("I'm a teapot"). Nothing faked — no tab added. Existing breadth
+proxies remain: equal-weight/SPX ratio, 5d cross-sectional dispersion, CBOE
+put/call ratios. Revisit if a clean source appears.
+
+**Also:** `FUTURES` now exported from `ui/js/panels/futures.js` (palette
+index); `getAlertConfig`/`putAlertConfig`/`getBriefcheck` added to
+`ui/js/api.js`. New tests `collector/tests/test_central.py` (4 tests:
+FOMC schedule pinned to the verified federalreserve.gov dates, weekday/
+chronology guards, SOFR-strip config shape, implied-rate arithmetic).
+`node --check` clean on all touched JS.
+
+## 2026-10-03 — Reliability batch: Postgres persistence, boot catch-up, alert tuning, briefcheck (subagent)
+
+**1. Postgres persistence — `collector/src/collector/store.py`.**
+`Store` now honors `DATABASE_URL`: when set it connects via psycopg and uses
+`%s` placeholders; otherwise SQLite at `db_path` exactly as before. All
+methods (`upsert_points`, `points`, `put_doc`/`doc`, `record_success`,
+`record_error`, `prune_outside_range`, `status`/`statuses`) behave identically
+on both backends. psycopg is an optional extra (`pip install -e
+".[postgres]"`) so SQLite stays the zero-dependency default; a clear
+RuntimeError is raised if DATABASE_URL is set without it.
+Enabling persistence: provision a free Postgres (Neon or Supabase), set
+`DATABASE_URL` on Render (and install the extra in the Docker image), and
+the terminal's history — radar, risk engine, universe graphs — survives
+deploys instead of rebuilding from empty `/tmp/bloom.db` each time.
+Verified: 5 new tests drive the PG path through an in-memory fake psycopg
+(placeholder style, upsert round-trip, docs, statuses, corrupt-doc
+handling, missing-driver error).
+
+**2. Scheduler boot catch-up — `scheduler.py` + `runner.py`.**
+`run_fetcher` now records each success in the `job_runs` doc. On
+`register_jobs`, any staggered job whose last run is missing or older than
+its cadence gets an early first run (start + 60s, 75s apart, in dependency
+order: risk → country_risk → xcorr → voldash → movers → home_radar → …)
+instead of the hardcoded +300s…+4200s offsets. Jobs with a recent run keep
+their configured offsets. Existing scheduler tests untouched (they assert
+intervals/ids only); 3 new tests cover catch-up ordering, recent-run
+preservation, and job_runs persistence.
+
+**3. Alert tuning backend — `collector/src/collector/alert_config.py` (NEW).**
+Per-type config persisted in the `alert_config` doc, seeded from the two
+digest kinds notify.py emits:
+- `anomaly` — Anomaly alerts (|z| ≥ 2.2σ), `threshold_mult` 1.0, `muted` false
+- `trend` — Trend alerts (1m move ≥ 1.15σ), `threshold_mult` 1.0, `muted` false
+`threshold_mult` scales the trigger threshold in `build_digest`
+(2.0 ≈ half as many alerts); `muted` types are filtered in
+`push_new_alerts` (still counted as seen so they don't queue while muted).
+New endpoints: `GET /api/alerts/config` → `{"types": [{id, label,
+threshold_mult, muted}]}`; `PUT /api/alerts/config` with
+`{id, threshold_mult?, muted?}` → `{"type": {...}}`, 400 on unknown id or
+out-of-range multiplier (0.1–10). CORS allow_methods gained PUT. 6 new
+tests incl. end-to-end threshold scaling and muted-send suppression.
+
+**4. briefcheck.py (NEW, repo root) — briefing-vs-terminal cross-check.**
+Standalone stdlib-only script for an operator machine (OFF Render):
+`python briefcheck.py --briefing-html PATH --base-url
+https://os-bloom.onrender.com [--tolerance-pct N]`. Parses the briefing's
+tables generically by header row, maps ~45 metrics (rates/curve, plumbing,
+vol, conditions, ETFs) to `/api/scorecard` + `/api/series`, compares with
+per-unit tolerances (10bp yields/spreads, 5bp OAS, 1% levels, 5% dollar
+stocks, 2% ratios), prints a JSON report
+`{checked_at, checked_count, mismatches: [{table, metric, briefing_value,
+terminal_value, deviation, unit}]}` and exits 1 on any breach.
+Live-verified 2026-10-03 against the real briefing + production terminal:
+23 metrics checked, 16 mismatches flagged — including the briefing's stale
+SPR (400.0 vs 283.767 MMBbls) and stale front-end rates (SOFR 5.31 vs 3.87,
+UST 1M 5.25 vs 4.06; briefing carries the old rate regime).
+New endpoints: `POST /api/briefcheck` accepts that JSON report (stores doc
+`briefcheck_latest`) → `{"stored": true}`; `GET /api/briefcheck` returns it
+or 404 when none posted. 8 new tests (mocked terminal).
+Skipped: briefing tables 6–8 (futures z-scores have no terminal equivalent;
+auction dynamics are event-specific not current levels; econ calendar is
+events not values).
+
+Tests: full suite 413 passed / 15 failed / 2 skipped — the 15 failures are
+byte-identical to the pre-change pristine baseline (test_batch6_finra_ice
+fixture FileNotFoundErrors, test_tsv), zero new failures. +22 new tests.
+
 ## 2026-10-03 — Batch 11: five new data feeds (World Bank, USAspending, CoinGecko, OpenFIGI, Finnhub)
 
 From the apivault.dev review Harry approved. All five endpoints verified live
