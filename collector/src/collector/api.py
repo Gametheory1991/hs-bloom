@@ -1,18 +1,23 @@
 """Read-only JSON API. App factory so tests inject their own store/config."""
 from __future__ import annotations
 
+import os
 from datetime import datetime, timedelta, timezone
 from typing import Literal
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
 from collector.changes import apply_transform, to_bands
+from collector.chat import SYSTEM_PROMPT, ask_gemini, build_context
 from collector.config import Config
 from collector.panels import build_dashboard
 from collector.store import Store
 
 RANGE_DAYS = {"1y": 365, "5y": 5 * 365, "10y": 10 * 365}
+
+CHAT_MODEL_DEFAULT = "gemini-flash-latest"
 
 
 def _fetcher_healthy(f: dict) -> bool:
@@ -23,9 +28,14 @@ def _fetcher_healthy(f: dict) -> bool:
     return f["last_success"] >= f["last_error_at"]
 
 
+class ChatRequest(BaseModel):
+    message: str
+    history: list[dict[str, str]] = []
+
+
 def create_app(store: Store, cfg: Config) -> FastAPI:
     app = FastAPI(title="os-bloom collector", docs_url=None, redoc_url=None)
-    app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET"])
+    app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET", "POST"])
     series_by_id = {s.id: s for s in cfg.series}
     cycle_by_id = {s.id: s for s in cfg.cycle_series}
     index_names = {i.symbol: i.name for i in cfg.indexes}
@@ -92,6 +102,31 @@ def create_app(store: Store, cfg: Config) -> FastAPI:
             cycle_series=cfg.cycle_series,
             cycle_tabs=cfg.cycle_tabs,
         )["panels"]["insights"]
+
+    @app.post("/api/chat")
+    def chat_endpoint(req: ChatRequest) -> dict:
+        api_key = os.environ.get("GEMINI_API_KEY")
+        if not api_key:
+            raise HTTPException(
+                status_code=503,
+                detail="chat unavailable: GEMINI_API_KEY not set",
+            )
+        model = os.environ.get("CHAT_MODEL", CHAT_MODEL_DEFAULT)
+        history = [
+            {"role": h["role"], "content": h["content"]}
+            for h in req.history[-20:]  # last 10 turns
+            if h.get("role") in ("user", "assistant") and h.get("content")
+        ]
+        context, series_ids = build_context(store, cfg, req.message)
+        messages = [
+            *history,
+            {"role": "user", "content": f"{context}\n\nQUESTION: {req.message}"},
+        ]
+        try:
+            reply = ask_gemini(api_key, model, SYSTEM_PROMPT, messages)
+        except RuntimeError as exc:
+            raise HTTPException(status_code=502, detail=f"chat provider error: {exc}")
+        return {"reply": reply, "series_used": series_ids}
 
     @app.get("/healthz")
     def healthz() -> dict:
