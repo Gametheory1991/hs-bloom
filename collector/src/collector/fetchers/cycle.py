@@ -1,4 +1,4 @@
-"""Daily market-cycle job: one series list, seven source kinds, per-series
+"""Daily market-cycle job: one series list, eight source kinds, per-series
 isolation (a bad id or a dead file URL degrades that series only — the
 summary error raises at the end so /healthz surfaces it)."""
 from __future__ import annotations
@@ -6,7 +6,7 @@ from __future__ import annotations
 from datetime import date
 
 from collector.config import CycleSeriesCfg
-from collector.fetchers import aaii, cboe, cftc, dbnomics, fred, oecd, yahoo
+from collector.fetchers import aaii, cboe, cftc, dbnomics, fred, oecd, ofr, yahoo
 from collector.http import GetBytes, GetText
 from collector.store import Store
 
@@ -30,6 +30,8 @@ async def _fetch_one(
         return await cboe.fetch_ratio_history(cfg.cboe, get_text, today=today)
     if cfg.aaii:
         return await aaii.fetch_spread(get_bytes)
+    if cfg.ofr:
+        return await ofr.fetch_mnemonic(cfg.ofr, get_text)
     if cfg.yahoo_ratio:
         num, den = cfg.yahoo_ratio
         a = await yahoo.fetch_chart(num, get_text, range_="10y")
