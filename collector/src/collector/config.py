@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import yaml
@@ -42,13 +42,19 @@ class SeriesCfg:
 
 @dataclass(frozen=True)
 class CycleSeriesCfg:
-    """One market-cycle series; exactly one source field is set per entry."""
+    """One market-cycle series; exactly one source field is set per entry.
+
+    `store: true` marks an externally maintained series (written by another
+    job, e.g. the thirteenf job's net-flow points): the cycle job just
+    re-upserts whatever is already in the store instead of fetching.
+    """
     id: str
     name: str
     unit: str
     transform: str = "none"
     hidden: bool = False           # fetched + chartable but never a panel row (usrec)
     valid_range: list[float] | None = None  # drop points outside [min, max] (corrupt feeds)
+    store: bool = False            # externally maintained; re-upsert only
     fred: str | None = None
     dbnomics: str | None = None    # "PROVIDER/dataset/series"
     oecd: str | None = None        # "{flow}/{key}" under the OECD rest/data base
@@ -59,6 +65,16 @@ class CycleSeriesCfg:
     ofr: str | None = None         # OFR Hedge Fund Monitor mnemonic (dataset=fpf)
     yahoo: str | None = None       # single Yahoo symbol, daily closes (e.g. MBB, ^VIX3M)
     yahoo_ratio: list[str] | None = None  # [numerator, denominator] yahoo symbols
+    fred_spread: list[str] | None = None  # [A, B] FRED ids -> A minus B (e.g. US10Y-DE10Y)
+    fred_ratio: list[str] | None = None   # [A, B] FRED ids -> A / B (e.g. HY OAS / IG OAS)
+    eia_wpsr: str | None = None    # "spr" | "commercial" — EIA WPSR table1.csv stocks
+    wei: bool = False              # Dallas Fed Weekly Economic Index (.xlsx)
+
+
+@dataclass(frozen=True)
+class ScorecardRowCfg:
+    series: str          # cycle_series id (resolves to cycle:<id>)
+    kind: str = "pct"    # "pct" for prices/levels, "bp" for yields/spreads/ratios in %
 
 
 @dataclass(frozen=True)
@@ -246,6 +262,7 @@ class Config:
     thirteenf: ThirteenFCfg
     auctions: AuctionsCfg
     dealer: list[DealerSeriesCfg]
+    scorecard: list[ScorecardRowCfg] = field(default_factory=list)
 
 
 def load_config(path: str | Path) -> Config:
@@ -284,6 +301,7 @@ def load_config(path: str | Path) -> Config:
             buckets=list(raw["auctions"]["buckets"]),
             lookback_days=int(raw["auctions"]["lookback_days"]),
         ),
+        scorecard=[ScorecardRowCfg(**r) for r in raw.get("scorecard", [])],
         dealer=[DealerSeriesCfg(**s) for s in raw["dealer"]],
         calendar_map=[CalendarMapEntry(**m) for m in raw["calendar_map"]],
         feeds=[FeedCfg(**f) for f in raw["feeds"]],

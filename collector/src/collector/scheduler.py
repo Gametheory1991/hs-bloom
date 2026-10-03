@@ -44,8 +44,8 @@ from collector.fetchers.dealer import fetch_dealer
 from collector.fetchers.refs_history import fetch_refs_history
 from collector.fetchers.zyfai import fetch_defi
 from collector.http import GetBytes, GetText, PostJson
-from collector.insights import refresh_digest
 from collector.newsletter import SmtpCfg, deliver_newsletter
+from collector.notify import refresh_digest_and_notify
 from collector.runner import run_fetcher
 from collector.store import Store
 
@@ -84,7 +84,7 @@ def register_jobs(
         "thirteenf": (cfg.cadences["thirteenf"], partial(fetch_thirteenf, cfg.thirteenf, store, get_text), start),
         "auctions": (cfg.cadences["auctions"], partial(fetch_auctions, cfg.auctions, store, get_text), start),
         "dealer": (cfg.cadences["dealer"], partial(fetch_dealer, cfg.dealer, store, get_text), start),
-        "insights": (cfg.cadences["insights"], partial(refresh_digest, store, cfg), start),
+        "insights": (cfg.cadences["insights"], partial(refresh_digest_and_notify, store, cfg, post_json), start),
         # risk is compute-only (no HTTP): it reads whatever the data jobs have
         # stored. APScheduler has no dependency ordering, so it starts 5 min
         # after everything else — on a fresh deploy the data jobs get a head

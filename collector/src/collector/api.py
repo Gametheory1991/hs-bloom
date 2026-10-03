@@ -133,4 +133,40 @@ def create_app(store: Store, cfg: Config) -> FastAPI:
         fetchers = store.statuses()
         return {"ok": all(_fetcher_healthy(f) for f in fetchers), "fetchers": fetchers}
 
+    @app.get("/api/thirteenf")
+    def thirteenf() -> dict:
+        """13F change-detection payloads per watchlist filer.
+
+        Each entry is the doc stored at thirteenf:<cik10>:changes by the
+        thirteenf job: net_flow_usd, per-kind counts (n_new/n_closed/
+        n_increased/n_decreased) and the top changes by |delta|. Filers with
+        no diff yet (first filing seen) are omitted.
+        """
+        filers = []
+        for w in cfg.thirteenf.watchlist:
+            doc = store.doc(f"thirteenf:{w.cik.zfill(10)}:changes")
+            if doc is not None:
+                filers.append(doc.payload)
+        return {"filers": filers}
+
+    @app.get("/api/scorecard")
+    def scorecard() -> dict:
+        """Briefing-style scorecard: 1D/1M/3M/1Y moves + 1Y z-score per row.
+
+        Rows come from the `scorecard:` config section (series id + kind).
+        """
+        from collector.scorecard import scorecard_row
+
+        rows = []
+        for r in cfg.scorecard:
+            ccfg = cycle_by_id.get(r.series)
+            if ccfg is None:
+                continue
+            points = store.points(f"cycle:{r.series}")
+            row = scorecard_row(points, r.kind)
+            row.update({"id": r.series, "name": ccfg.name,
+                        "unit": ccfg.unit, "kind": r.kind})
+            rows.append(row)
+        return {"rows": rows}
+
     return app
