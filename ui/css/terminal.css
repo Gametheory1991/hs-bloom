@@ -401,3 +401,40 @@ path.map-country:hover { stroke: var(--amber); stroke-width: 1.6; }
 .figi-form button:active { background: var(--line); }
 .figi-table td.mono { font-family: monospace; font-size: 11px; }
 .warn { color: var(--amber); }
+
+/* Command palette (ui/js/palette.js) */
+.palette-box { width: min(560px, 92vw); padding: 0; }
+.palette-input {
+  width: 100%; box-sizing: border-box; background: var(--panel); color: var(--fg);
+  border: none; border-bottom: 1px solid var(--line); padding: 10px 12px;
+  font-size: 14px; outline: none;
+}
+.palette-results { max-height: 320px; overflow: auto; }
+.palette-item {
+  display: flex; justify-content: space-between; gap: 8px; padding: 7px 12px;
+  cursor: pointer; font-size: 13px;
+}
+.palette-item.sel { background: #2a331f; }
+.palette-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.palette-sub { font-size: 11px; flex-shrink: 0; }
+
+/* Alert tuning (ui/js/panels/alerts.js) */
+.alert-row {
+  display: flex; align-items: center; gap: 10px; padding: 6px 0;
+  border-bottom: 1px solid var(--line); font-size: 12px;
+}
+.alert-row:last-child { border-bottom: none; }
+.alert-info { flex: 1; min-width: 0; }
+.alert-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.alert-state { font-size: 10px; min-height: 12px; }
+.alert-ctl { display: flex; align-items: center; gap: 4px; color: var(--muted); font-size: 11px; }
+.alert-mult { width: 52px; background: var(--bg); color: var(--fg); border: 1px solid var(--line); padding: 2px 4px; }
+.alert-ctl input[type="checkbox"] { accent-color: var(--amber); }
+
+/* Central-bank watch: SOFR strip chart (ui/js/panels/central.js) */
+.strip-chart { width: 100%; height: auto; margin: 4px 0 8px; }
+.strip-chart .svg-lab { fill: var(--muted); font-size: 11px; }
+@media (max-width: 700px) {
+  .palette-box { width: 94vw; }
+  .alert-row { flex-wrap: wrap; }
+}
