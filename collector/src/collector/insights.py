@@ -4,13 +4,12 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from statistics import mean, pstdev
 
 from collector.changes import apply_transform, ref_close
 from collector.config import Config
 from collector.store import Store
-from collector.alert_config import scaled_thresholds
 
 ANOMALY_Z = 2.2
 TREND_Z = 1.15
@@ -322,6 +321,69 @@ def _struct_bullet(note: dict) -> str:
     return "Market structure — " + "; ".join(bits) + "."
 
 
+def _crypto_breadth_note(store: Store) -> dict | None:
+    """Crypto breadth (batch 11): BTC dominance + 24h washout breadth from
+    the CoinGecko top-50 doc."""
+    doc = store.doc("coingecko")
+    if doc is None:
+        return None
+    coins = doc.payload.get("coins", [])
+    if not coins:
+        return None
+    down5 = sum(1 for c in coins if (c.get("chg24h") or 0) < -5)
+    up5 = sum(1 for c in coins if (c.get("chg24h") or 0) > 5)
+    return {"asof": doc.payload.get("as_of"),
+            "n": len(coins),
+            "btc_dominance_pct": doc.payload.get("btc_dominance_pct"),
+            "down5_24h": down5, "up5_24h": up5}
+
+
+def _fiscal_note(store: Store) -> dict | None:
+    """US fiscal pulse (batch 11): latest monthly federal obligations vs the
+    trailing-3-month average, from the usaspending doc."""
+    doc = store.doc("usaspending")
+    if doc is None:
+        return None
+    monthly = doc.payload.get("monthly", [])
+    if len(monthly) < 4:
+        return None
+    latest = monthly[-1]
+    avg3 = sum(m["total_b"] for m in monthly[-4:-1]) / 3
+    return {"asof": doc.payload.get("as_of"),
+            "latest_month": latest["date"][:7],
+            "latest_total_b": latest["total_b"],
+            "avg3_total_b": round(avg3, 1),
+            "contract_b": latest["contract_b"],
+            "grants_b": latest["grants_b"]}
+
+
+def _finnhub_note(store: Store) -> dict | None:
+    """Finnhub watchlist intel (batch 11): upcoming earnings count + names
+    reporting in the next 7 days, and latest insider MSPR reads."""
+    doc = store.doc("finnhub")
+    if doc is None:
+        return None
+    earnings = doc.payload.get("earnings", [])
+    if not earnings:
+        return None
+    today = date.today()
+    # names reporting within 7 days of today
+    week_out = []
+    for e in earnings:
+        try:
+            d = date.fromisoformat(e["date"])
+            if today <= d <= today + timedelta(days=7):
+                week_out.append(e["symbol"])
+        except (KeyError, TypeError, ValueError):
+            continue
+    msprs = [m["mspr"] for m in doc.payload.get("insider", [])
+             if m.get("mspr") is not None]
+    return {"asof": doc.payload.get("as_of"),
+            "n_earnings": len(earnings),
+            "week_out": sorted(set(week_out)),
+            "avg_mspr": round(sum(msprs) / len(msprs), 1) if msprs else None}
+
+
 def build_digest(store: Store, cfg: Config, now: datetime | None = None) -> dict:
     now = now or datetime.now(timezone.utc)
     risk_doc = store.doc("risk_summary")
@@ -338,12 +400,12 @@ def build_digest(store: Store, cfg: Config, now: datetime | None = None) -> dict
     ai_note = _ai_infra_note(store)
     ms_note = _ms_universe_note(store)
     struct_note = _market_structure_note(store)
+    crypto_note = _crypto_breadth_note(store)
+    fiscal_note = _fiscal_note(store)
+    finnhub_note = _finnhub_note(store)
     anomalies = []
     trends = []
     active_series = 0
-    # per-type tuning (alert_config doc): threshold_mult scales the trigger
-    # thresholds; muted types are filtered at send time in notify.py
-    anomaly_z, trend_z = scaled_thresholds(store, ANOMALY_Z, TREND_Z)
     for item in _series_catalog(cfg):
         points = apply_transform(store.points(item.store_id), item.transform)
         if len(points) < 2:
@@ -357,7 +419,7 @@ def build_digest(store: Store, cfg: Config, now: datetime | None = None) -> dict
             if sigma > 0:
                 level_mean = mean(baseline)
                 z_score = round((latest_value - level_mean) / sigma, 2)
-                if abs(z_score) >= anomaly_z:
+                if abs(z_score) >= ANOMALY_Z:
                     anomalies.append({
                         "id": f"anomaly:{item.series_id}",
                         "series_id": item.series_id,
@@ -374,7 +436,7 @@ def build_digest(store: Store, cfg: Config, now: datetime | None = None) -> dict
                 if ref_1m is not None:
                     delta = round(latest_value - ref_1m, 2)
                     trend_score = round(abs(delta) / sigma, 2)
-                    if delta != 0 and trend_score >= trend_z:
+                    if delta != 0 and trend_score >= TREND_Z:
                         trends.append({
                             "id": f"trend:{item.series_id}",
                             "series_id": item.series_id,
@@ -431,6 +493,20 @@ def build_digest(store: Store, cfg: Config, now: datetime | None = None) -> dict
              f"${ms_note['total_reported_bn']:.0f}B reported deals tracked."]
             if ms_note and ms_note.get("banks_last_q") else [])
         + ([_struct_bullet(struct_note)] if struct_note else [])
+        + ([f"Crypto breadth — BTC dominance {crypto_note['btc_dominance_pct']:.1f}%; "
+             f"{crypto_note['down5_24h']}/{crypto_note['n']} top coins down >5% in 24h, "
+             f"{crypto_note['up5_24h']} up >5%."]
+            if crypto_note else [])
+        + ([f"Fiscal pulse — federal obligations ${fiscal_note['latest_total_b']:,.0f}B "
+             f"in {fiscal_note['latest_month']} vs ${fiscal_note['avg3_total_b']:,.0f}B "
+             f"prior-3m avg (contracts ${fiscal_note['contract_b']:,.0f}B, "
+             f"grants ${fiscal_note['grants_b']:,.0f}B)."]
+            if fiscal_note else [])
+        + ([f"Earnings — {finnhub_note['n_earnings']} watchlist names report in the "
+             f"next 3 weeks"
+             + (f" ({', '.join(finnhub_note['week_out'][:6])} within 7d)" if finnhub_note['week_out'] else "")
+             + (f"; avg insider MSPR {finnhub_note['avg_mspr']:+.1f}." if finnhub_note['avg_mspr'] is not None else ".")]
+            if finnhub_note else [])
         + [
             f"Anomaly — {row['name']}: {row['summary']}."
             for row in anomalies[:2]
@@ -470,6 +546,13 @@ def build_digest(store: Store, cfg: Config, now: datetime | None = None) -> dict
             # set or the deal rollup changes)
             "ms_neg_fcf": sorted((ms_note or {}).get("neg_fcf") or []),
             "ms_deals_bn": (ms_note or {}).get("total_reported_bn"),
+            # batch 11: crypto breadth, fiscal pulse, earnings (hashed so the
+            # newsletter fires when breadth washes out, obligations inflect,
+            # or the earnings roster changes)
+            "crypto_breadth": ((crypto_note or {}).get("down5_24h"),
+                               (crypto_note or {}).get("btc_dominance_pct")),
+            "fiscal_total_b": (fiscal_note or {}).get("latest_total_b"),
+            "finnhub_earnings": sorted((finnhub_note or {}).get("week_out") or []),
         },
         sort_keys=True,
     ).encode("utf-8")).hexdigest()[:16]

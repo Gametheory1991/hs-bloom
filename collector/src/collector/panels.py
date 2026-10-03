@@ -385,6 +385,61 @@ def _tsv_panel(store: Store) -> dict:
     return base
 
 
+def _defi_panel(store: Store) -> dict:
+    """DeFi tab: Zyfai vault rows plus CoinGecko crypto breadth (batch 11).
+
+    The crypto table is a separate key so the vault renderer is untouched;
+    an absent coingecko doc degrades to an empty list, never a 500.
+    """
+    panel = _doc_panel(store, "defi_pools", "rows")
+    cg = store.doc("coingecko")
+    panel["crypto"] = cg.payload.get("coins", []) if cg else []
+    panel["crypto_as_of"] = cg.payload.get("as_of") if cg else None
+    panel["btc_dominance_pct"] = cg.payload.get("btc_dominance_pct") if cg else None
+    panel["crypto_updated_at"] = cg.updated_at if cg else None
+    return panel
+
+
+def _worldbank_panel(store: Store) -> dict:
+    """Global macro fundamentals (batch 11): latest GDP/CPI/unemployment
+    per bond-matrix country, from the worldbank doc."""
+    doc = store.doc("worldbank")
+    if doc is None:
+        return {"as_of": None, "countries": {}, "updated_at": None, "source": None}
+    return {"as_of": doc.payload.get("as_of"),
+            "countries": doc.payload.get("countries", {}),
+            "updated_at": doc.updated_at, "source": doc.source}
+
+
+def _usaspending_panel(store: Store) -> dict:
+    """US fiscal pulse (batch 11): monthly obligations, top recipients and
+    awarding agencies from the usaspending doc."""
+    doc = store.doc("usaspending")
+    if doc is None:
+        return {"as_of": None, "monthly": [], "top_recipients": [],
+                "top_agencies": [], "updated_at": None, "source": None}
+    p = doc.payload
+    return {"as_of": p.get("as_of"), "monthly": p.get("monthly", []),
+            "top_recipients": p.get("top_recipients", []),
+            "top_agencies": p.get("top_agencies", []),
+            "updated_at": doc.updated_at, "source": doc.source}
+
+
+def _finnhub_panel(store: Store) -> dict:
+    """Finnhub watchlist intel (batch 11): upcoming earnings for universe
+    tickers + insider sentiment for earnings names. Empty until a
+    FINNHUB_API_KEY is configured."""
+    doc = store.doc("finnhub")
+    if doc is None:
+        return {"as_of": None, "earnings": [], "insider": [],
+                "key_configured": False, "updated_at": None, "source": None}
+    p = doc.payload
+    return {"as_of": p.get("as_of"), "window": p.get("window"),
+            "earnings": p.get("earnings", []), "insider": p.get("insider", []),
+            "key_configured": True,
+            "updated_at": doc.updated_at, "source": doc.source}
+
+
 def build_dashboard(
     store: Store,
     indexes: list[IndexCfg],
@@ -404,7 +459,7 @@ def build_dashboard(
                       "updated_at": bonds_doc.updated_at if bonds_doc else None,
                       "source": bonds_doc.source if bonds_doc else None},
             "news": _doc_panel(store, "news", "items"),
-            "defi": _doc_panel(store, "defi_pools", "rows"),
+            "defi": _defi_panel(store),
             "midnight": _doc_panel(store, "midnight_curve", "rows"),
             "morpho": _doc_panel(store, "morpho_markets", "rows"),
             "refs": _refs_panel(store),
@@ -420,5 +475,8 @@ def build_dashboard(
             "ai_flow": _universe_panel(store, "ai_buildout"),
             "ms_flow": _universe_panel(store, "market_structure"),
             "tsv": _tsv_panel(store),
+            "worldbank": _worldbank_panel(store),
+            "usaspending": _usaspending_panel(store),
+            "finnhub": _finnhub_panel(store),
         },
     }

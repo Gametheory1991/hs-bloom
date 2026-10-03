@@ -9,12 +9,6 @@ startup run on every deployment.
 
 The newsletter job intentionally starts a few seconds after insights so a new
 digest exists before the first delivery attempt.
-
-Boot catch-up: run_fetcher records each success in the job_runs doc, and
-register_jobs gives any staggered job whose last run is missing or older
-than its cadence an early first run (start + 60s, 75s apart, in dependency
-order) instead of the hardcoded large offsets — so a fresh deploy populates
-the radar/universe panels within minutes, not over an hour.
 """
 from __future__ import annotations
 
@@ -57,54 +51,19 @@ from collector.fetchers.ice_star import fetch_ice_star
 from collector.fetchers.refs_history import fetch_refs_history
 from collector.fetchers.trace_monthly import fetch_trace_monthly
 from collector.fetchers.trace_treasury import fetch_trace_treasury
+from collector.fetchers.worldbank import fetch_worldbank
+from collector.fetchers.usaspending import fetch_usaspending
+from collector.fetchers.coingecko import fetch_coingecko
+from collector.fetchers.openfigi import fetch_openfigi
+from collector.fetchers.finnhub import fetch_finnhub
 from collector.fetchers.zyfai import fetch_defi
 from collector.http import GetBytes, GetText, PostJson
 from collector.newsletter import SmtpCfg, deliver_newsletter
 from collector.runner import run_fetcher
-from collector.runner import JOB_RUNS_DOC
 from collector.store import Store
 
 MACRO_HISTORY_SECONDS = 86400  # daily; not config — no reason to tune it
 GSE_SECONDS = 30 * 86400  # monthly; the GSE summaries release ~25d after month-end
-
-CATCHUP_DELAY = 60   # first catch-up slot: start + 60s
-CATCHUP_GAP = 75     # spacing between catch-up slots (60–90s): no thundering herd
-
-
-def _catchup_first_runs(
-    fetchers: dict[str, tuple[int, object, datetime]],
-    store: Store,
-    start: datetime,
-) -> None:
-    """Boot catch-up: jobs whose last successful run is missing or older than
-    their cadence get an early first run (start + 60s, 75s apart) instead of
-    the hardcoded large stagger offsets. Iteration follows dict order, which
-    is dependency order (risk before country_risk before xcorr ... before
-    home_radar), so the catch-up sequence preserves it. Jobs with a recent
-    run keep their configured first-run time as fallback spacing.
-
-    run_fetcher persists each success into the job_runs doc, so this survives
-    restarts only when the store itself survives (DATABASE_URL); on an
-    ephemeral store every job is "missing" and the whole staggered set
-    catches up shortly after boot instead of up to 70 minutes later.
-    """
-    doc = store.doc(JOB_RUNS_DOC)
-    last_runs = doc.payload if doc and isinstance(doc.payload, dict) else {}
-    slot = start + timedelta(seconds=CATCHUP_DELAY)
-    for name, (seconds, fn, first) in fetchers.items():
-        if not isinstance(first, datetime) or first <= start + timedelta(seconds=CATCHUP_DELAY):
-            continue  # fires at/near boot already; nothing to catch up
-        last = last_runs.get(name)
-        overdue = True
-        if isinstance(last, str) and last:
-            try:
-                last_dt = datetime.fromisoformat(last.replace("Z", "+00:00"))
-                overdue = (start - last_dt).total_seconds() >= seconds
-            except ValueError:
-                overdue = True
-        if overdue:
-            fetchers[name] = (seconds, fn, slot)
-            slot += timedelta(seconds=CATCHUP_GAP)
 
 
 def register_jobs(
@@ -228,11 +187,29 @@ def register_jobs(
         # registry exists, so this is the machine-trackable part).
         "tsv_watch": (cfg.cadences.get("tsv_watch", 604800), partial(fetch_tsv_watch, store, get_text),
                  start + timedelta(seconds=4200)),
+        # batch 11: World Bank macro fundamentals (GDP/CPI/unemployment)
+        # for the 13 bond-matrix countries — keyless, 3 batched calls.
+        "worldbank": (cfg.cadences.get("worldbank", 604800), partial(fetch_worldbank, store, get_text),
+                 start + timedelta(seconds=4500)),
+        # batch 11: USAspending.gov federal fiscal pulse — monthly
+        # obligations + top recipients/agencies, keyless, 3 POSTs.
+        "usaspending": (cfg.cadences.get("usaspending", 604800), partial(fetch_usaspending, store, post_json),
+                 start + timedelta(seconds=4800)),
+        # batch 11: CoinGecko crypto breadth — top-50 by market cap,
+        # keyless, one batched call per day.
+        "coingecko": (cfg.cadences.get("coingecko", 86400), partial(fetch_coingecko, store, get_text),
+                 start + timedelta(seconds=5100)),
+        # batch 11: OpenFIGI symbology enrichment — needs OPENFIGI_API_KEY
+        # (free registration); skips cleanly without it, never fails.
+        "openfigi": (cfg.cadences.get("openfigi", 604800), partial(fetch_openfigi, store, post_json),
+                 start + timedelta(seconds=5400)),
+        # batch 11: Finnhub earnings calendar + insider sentiment — needs
+        # FINNHUB_API_KEY (free tier); skips cleanly without it. Daily when
+        # keyed so the earnings window rolls.
+        "finnhub": (cfg.cadences.get("finnhub", 86400), partial(fetch_finnhub, store, get_text),
+                 start + timedelta(seconds=5700)),
         "newsletter": (cfg.cadences["insights"], partial(deliver_newsletter, store, smtp_cfg), start + timedelta(seconds=5)),
     }
-    # Boot catch-up (see _catchup_first_runs): overdue staggered jobs run
-    # soon after boot instead of waiting out their full stagger offsets.
-    _catchup_first_runs(fetchers, store, start)
     for name, (seconds, fn, next_run_time) in fetchers.items():
         scheduler.add_job(
             partial(run_fetcher, name, store, fn),
