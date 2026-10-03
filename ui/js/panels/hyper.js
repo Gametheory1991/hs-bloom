@@ -1,8 +1,10 @@
 // HYPER tab: the hyperscaler desk. Equity cards for the six AI hyperscalers
-// (price + 1m change + 90d sparkline, from the hyper doc's equity cards) and
-// a debt-issuance monitor table parsed from SEC filings (424B2/424B3/424B5/FWP).
-// Honest limits are shown, not faked: no free single-name bond spread/CDS or
-// short-interest feed exists; holder flows are covered by the 13F watchlist.
+// (price + 1m change + 90d sparkline, from the hyper doc's equity cards;
+// short interest per card from FINRA's free twice-monthly file, merged in
+// by the collector) and a debt-issuance monitor table parsed from SEC
+// filings (424B2/424B3/424B5/FWP).
+// Honest limits are shown, not faked: no free single-name bond spread/CDS
+// feed exists; holder flows are covered by the 13F watchlist.
 import { fmtAge, isStale } from "../fmt.js";
 
 const STALE_MINUTES = 10080; // 2x the weekly hyperscaler cadence
@@ -54,6 +56,14 @@ function issuanceRows(issuances) {
   }).join("");
 }
 
+function fmtShort(s) {
+  if (!s || s.short == null) return `<span class="muted">short: —</span>`;
+  const sh = s.short >= 1e6 ? `${(s.short / 1e6).toFixed(1)}M sh` : `${Math.round(s.short / 1e3)}K sh`;
+  const dtc = s.dtc != null ? ` · ${s.dtc.toFixed(1)}d to cover` : "";
+  const chg = s.chg_pct != null ? ` <span class="${s.chg_pct >= 0 ? "up" : "down"}">${s.chg_pct >= 0 ? "+" : ""}${s.chg_pct.toFixed(1)}%</span>` : "";
+  return `<span title="FINRA short interest, settlement">short: ${sh}${dtc}</span>${chg}`;
+}
+
 export function renderHyper(hyper) {
   const body = document.querySelector("#panel-hyper .panel-body");
   const footEl = document.querySelector("#panel-hyper .panel-foot");
@@ -71,6 +81,7 @@ export function renderHyper(hyper) {
       <span class="muted">${esc(e.label)}</span></div>
       <div class="hyper-card-price">${e.last == null ? "—" : "$" + e.last.toFixed(2)}
       ${fmtChg(e.chg_1m_pct)} <span class="muted">1m</span></div>
+      <div class="hyper-card-short">${fmtShort(e.short)}</div>
       ${sparkSvg(e.spark)}
     </div>`).join("");
   body.innerHTML = `
