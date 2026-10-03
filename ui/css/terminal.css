@@ -330,3 +330,56 @@ path.map-country:hover { stroke: var(--amber); stroke-width: 1.6; }
 .scorecard tr.clickable { cursor: pointer; }
 .scorecard tr.clickable:hover td { background: rgba(255, 255, 255, 0.04); }
 .scorecard .strong { font-weight: 700; }
+
+/* ---- batches 6-10 additions ---- */
+/* AI FLOW panel (batch 7) */
+.ai-capex-wrap { margin-bottom: 6px; }
+.ai-capex-svg { width: 100%; max-width: 620px; height: auto; display: block; }
+.ai-legend { font-size: 10px; color: var(--muted); margin: 4px 0 8px; line-height: 1.7; }
+.ai-graph-scroll { overflow-x: auto; margin: 4px 0; }
+.ai-graph-svg { width: 100%; min-width: 640px; height: auto; display: block; }
+.ai-node-card { border: 1px solid var(--line); border-left: 3px solid var(--amber); padding: 8px 10px; margin: 8px 0; background: var(--bg); }
+.ai-node-card-head { display: flex; gap: 8px; align-items: baseline; margin-bottom: 6px; }
+.ai-node-close { margin-left: auto; background: none; border: 1px solid var(--line); color: var(--fg); border-radius: 4px; padding: 2px 8px; }
+.ai-kv-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 4px 12px; margin: 6px 0; }
+.ai-kv { display: flex; justify-content: space-between; font-size: 12px; }
+.ai-kv span { color: var(--muted); }
+.ai-flags { font-size: 12px; margin: 4px 0; }
+.ai-flag { background: rgba(224, 82, 82, 0.15); border: 1px solid #e05252; color: #e05252; border-radius: 3px; padding: 1px 6px; font-size: 10px; margin-right: 4px; white-space: nowrap; }
+.ai-section-sub { color: var(--amber); font-size: 10px; letter-spacing: 2px; margin: 8px 0 4px; }
+.ai-deals { font-size: 12px; margin: 4px 0; padding-left: 18px; }
+.ai-deals li { margin-bottom: 4px; }
+.ai-risks { font-size: 12px; padding-left: 18px; margin: 4px 0 8px; }
+.ai-risks li { margin-bottom: 6px; }
+.ai-rollup { font-size: 12px; margin: 4px 0 6px; padding: 6px 8px; border-left: 3px solid var(--amber); background: rgba(255, 255, 255, 0.02); }
+
+/* AI FLOW coverage map (batch 7: universe scale) */
+.ai-search { width: 100%; max-width: 340px; background: var(--bg); border: 1px solid var(--line); color: var(--fg); border-radius: 4px; padding: 6px 10px; margin: 4px 0 8px; font-size: 13px; }
+.ai-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 10px; }
+.ai-chip { background: none; border: 1px solid var(--line); color: var(--muted); border-radius: 12px; padding: 3px 10px; font-size: 11px; }
+.ai-chip.on { border-color: var(--amber); color: var(--amber); }
+.ai-vlabel { color: var(--amber); font-size: 10px; letter-spacing: 2px; margin: 10px 0 4px; text-transform: uppercase; }
+.ai-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
+.ai-card { border: 1px solid var(--line); padding: 7px 9px; background: var(--bg); cursor: pointer; }
+.ai-card-head { display: flex; gap: 6px; align-items: baseline; font-size: 12px; }
+.ai-dot-red { width: 8px; height: 8px; border-radius: 50%; background: #e05252; margin-left: auto; flex: none; }
+.ai-card-fin { font-size: 11px; margin: 3px 0; display: flex; gap: 8px; }
+.ai-card-flags { min-height: 16px; }
+
+/* TSV panel (batch 9) */
+.tsv-sec-title { font-size: 11px; letter-spacing: 1px; color: var(--accent, #e8c96a); margin: 14px 0 6px; font-weight: 600; }
+.tsv-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 6px; }
+.tsv-fact { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 6px 8px; }
+.tsv-fact-k { font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); }
+.tsv-fact-v { font-size: 12px; margin-top: 2px; }
+.tsv-vert { margin-bottom: 10px; }
+.tsv-co { border-left: 2px solid rgba(255,255,255,0.12); padding: 4px 0 4px 8px; margin: 6px 0; }
+.tsv-co-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.tsv-co-name { font-weight: 600; font-size: 13px; }
+.tsv-status { font-size: 9px; border: 1px solid; border-radius: 4px; padding: 1px 6px; letter-spacing: 0.5px; }
+.tsv-ticker { font-size: 10px; color: var(--muted); font-family: monospace; }
+.tsv-note { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.tsv-hit { font-size: 12px; margin: 4px 0; }
+.tsv-hit a { color: #7fb3e8; }
+.tsv-notes { font-size: 11px; color: var(--muted); padding-left: 18px; }
+.tsv-notes li { margin: 3px 0; }
