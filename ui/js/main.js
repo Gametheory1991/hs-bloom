@@ -8,6 +8,7 @@ import { renderCycle } from "./panels/cycle.js";
 import { renderRefs } from "./panels/refs.js";
 import { renderInsights } from "./panels/insights.js";
 import { initNotifications, notifyInsights } from "./notifications.js";
+import { initChat } from "./chat.js";
 import { initTabs } from "./tabs.js";
 
 const POLL_MS = 60_000;
@@ -64,6 +65,7 @@ async function tick() {
 
 initTabs();
 initNotifications();
+initChat();
 initDefiViewToggle(() => {
   if (lastDash) renderDefiPanel(lastDash.panels);
 });
