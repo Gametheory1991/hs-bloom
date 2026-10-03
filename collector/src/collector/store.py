@@ -1,4 +1,4 @@
-"""SQLite persistence. Three tables: time series, JSON docs, fetcher health."""
+"""SQLite persistence for series, JSON docs, fetcher health and the alert outbox."""
 from __future__ import annotations
 
 import json
@@ -31,6 +31,27 @@ CREATE TABLE IF NOT EXISTS fetcher_status(
   last_error    TEXT,
   last_error_at TEXT,
   active_source TEXT
+);
+CREATE TABLE IF NOT EXISTS alert_events(
+  event_id TEXT PRIMARY KEY,
+  series_id TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  direction TEXT NOT NULL,
+  as_of TEXT NOT NULL,
+  detected_at TEXT NOT NULL,
+  payload TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS alert_events_date ON alert_events(detected_at);
+CREATE INDEX IF NOT EXISTS alert_events_series ON alert_events(series_id, as_of);
+CREATE TABLE IF NOT EXISTS alert_deliveries(
+  event_id TEXT NOT NULL REFERENCES alert_events(event_id),
+  channel TEXT NOT NULL,
+  state TEXT NOT NULL DEFAULT 'pending',
+  attempts INTEGER NOT NULL DEFAULT 0,
+  retry_at TEXT NOT NULL,
+  sent_at TEXT,
+  last_error TEXT,
+  PRIMARY KEY(event_id, channel)
 );
 """
 
@@ -132,6 +153,120 @@ class Store:
 
     def status(self, name: str) -> dict[str, Any] | None:
         return next((s for s in self.statuses() if s["name"] == name), None)
+
+    def record_alert(self, event: dict, channels: list[str], now: str) -> None:
+        with self._lock:
+            self.conn.execute(
+                "INSERT OR IGNORE INTO alert_events VALUES(?,?,?,?,?,?,?)",
+                (event["event_id"], event["series_id"], event["kind"], event["direction"],
+                 event["as_of"], now, json.dumps(event, allow_nan=False)),
+            )
+            self.conn.executemany(
+                "INSERT OR IGNORE INTO alert_deliveries(event_id,channel,retry_at) VALUES(?,?,?)",
+                [(event["event_id"], channel, now) for channel in channels],
+            )
+            self.conn.commit()
+
+    def alerts(self, *, series_id: str | None = None, kind: str | None = None,
+               direction: str | None = None, since: str | None = None,
+               until: str | None = None, detected_since: str | None = None,
+               limit: int = 50, offset: int = 0) -> dict:
+        clauses, args = [], []
+        for column, value in (("series_id", series_id), ("kind", kind), ("direction", direction)):
+            if value is not None:
+                clauses.append(f"{column}=?")
+                args.append(value)
+        for column, operator, value in (("as_of", ">=", since), ("as_of", "<=", until),
+                                        ("detected_at", ">=", detected_since)):
+            if value is not None:
+                clauses.append(f"{column}{operator}?")
+                args.append(value)
+        where = " WHERE " + " AND ".join(clauses) if clauses else ""
+        with self._lock:
+            total = self.conn.execute("SELECT count(*) FROM alert_events" + where, args).fetchone()[0]
+            rows = self.conn.execute(
+                "SELECT event_id,payload,detected_at FROM alert_events" + where +
+                " ORDER BY detected_at DESC,event_id LIMIT ? OFFSET ?", [*args, limit, offset],
+            ).fetchall()
+            items = []
+            for event_id, payload, detected_at in rows:
+                item = json.loads(payload)
+                item["detected_at"] = detected_at
+                deliveries = self.conn.execute(
+                    "SELECT channel,state,attempts,sent_at,last_error,retry_at "
+                    "FROM alert_deliveries WHERE event_id=? ORDER BY channel", (event_id,),
+                ).fetchall()
+                item["deliveries"] = [
+                    dict(zip(("channel", "state", "attempts", "sent_at", "last_error", "retry_at"), row))
+                    for row in deliveries
+                ]
+                items.append(item)
+        return {"items": items, "total": total, "limit": limit, "offset": offset}
+
+    def claim_alert_deliveries(self, channels: list[str], now: str, lease_until: str,
+                               limit: int = 100) -> list[dict]:
+        """Lease due work so concurrent runs cannot repeat successful deliveries."""
+        if not channels:
+            return []
+        placeholders = ",".join("?" for _ in channels)
+        with self._lock:
+            self.conn.execute("BEGIN IMMEDIATE")
+            try:
+                rows = self.conn.execute(
+                    "SELECT d.event_id,d.channel,d.attempts,e.payload FROM alert_deliveries d "
+                    "JOIN alert_events e ON e.event_id=d.event_id "
+                    f"WHERE d.channel IN ({placeholders}) "
+                    "AND d.state IN ('pending','error','delivering') AND d.retry_at<=? "
+                    "ORDER BY d.retry_at,d.event_id,d.channel LIMIT ?", [*channels, now, limit],
+                ).fetchall()
+                self.conn.executemany(
+                    "UPDATE alert_deliveries SET state='delivering',attempts=attempts+1,retry_at=? "
+                    "WHERE event_id=? AND channel=?",
+                    [(lease_until, event_id, channel) for event_id, channel, _, _ in rows],
+                )
+                self.conn.commit()
+            except Exception:
+                self.conn.rollback()
+                raise
+        return [
+            {"event": json.loads(payload), "channel": channel, "attempts": attempts + 1}
+            for _, channel, attempts, payload in rows
+        ]
+
+    def cancel_disabled_alert_deliveries(self, config: dict) -> None:
+        """Cancellation is terminal; re-enabling must not replay historical work."""
+        with self._lock:
+            rows = self.conn.execute(
+                "SELECT DISTINCT e.event_id,e.series_id,e.kind FROM alert_events e "
+                "JOIN alert_deliveries d ON d.event_id=e.event_id "
+                "WHERE d.state IN ('pending','error','delivering')",
+            ).fetchall()
+            cancelled = []
+            for event_id, series_id, kind in rows:
+                settings = {**config["defaults"], **config["series"].get(series_id, {})}
+                enabled = settings["enabled"]
+                if kind == "range":
+                    enabled = enabled and settings["range_enabled"]
+                elif kind == "reversal":
+                    enabled = enabled and settings["reversal_enabled"]
+                if not enabled:
+                    cancelled.append((event_id,))
+            self.conn.executemany(
+                "UPDATE alert_deliveries SET state='cancelled',last_error=NULL "
+                "WHERE event_id=? AND state IN ('pending','error','delivering')", cancelled,
+            )
+            self.conn.commit()
+
+    def finish_alert_delivery(self, event_id: str, channel: str, *, now: str,
+                              retry_at: str, error: str | None = None) -> None:
+        with self._lock:
+            self.conn.execute(
+                "UPDATE alert_deliveries SET state=?,retry_at=?,sent_at=?,last_error=? "
+                "WHERE event_id=? AND channel=? AND state='delivering'",
+                ("error" if error else "sent", retry_at, None if error else now,
+                 error, event_id, channel),
+            )
+            self.conn.commit()
 
     def statuses(self) -> list[dict[str, Any]]:
         with self._lock:

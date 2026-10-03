@@ -63,7 +63,7 @@ def register_jobs(
         "refs_history": (cfg.cadences["refs_history"], partial(fetch_refs_history, cfg.refs, store, get_text), start),
         "morpho": (cfg.cadences["morpho"], partial(fetch_morpho, cfg.defi, store, post_json), start),
         "cycle": (cfg.cadences["cycle"], partial(fetch_cycle, cfg.cycle_series, store, fred_api_key, get_text, get_bytes), start),
-        "insights": (cfg.cadences["insights"], partial(refresh_digest, store, cfg), start),
+        "insights": (cfg.cadences["insights"], partial(refresh_digest, store, cfg, smtp_cfg=smtp_cfg), start),
         "newsletter": (cfg.cadences["insights"], partial(deliver_newsletter, store, smtp_cfg), start + timedelta(seconds=5)),
     }
     for name, (seconds, fn, next_run_time) in fetchers.items():

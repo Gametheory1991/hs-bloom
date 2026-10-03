@@ -1,14 +1,19 @@
-"""Read-only JSON API. App factory so tests inject their own store/config."""
+"""JSON API with a token-protected alert threshold update endpoint."""
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+import hmac
+import os
+import threading
+from datetime import date, datetime, timedelta, timezone
 from typing import Literal
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Body, FastAPI, Header, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
 from collector.changes import apply_transform, to_bands
-from collector.config import Config
+from collector.anomalies import effective_config, series_catalog
+from collector.config import Config, validate_alerting_config
+from collector.insights import build_digest
 from collector.panels import build_dashboard
 from collector.store import Store
 
@@ -25,7 +30,10 @@ def _fetcher_healthy(f: dict) -> bool:
 
 def create_app(store: Store, cfg: Config) -> FastAPI:
     app = FastAPI(title="os-bloom collector", docs_url=None, redoc_url=None)
-    app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET"])
+    app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET", "POST"],
+                       allow_headers=["Authorization", "Content-Type"])
+    alert_series_ids = {item.series_id for item in series_catalog(cfg)}
+    config_lock = threading.Lock()
     series_by_id = {s.id: s for s in cfg.series}
     cycle_by_id = {s.id: s for s in cfg.cycle_series}
     index_names = {i.symbol: i.name for i in cfg.indexes}
@@ -40,6 +48,8 @@ def create_app(store: Store, cfg: Config) -> FastAPI:
         ref_labels[p.underlying_id] = p.underlying_label
     for f in cfg.refs.funding:
         ref_labels[f.id] = f.label
+    for chart in cfg.refs.llama_chart:
+        ref_labels.setdefault(chart.series, chart.series)
 
     @app.get("/api/dashboard")
     def dashboard() -> dict:
@@ -92,6 +102,60 @@ def create_app(store: Store, cfg: Config) -> FastAPI:
             cycle_series=cfg.cycle_series,
             cycle_tabs=cfg.cycle_tabs,
         )["panels"]["insights"]
+
+    @app.get("/api/anomalies")
+    def anomalies(
+        series_id: str | None = Query(default=None, max_length=120),
+        kind: Literal["anomaly", "range", "reversal"] | None = None,
+        direction: Literal["up", "down"] | None = None,
+        since: date | None = None,
+        until: date | None = None,
+        limit: int = Query(default=50, ge=1, le=200),
+        offset: int = Query(default=0, ge=0, le=10000),
+    ) -> dict:
+        if series_id is not None and series_id not in alert_series_ids:
+            raise HTTPException(status_code=404, detail="unknown series")
+        if since is not None and until is not None and since > until:
+            raise HTTPException(status_code=422, detail="since must not exceed until")
+        return store.alerts(series_id=series_id, kind=kind, direction=direction,
+                            since=since.isoformat() if since else None,
+                            until=until.isoformat() if until else None, limit=limit, offset=offset)
+
+    @app.get("/api/alerts/config")
+    def alert_config() -> dict:
+        return effective_config(store, cfg)
+
+    @app.post("/api/alerts/config")
+    def update_alert_config(payload: dict = Body(...),
+                            authorization: str | None = Header(default=None)) -> dict:
+        token = os.environ.get("ALERT_CONFIG_TOKEN", "")
+        if not token:
+            raise HTTPException(status_code=503, detail="alert configuration updates are disabled")
+        supplied = authorization[7:] if authorization and authorization.startswith("Bearer ") else ""
+        if not hmac.compare_digest(supplied.encode("utf-8"), token.encode("utf-8")):
+            raise HTTPException(status_code=401, detail="invalid bearer token",
+                                headers={"WWW-Authenticate": "Bearer"})
+        with config_lock:
+            try:
+                config = validate_alerting_config(payload, alert_series_ids, effective_config(store, cfg))
+            except ValueError as exc:
+                raise HTTPException(status_code=422, detail=str(exc)) from None
+            store.put_doc("alerting_config", config, source="api")
+            store.cancel_disabled_alert_deliveries(config)
+            store.put_doc("insights", build_digest(store, cfg), source="local-analysis")
+        return config
+
+    @app.get("/api/digest")
+    def digest() -> dict:
+        now = datetime.now(timezone.utc)
+        result = build_digest(store, cfg, now=now)
+        daily = store.alerts(detected_since=now.replace(hour=0, minute=0, second=0, microsecond=0)
+                             .isoformat().replace("+00:00", "Z"), limit=200)
+        result["daily_summary"] = {
+            "date": now.date().isoformat(), "timezone": "UTC",
+            "event_count": daily["total"], "events": daily["items"],
+        }
+        return result
 
     @app.get("/healthz")
     def healthz() -> dict:
