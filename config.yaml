@@ -326,7 +326,7 @@ tic:                 # TIC Table 5 (slt_table5.txt), monthly, values in $bn; Gra
   countries: [Japan, United Kingdom, "China, Mainland", Belgium, "Cayman Islands", Luxembourg, Canada, Ireland, France, Taiwan]
 
 thirteenf:           # SEC EDGAR 13F-HR; quarterly filings (<=45d lag); UA is mandatory — set a real contact before deploy
-  user_agent: "os-bloom/1.0 contact admin@example.com"
+  user_agent: "os-bloom/1.0 contact harrysugamakc@gmail.com"
   watchlist:
     - { name: "Berkshire Hathaway",      cik: "0001067983" }
     - { name: "Bridgewater Associates",  cik: "0001350694" }
