@@ -26,6 +26,8 @@ cadences:          # seconds between fetcher runs
   xcorr: 86400      # correlation + realized-vol compute job; daily (no external HTTP)
   movers: 604800    # single-stock sigma movers; ~600 Yahoo requests, weekly Saturday
   voldash: 86400    # vol dashboard compute; daily (no external HTTP)
+  home_radar: 86400 # market radar compute; daily (no external HTTP)
+  hyperscaler: 604800 # hyperscaler desk; weekly (6 SEC submissions + 424B2 fetches)
 
 indexes:           # all served by yahoo
   - { symbol: SPX,  name: "S&P 500",       yahoo: "^GSPC" }
@@ -231,6 +233,14 @@ cycle_series:      # market-cycle series (spec 2026-08-24); exactly one source k
   - { id: oi-ust-5y,  name: "5Y T-Note futures OI",   unit: contracts, cftc_oi: "044601" }
   - { id: oi-ust-10y, name: "10Y T-Note futures OI",  unit: contracts, cftc_oi: "043602" }
   - { id: oi-ust-30y, name: "30Y T-Bond futures OI",  unit: contracts, cftc_oi: "020601" }
+
+  # ---- batch 5: hyperscaler equities (Yahoo single-symbol; feed the HYPER tab cards) ----
+  - { id: googl, name: "GOOGL (Alphabet)",  unit: px, yahoo: GOOGL }
+  - { id: amzn,  name: "AMZN (Amazon)",     unit: px, yahoo: AMZN }
+  - { id: meta,  name: "META (Meta)",       unit: px, yahoo: META }
+  - { id: orcl,  name: "ORCL (Oracle)",     unit: px, yahoo: ORCL }
+  - { id: msft,  name: "MSFT (Microsoft)",  unit: px, yahoo: MSFT }
+  - { id: aapl,  name: "AAPL (Apple)",      unit: px, yahoo: AAPL }
 
 cycle_tabs:        # layout only; rows reference cycle_series ids
   - id: risk
