@@ -160,6 +160,20 @@ async def deliver_newsletter(store: Store, cfg: SmtpCfg) -> str:
         return "smtp-waiting"
     digest = insights.payload
     digest_id = digest.get("digest_id")
+    coverage = digest.get("newsletter", {}).get("coverage", {})
+    if isinstance(coverage, dict) and coverage.get("active_series") == 0:
+        store.put_doc(
+            "newsletter_status",
+            _status_payload(
+                cfg,
+                state="waiting_for_data",
+                last_digest_id=prev.get("last_digest_id"),
+                last_sent_at=prev.get("last_sent_at"),
+                last_error=None,
+            ),
+            source="smtp",
+        )
+        return "smtp-waiting-data"
     today = datetime.now(timezone.utc).date()
     try:
         last_sent = datetime.fromisoformat(prev.get("last_sent_at", "").replace("Z", "+00:00"))

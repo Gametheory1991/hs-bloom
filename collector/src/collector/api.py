@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import hmac
 import os
-import threading
 from datetime import date, datetime, timedelta, timezone
 from typing import Literal
 
@@ -33,7 +32,6 @@ def create_app(store: Store, cfg: Config) -> FastAPI:
     app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET", "POST"],
                        allow_headers=["Authorization", "Content-Type"])
     alert_series_ids = {item.series_id for item in series_catalog(cfg)}
-    config_lock = threading.Lock()
     series_by_id = {s.id: s for s in cfg.series}
     cycle_by_id = {s.id: s for s in cfg.cycle_series}
     index_names = {i.symbol: i.name for i in cfg.indexes}
@@ -135,7 +133,7 @@ def create_app(store: Store, cfg: Config) -> FastAPI:
         if not hmac.compare_digest(supplied.encode("utf-8"), token.encode("utf-8")):
             raise HTTPException(status_code=401, detail="invalid bearer token",
                                 headers={"WWW-Authenticate": "Bearer"})
-        with config_lock:
+        with store.alert_lock:
             try:
                 config = validate_alerting_config(payload, alert_series_ids, effective_config(store, cfg))
             except ValueError as exc:

@@ -7,7 +7,8 @@ import os
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlsplit
 
-from collector.anomalies import thresholds
+from collector.anomalies import detect_anomalies, effective_config, thresholds
+from collector.config import Config, validate_alerting_config
 from collector.http import PostJson, post_webhook
 from collector.newsletter import SmtpCfg, _send, load_smtp_cfg
 from collector.store import Store
@@ -32,31 +33,53 @@ def _webhook_url() -> str:
 
 async def process_alerts(store: Store, events: list[dict], smtp_cfg: SmtpCfg | None = None,
                          post_json: PostJson | None = None, now: datetime | None = None,
-                         config: dict | None = None) -> None:
+                         config: dict | None = None, cfg: Config | None = None) -> None:
     now = now or datetime.now(timezone.utc)
     smtp_cfg = smtp_cfg or load_smtp_cfg()
     webhook = _webhook_url()
     email_enabled = os.environ.get("ALERT_EMAIL_ENABLED", "1").strip().lower() in {"1", "true"}
     channels = (["smtp"] if smtp_cfg.enabled and email_enabled else []) + (["webhook"] if webhook else [])
-    for row in events:
-        if config is not None:
-            settings = thresholds(config, row["series_id"])
-            if (not settings["enabled"]
-                    or row["kind"] == "range" and not settings["range_enabled"]
-                    or row["kind"] == "reversal" and not settings["reversal_enabled"]):
-                continue
-        # Threshold changes, revisions and restarts do not resend the same
-        # series/date/type/direction event. Only latest readings are examined.
-        key = [row["store_id"], row["as_of"], row["kind"], row["direction"]]
-        event = {**row, "event_id": hashlib.sha256("|".join(key).encode()).hexdigest()[:32]}
-        store.record_alert(event, channels, _iso(now))
+    with store.alert_lock:
+        if cfg is not None:
+            from collector.insights import build_digest
 
-    if config is not None:
-        store.cancel_disabled_alert_deliveries(config)
-    deliveries = store.claim_alert_deliveries(channels, _iso(now), _iso(now + timedelta(minutes=10)))
+            config = effective_config(store, cfg)
+            events = detect_anomalies(store, cfg, config)
+            store.put_doc("insights", build_digest(store, cfg, config=config, anomalies=events),
+                          source="local-analysis")
+        else:
+            saved = store.doc("alerting_config")
+            if saved is not None:
+                raw = saved.payload
+                ids = {event["series_id"] for event in events}
+                if isinstance(raw, dict) and isinstance(raw.get("series"), dict):
+                    ids.update(raw["series"])
+                try:
+                    config = validate_alerting_config(raw, ids)
+                except (ValueError, TypeError):
+                    pass
+        for row in events:
+            if config is not None:
+                settings = thresholds(config, row["series_id"])
+                if (not settings["enabled"]
+                        or row["kind"] == "range" and not settings["range_enabled"]
+                        or row["kind"] == "reversal" and not settings["reversal_enabled"]):
+                    continue
+            # Threshold changes, revisions and restarts do not resend the same
+            # series/date/type/direction event. Only latest readings are examined.
+            key = [row["store_id"], row["as_of"], row["kind"], row["direction"]]
+            event = {**row, "event_id": hashlib.sha256("|".join(key).encode()).hexdigest()[:32]}
+            store.record_alert(event, channels, _iso(now))
+
+        if config is not None:
+            store.cancel_disabled_alert_deliveries(config)
+        deliveries = store.claim_alert_deliveries(channels, _iso(now), _iso(now + timedelta(minutes=10)))
 
     async def deliver(delivery: dict) -> None:
         event, channel = delivery["event"], delivery["channel"]
+        with store.alert_lock:
+            if not store.alert_delivery_active(event["event_id"], channel):
+                return
         error = None
         try:
             if channel == "smtp":

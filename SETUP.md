@@ -82,6 +82,8 @@ Set `ALERT_EMAIL_ENABLED=0` for newsletter-only email, or
 require `SMTP_ENABLED=1`. These flags do not disable webhook delivery.
 Newsletter delivery is attempted after insights refreshes, not at a fixed
 wall-clock hour; failed attempts are retried on later scheduled runs.
+At startup it waits for populated time-series data rather than sending an
+empty digest that would consume the day's newsletter (`waiting_for_data` state).
 The dashboard's newsletter delivery state is also available at `/api/insights`.
 
 For a webhook, set `ALERT_WEBHOOK_URL` to an HTTP(S) endpoint you control
@@ -102,6 +104,8 @@ deliveries without deleting event history; re-enabling does not replay cancelled
 events. Already in-flight sends may finish. An interrupted send can be retried; receivers
 should honor `Idempotency-Key` to avoid duplicates. Email cannot guarantee
 exactly-once delivery after a process crash.
+Enabling a notification channel can deliver currently active latest-reading
+signals and resume unsent work; it does not rescan every historical data point.
 
 After editing `.env`, recreate the collector:
 `docker compose up -d --force-recreate collector`.

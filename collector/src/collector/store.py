@@ -71,6 +71,7 @@ class Store:
     def __init__(self, path: str | Path):
         self.conn = sqlite3.connect(str(path), check_same_thread=False)
         self._lock = threading.Lock()
+        self.alert_lock = threading.RLock()
         self.conn.executescript(SCHEMA)
 
     def upsert_points(self, series_id: str, points: Iterable[tuple[date, float]]) -> None:
@@ -267,6 +268,14 @@ class Store:
                  error, event_id, channel),
             )
             self.conn.commit()
+
+    def alert_delivery_active(self, event_id: str, channel: str) -> bool:
+        with self._lock:
+            row = self.conn.execute(
+                "SELECT state FROM alert_deliveries WHERE event_id=? AND channel=?",
+                (event_id, channel),
+            ).fetchone()
+        return row is not None and row[0] == "delivering"
 
     def statuses(self) -> list[dict[str, Any]]:
         with self._lock:

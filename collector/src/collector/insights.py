@@ -44,10 +44,11 @@ def _coverage(store: Store, tracked_series: int, active_series: int) -> dict:
     }
 
 
-def build_digest(store: Store, cfg: Config, now: datetime | None = None) -> dict:
+def build_digest(store: Store, cfg: Config, now: datetime | None = None, *,
+                 config: dict | None = None, anomalies: list[dict] | None = None) -> dict:
     now = now or datetime.now(timezone.utc)
-    config = effective_config(store, cfg)
-    anomalies = detect_anomalies(store, cfg, config)
+    config = config if config is not None else effective_config(store, cfg)
+    anomalies = anomalies if anomalies is not None else detect_anomalies(store, cfg, config)
     trends = []
     active_series = 0
     for item in _series_catalog(cfg):
@@ -125,8 +126,5 @@ def build_digest(store: Store, cfg: Config, now: datetime | None = None) -> dict
 async def refresh_digest(store: Store, cfg: Config, smtp_cfg=None) -> str:
     from collector.alerts import process_alerts
 
-    digest = build_digest(store, cfg)
-    store.put_doc("insights", digest, source="local-analysis")
-    config = effective_config(store, cfg)
-    await process_alerts(store, detect_anomalies(store, cfg, config), smtp_cfg=smtp_cfg, config=config)
+    await process_alerts(store, [], smtp_cfg=smtp_cfg, cfg=cfg)
     return "local-analysis"

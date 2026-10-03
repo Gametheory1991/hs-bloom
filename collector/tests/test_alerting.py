@@ -1,3 +1,6 @@
+import asyncio
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
@@ -189,6 +192,115 @@ def test_config_api_rejects_huge_integer_without_persisting(cfg, store, monkeypa
     assert response.json()["detail"] == "z_threshold must be finite and bounded"
     assert store.doc("alerting_config") is None
     assert client.get("/api/alerts/config").json() == original
+
+
+def test_scheduled_refresh_and_config_post_share_the_synchronous_phase_lock(cfg, store, monkeypatch):
+    seed(store)
+    monkeypatch.delenv("ALERT_WEBHOOK_URL", raising=False)
+    monkeypatch.setenv("ALERT_CONFIG_TOKEN", "unit-test-only")
+    client = TestClient(create_app(store, cfg))
+    headers = {"Authorization": "Bearer " + "unit-test-only"}
+    snapshot_entered = threading.Event()
+    finish_snapshot = threading.Event()
+    post_attempted_lock = threading.Event()
+    post_was_blocked = []
+    real_lock = store.alert_lock
+
+    class ObservedLock:
+        def __enter__(self):
+            if snapshot_entered.is_set() and not finish_snapshot.is_set():
+                acquired = real_lock.acquire(blocking=False)
+                post_was_blocked.append(not acquired)
+                post_attempted_lock.set()
+                if not acquired:
+                    real_lock.acquire()
+            else:
+                real_lock.acquire()
+            return self
+
+        def __exit__(self, *args):
+            real_lock.release()
+
+    store.alert_lock = ObservedLock()
+    original_build = build_digest
+
+    def paused_build(*args, **kwargs):
+        snapshot_entered.set()
+        assert finish_snapshot.wait(10)
+        return original_build(*args, **kwargs)
+
+    monkeypatch.setattr("collector.insights.build_digest", paused_build)
+    with ThreadPoolExecutor(max_workers=2) as workers:
+        refresh = workers.submit(lambda: asyncio.run(refresh_digest(store, cfg, smtp_cfg=smtp(False))))
+        update = None
+        try:
+            assert snapshot_entered.wait(5)
+            update = workers.submit(
+                lambda: client.post("/api/alerts/config", headers=headers,
+                                    json={"series": {"SPX": {"enabled": False}}}),
+            )
+            assert post_attempted_lock.wait(5)
+            assert post_was_blocked == [True]
+            assert not update.done()
+        finally:
+            finish_snapshot.set()
+        refresh.result(timeout=5)
+        assert update.result(timeout=5).status_code == 200
+    assert client.get("/api/alerts/config").json()["series"]["SPX"]["enabled"] is False
+    assert client.get("/api/insights").json()["alerts"] == []
+    assert store.alerts()["total"] == 2
+
+
+@pytest.mark.asyncio
+async def test_direct_processing_rereads_persisted_config_before_enqueuing(cfg, store, monkeypatch):
+    seed(store)
+    monkeypatch.delenv("ALERT_WEBHOOK_URL", raising=False)
+    monkeypatch.setenv("ALERT_CONFIG_TOKEN", "unit-test-only")
+    stale_events = detect_anomalies(store, cfg)
+    stale_config = effective_config(store, cfg)
+    client = TestClient(create_app(store, cfg))
+    response = client.post(
+        "/api/alerts/config", headers={"Authorization": "Bearer " + "unit-test-only"},
+        json={"series": {"SPX": {"enabled": False}}},
+    )
+    assert response.status_code == 200
+    await process_alerts(store, stale_events, smtp(False), config=stale_config)
+    assert store.alerts()["total"] == 0
+    assert client.get("/api/insights").json()["alerts"] == []
+
+
+def test_configuration_can_update_while_notification_network_is_awaited(cfg, store, monkeypatch):
+    seed(store)
+    monkeypatch.setenv("ALERT_WEBHOOK_URL", "https://webhook.example.test")
+    monkeypatch.setenv("ALERT_CONFIG_TOKEN", "unit-test-only")
+    client = TestClient(create_app(store, cfg))
+    network_started = threading.Event()
+    finish_network = threading.Event()
+
+    async def blocked_webhook(*args, **kwargs):
+        network_started.set()
+        assert await asyncio.to_thread(finish_network.wait, 10)
+        return {}
+
+    with ThreadPoolExecutor(max_workers=2) as workers:
+        processing = workers.submit(
+            lambda: asyncio.run(process_alerts(store, [], smtp(False), blocked_webhook, now=NOW, cfg=cfg)),
+        )
+        try:
+            assert network_started.wait(5)
+            update = workers.submit(
+                lambda: client.post(
+                    "/api/alerts/config", headers={"Authorization": "Bearer " + "unit-test-only"},
+                    json={"series": {"SPX": {"enabled": False}}},
+                ),
+            )
+            assert update.result(timeout=5).status_code == 200
+        finally:
+            finish_network.set()
+        processing.result(timeout=5)
+    assert client.get("/api/insights").json()["alerts"] == []
+    assert all(delivery["state"] == "cancelled"
+               for event in store.alerts()["items"] for delivery in event["deliveries"])
 
 
 @pytest.mark.asyncio
