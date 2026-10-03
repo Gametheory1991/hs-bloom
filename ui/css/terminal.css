@@ -204,3 +204,30 @@ path.map-country:hover { stroke: var(--amber); stroke-width: 1.6; }
   padding: 6px 12px; font: inherit; cursor: pointer;
 }
 .chat-form button:hover { border-color: var(--amber); }
+
+/* X-CORR tab */
+.panel-subhead {
+  display: flex; justify-content: space-between; align-items: center;
+  color: var(--amber); font-size: 11px; letter-spacing: 2px;
+  padding: 10px 0 4px; border-bottom: 1px solid var(--line); margin-bottom: 4px;
+}
+.seg button {
+  background: transparent; color: var(--muted); border: 1px solid var(--line);
+  font: inherit; font-size: 10px; padding: 2px 8px; cursor: pointer;
+}
+.seg button:first-child { border-radius: 3px 0 0 3px; }
+.seg button:last-child { border-radius: 0 3px 3px 0; }
+.seg button.on { color: var(--amber); border-color: var(--amber); }
+.kv {
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 8px; padding: 4px 0; border-bottom: 1px dotted var(--line); font-size: 12px;
+}
+.badge {
+  font-size: 9px; letter-spacing: 1px; padding: 1px 5px; border-radius: 3px;
+  border: 1px solid var(--amber); color: var(--amber); vertical-align: 1px;
+}
+.badge.warn { border-color: var(--down); color: var(--down); }
+.pctbar {
+  width: 72px; height: 5px; background: var(--line); border-radius: 3px; flex: none;
+}
+.pctbar div { height: 100%; background: var(--amber); border-radius: 3px; }
