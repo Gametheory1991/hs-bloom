@@ -1,5 +1,5 @@
-// X-CORR tab: cross-asset correlation heatmap, regime pairs, realized vol,
-// and the GSE/MBS plumbing read-out.
+// X-CORR tab: cross-asset correlation heatmap (CBOE-style triangular matrix),
+// regime pairs + time series, realized vol, and the GSE/MBS plumbing read-out.
 // Data: /api/dashboard "xcorr" + "gse" panels. Vanilla JS + inline SVG,
 // no new libraries. Mobile-first: the matrix scrolls horizontally.
 import { fmtAge, fmtUsd } from "../fmt.js";
@@ -26,7 +26,48 @@ function corrColor(v) {
 
 const fmtCorr = (v) => (v == null ? "—" : (v > 0 ? "+" : "") + v.toFixed(2));
 
+// Triangular CBOE-style matrix: lower triangle only, group headers, cells
+// with |corr| >= 80% highlighted (CBOE's red tint).
+function triHeatmap(labels, matrix, groups) {
+  const n = labels.length;
+  if (!n) return `<div class="muted">No correlation data yet — the xcorr job runs daily after the data jobs.</div>`;
+  const cell = 34, padL = 78, padT = 20;
+  const W = padL + n * cell, H = padT + n * cell;
+  const grpColor = (g) => ({
+    "Equities": "#4f9cf0", "Corporate Credit": "#e3b008", "Rates": "#b07fe8",
+    "Commodities": "#e07b39", "Foreign Exchange": "#2fb56b",
+  }[g] || "#9aa4b2");
+  let s = `<div style="overflow-x:auto"><svg viewBox="0 0 ${W} ${H}" width="${W}" style="max-width:none;display:block" role="img" aria-label="correlation matrix">`;
+  // group headers across the top
+  (groups || []).forEach(([g, a, b]) => {
+    const x0 = padL + a * cell, x1 = padL + b * cell;
+    s += `<text x="${(x0 + x1) / 2}" y="10" text-anchor="middle" font-size="9" fill="${grpColor(g)}" letter-spacing="1">${esc(g).toUpperCase()}</text>`;
+  });
+  labels.forEach((lab, i) => {
+    const y = padT + i * cell + cell / 2;
+    s += `<text x="${padL - 6}" y="${y + 4}" text-anchor="end" font-size="10" fill="#9aa4b2">${esc(lab)}</text>`;
+  });
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j <= i; j++) {
+      if (i === j) continue; // skip the 1.0 diagonal, like CBOE
+      const v = matrix[i] ? matrix[i][j] : null;
+      const x = padL + j * cell, y = padT + i * cell;
+      const hot = v != null && Math.abs(v) >= 0.8;
+      const fill = hot ? (v > 0 ? "#7a2e35" : "#7a2e35") : corrColor(v);
+      const pct = v == null ? "" : `${Math.round(v * 100)}%`;
+      s += `<rect x="${x + 1}" y="${y + 1}" width="${cell - 2}" height="${cell - 2}" rx="2" fill="${fill}">` +
+        `<title>${esc(labels[i])} vs ${esc(labels[j])}: ${fmtCorr(v)}</title></rect>`;
+      if (v != null)
+        s += `<text x="${x + cell / 2}" y="${y + cell / 2 + 4}" text-anchor="middle" font-size="10" fill="${hot ? "#ffb3b8" : "#c7cfd8"}">${pct}</text>`;
+    }
+  }
+  s += `</svg></div>
+    <div class="muted" style="margin-top:4px">1M Pearson on daily changes, pairwise-complete. ≥80% highlighted. Tap/hold a cell for the value.</div>`;
+  return s;
+}
+
 function heatmap(labels, matrix) {
+  // legacy full-square fallback (kept for the 252d window)
   const n = labels.length;
   if (!n) return `<div class="muted">No correlation data yet — the xcorr job runs daily after the data jobs.</div>`;
   const cell = 30, pad = 92;
@@ -57,15 +98,46 @@ let win = "60d";
 function matrixSection(x) {
   const m = win === "60d" ? x.matrix_60d : x.matrix_252d;
   const nobs = win === "60d" ? x.n_obs_60d : x.n_obs_252d;
+  const body = win === "60d"
+    ? triHeatmap(x.labels || [], m || [], x.groups || [])
+    : heatmap(x.labels || [], m || []);
   return `
     <div class="panel-subhead">
-      <span>CORRELATION MATRIX</span>
+      <span>CROSS-ASSET CORRELATION MATRIX <span class="muted">1M</span></span>
       <span class="seg">
         <button data-win="60d" class="${win === "60d" ? "on" : ""}">60D</button><button data-win="252d" class="${win === "252d" ? "on" : ""}">1Y</button>
       </span>
     </div>
-    ${heatmap(x.labels || [], m || [])}
+    ${body}
     <div class="muted">window ${win === "60d" ? "60" : "252"} trading days · ${nobs || 0} obs/pair max · as of ${esc(x.asof || "—")}</div>`;
+}
+
+// CBOE-style pair time series: trailing 1y of the 60d rolling correlation
+// for the first six (digest) pairs.
+function pairCharts(x) {
+  const hist = x.pair_hist || {};
+  const pairs = (x.pairs || []).slice(0, 6);
+  const charts = pairs.map((p) => {
+    const h = hist[p.id] || [];
+    if (h.length < 20) return "";
+    const W = 340, H = 120, padL = 34, padB = 16, padT = 6;
+    const t0 = Date.parse(h[0][0]), t1 = Date.parse(h[h.length - 1][0]);
+    const X = (iso) => padL + ((Date.parse(iso) - t0) / Math.max(1, t1 - t0)) * (W - padL - 8);
+    const Y = (v) => padT + (1 - (v + 1) / 2) * (H - padT - padB);
+    const d = h.map((pt, i) => `${i ? "L" : "M"}${X(pt[0]).toFixed(1)},${Y(pt[1]).toFixed(1)}`).join(" ");
+    const last = h[h.length - 1][1];
+    return `<div style="margin-bottom:8px">
+      <div class="muted" style="margin-bottom:2px">${esc(p.label)} <span class="muted">${esc(p.a)} vs ${esc(p.b)}</span> <b style="color:${Math.abs(last) >= 0.7 ? "#e05252" : "#c7cfd8"}">${(last > 0 ? "+" : "") + Math.round(last * 100)}%</b></div>
+      <svg viewBox="0 0 ${W} ${H}" width="${W}" style="max-width:100%;display:block" role="img">
+        <line x1="${padL}" y1="${Y(0)}" x2="${W - 8}" y2="${Y(0)}" stroke="#3a4450" stroke-width="1"/>
+        <text x="${padL - 4}" y="${Y(1) + 3}" text-anchor="end" font-size="8" fill="#5a6572">100%</text>
+        <text x="${padL - 4}" y="${Y(0) + 3}" text-anchor="end" font-size="8" fill="#5a6572">0</text>
+        <text x="${padL - 4}" y="${Y(-1) + 3}" text-anchor="end" font-size="8" fill="#5a6572">-100%</text>
+        <path d="${d}" fill="none" stroke="#4f9cf0" stroke-width="1.5"/>
+      </svg></div>`;
+  }).join("");
+  if (!charts) return "";
+  return `<div class="panel-subhead"><span>CROSS-ASSET CORRELATION ANALYSIS <span class="muted">60d rolling, 1Y</span></span></div>${charts}`;
 }
 
 function pairsSection(x) {
@@ -113,7 +185,7 @@ export function renderXcorr(xcorr, gse) {
   const body = document.querySelector("#panel-xcorr .panel-body");
   if (!body) return;
   body.innerHTML =
-    matrixSection(x) + pairsSection(x) + rvolSection(x) + gseSection(gse || {});
+    matrixSection(x) + pairCharts(x) + pairsSection(x) + rvolSection(x) + gseSection(gse || {});
   body.querySelectorAll("[data-win]").forEach((b) =>
     b.addEventListener("click", () => {
       win = b.dataset.win;
