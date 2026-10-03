@@ -128,3 +128,38 @@ async def test_fetch_cycle_valid_range_drops_corrupt_points(tmp_path):
                              valid_range=[4.13, 4.2])]
     await fetch_cycle(narrow, store, "k", get_text, get_bytes)
     assert list(store.points("cycle:vixn").values()) == [4.15]  # 4.12 dropped
+
+
+async def test_fetch_cycle_retries_yahoo_on_429(tmp_path):
+    """A 429 on a Yahoo series is retried once after a backoff, not recorded."""
+    import asyncio
+
+    store = Store(tmp_path / "t.db")
+    series = [
+        CycleSeriesCfg(id="spx", name="SPX", unit="idx", yahoo="^GSPC"),
+    ]
+    calls = {"n": 0}
+
+    async def get_text(url, params=None, headers=None):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise RuntimeError("HTTP 429 for https://query1.finance.yahoo.com/v8/finance/chart/%5EGSPC")
+        return YAHOO
+
+    async def get_bytes(url, params=None, headers=None):
+        raise AssertionError("unused")
+
+    sleeps = []
+    orig_sleep = asyncio.sleep
+
+    async def fake_sleep(s):
+        sleeps.append(s)
+
+    asyncio.sleep = fake_sleep
+    try:
+        assert await fetch_cycle(series, store, "k", get_text, get_bytes) == "cycle"
+    finally:
+        asyncio.sleep = orig_sleep
+    assert calls["n"] == 2  # one retry happened
+    assert 15 in sleeps  # backoff was taken
+    assert store.points("cycle:spx") != {}
