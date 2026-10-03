@@ -320,15 +320,69 @@ def _radar_panel(store: Store) -> dict:
 
 
 def _hyper_panel(store: Store) -> dict:
-    """Hyperscaler desk: debt issuance + equity cards."""
+    """Hyperscaler desk: debt issuance + equity cards, with FINRA short
+    interest merged onto each card by ticker (batch 6)."""
     doc = store.doc("hyper")
     if doc is None:
         return {"as_of": None, "issuances": [], "equities": [],
                 "note": None, "updated_at": None, "source": None}
     p = doc.payload
+    equities = p.get("equities", [])
+    short_doc = store.doc("finra_short")
+    short_by_ticker = ((short_doc.payload.get("tickers") or {})
+                       if short_doc else {})
+    for e in equities:
+        e["short"] = short_by_ticker.get(e.get("ticker"))  # None until run
     return {"as_of": p.get("as_of"), "issuances": p.get("issuances", []),
-            "equities": p.get("equities", []), "note": p.get("note"),
+            "equities": equities, "note": p.get("note"),
+            "short_as_of": (short_doc.payload.get("as_of")
+                            if short_doc else None),
             "updated_at": doc.updated_at, "source": doc.source}
+
+
+def _universe_panel(store: Store, universe_id: str) -> dict:
+    """Universe coverage-map panel (generic, batch 7/8).
+
+    Doc key is <universe_id>_graph (generic coverage-map schema:
+    verticals -> companies, edges, aggregates, risk_notes).
+    batch 7: ai_flow <- ai_buildout; batch 8: ms_flow <- market_structure.
+    """
+    doc = store.doc(f"{universe_id}_graph")
+    if doc is None:
+        return {"as_of": None, "universe_id": universe_id, "verticals": [],
+                "edges": [], "rollups": {}, "capex_stack": {},
+                "risk_notes": [], "aggregates": {},
+                "updated_at": None, "source": None}
+    p = doc.payload
+    return {"as_of": p.get("as_of"), "universe_id": p.get("universe_id"),
+            "verticals": p.get("verticals", []), "edges": p.get("edges", []),
+            "rollups": p.get("rollups", {}),
+            "capex_stack": p.get("capex_stack", {}),
+            "risk_notes": p.get("risk_notes", []),
+            "aggregates": p.get("aggregates", {}),
+            "capex_overlay": p.get("capex_overlay"),
+            "_schema_note": p.get("_schema_note"),
+            "updated_at": doc.updated_at, "source": doc.source}
+
+
+# Back-compat alias (batch 7 callers).
+def _ai_flow_panel(store: Store) -> dict:
+    return _universe_panel(store, "ai_buildout")
+
+
+def _tsv_panel(store: Store) -> dict:
+    """Tokenized Securities Venue watch: universe graph + regulatory scan.
+
+    Generic coverage-map graph doc (tokenized_securities_graph) plus the
+    weekly tsv_watch regulatory scan under the "watch" key.
+    """
+    base = _universe_panel(store, "tokenized_securities")
+    watch_doc = store.doc("tsv_watch")
+    base["watch"] = watch_doc.payload if watch_doc else None
+    base["watch_updated_at"] = watch_doc.updated_at if watch_doc else None
+    graph_doc = store.doc("tokenized_securities_graph")
+    base["order"] = (graph_doc.payload.get("order") if graph_doc else None) or {}
+    return base
 
 
 def build_dashboard(
@@ -363,5 +417,8 @@ def build_dashboard(
             "voldash": _voldash_panel(store),
             "radar": _radar_panel(store),
             "hyper": _hyper_panel(store),
+            "ai_flow": _universe_panel(store, "ai_buildout"),
+            "ms_flow": _universe_panel(store, "market_structure"),
+            "tsv": _tsv_panel(store),
         },
     }

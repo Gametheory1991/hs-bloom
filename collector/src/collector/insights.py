@@ -236,6 +236,91 @@ def _movers_note(store: Store) -> dict | None:
     return out
 
 
+def _ms_universe_note(store: Store) -> dict | None:
+    """Market-structure universe (batch 8): negative-FCF names, latest
+    money-center-bank and exchange revenue quarters, deal rollup. All from
+    the market_structure_graph doc. Name is ms_universe_* to avoid the
+    batch-6 _market_structure_note (FINRA/TRACE data) naming collision."""
+    doc = store.doc("market_structure_graph")
+    if doc is None:
+        return None
+    p = doc.payload
+    rollups = p.get("rollups") or {}
+    neg = rollups.get("nodes_cashflow_negative") or []
+    stack = p.get("capex_stack") or {}
+    banks = stack.get("__agg__MSB6") or []
+    exchs = stack.get("__agg__EXCH4") or []
+    def last_q(agg):
+        return f"${agg[-1][1] / 1e9:.1f}B ({agg[-1][0][:7]})" if agg else None
+    return {
+        "asof": p.get("as_of"),
+        "neg_fcf": neg,
+        "banks_last_q": last_q(banks),
+        "exch_last_q": last_q(exchs),
+        "total_reported_bn": rollups.get("total_reported_bn"),
+        "node_count": rollups.get("node_count"),
+    }
+
+
+def _ai_infra_note(store: Store) -> dict | None:
+    """AI infra: negative-FCF names, latest Big-6 capex quarter, deal rollup.
+    All from the ai_buildout_graph doc (vendored press-reported universe +
+    live XBRL overlay)."""
+    doc = store.doc("ai_buildout_graph")
+    if doc is None:
+        return None
+    p = doc.payload
+    rollups = p.get("rollups") or {}
+    neg = rollups.get("nodes_cashflow_negative") or []
+    stack = p.get("capex_stack") or {}
+    agg = stack.get("__agg__HYPER6") or []
+    last_q = f"${agg[-1][1] / 1e9:.0f}B ({agg[-1][0][:7]})" if agg else None
+    return {
+        "asof": p.get("as_of"),
+        "neg_fcf": neg,
+        "hyper6_last_q": last_q,
+        "total_reported_bn": rollups.get("total_reported_bn"),
+        "node_count": rollups.get("node_count"),
+    }
+
+
+def _market_structure_note(store: Store) -> dict | None:
+    """Market structure (batch 6): FINRA margin debt, TRACE Treasury par,
+    TRACE corporate par, total short interest. Latest values only."""
+    def latest(key: str):
+        pts = store.points(key)
+        if not pts:
+            return None
+        d = max(pts)
+        return d, pts[d]
+
+    margin = latest("cycle:finra-margin-debit")
+    ust = latest("cycle:trace-ust-par")
+    corp = latest("cycle:trace-corp-par")
+    short = latest("cycle:finra-short-total")
+    if not any((margin, ust, corp, short)):
+        return None
+    return {"margin": margin, "ust_par": ust, "corp_par": corp, "short": short}
+
+
+def _struct_bullet(note: dict) -> str:
+    """One-line market-structure read-out for the digest."""
+    bits = []
+    if note.get("margin"):
+        d, v = note["margin"]
+        bits.append(f"margin debt ${v / 1e6:.2f}T ({d:%Y-%m})")
+    if note.get("ust_par"):
+        d, v = note["ust_par"]
+        bits.append(f"Treasury TRACE ${v:,.0f}B/d ({d:%m-%d})")
+    if note.get("corp_par"):
+        d, v = note["corp_par"]
+        bits.append(f"corp TRACE ${v / 1e6:.2f}T/mo ({d:%Y-%m})")
+    if note.get("short"):
+        d, v = note["short"]
+        bits.append(f"short interest {v / 1e9:.1f}B sh ({d:%m-%d})")
+    return "Market structure — " + "; ".join(bits) + "."
+
+
 def build_digest(store: Store, cfg: Config, now: datetime | None = None) -> dict:
     now = now or datetime.now(timezone.utc)
     risk_doc = store.doc("risk_summary")
@@ -249,6 +334,9 @@ def build_digest(store: Store, cfg: Config, now: datetime | None = None) -> dict
     mbs_note = _mbs_note(store, gse_payload)
     vol_note = _vol_note(store)
     movers_note = _movers_note(store)
+    ai_note = _ai_infra_note(store)
+    ms_note = _ms_universe_note(store)
+    struct_note = _market_structure_note(store)
     anomalies = []
     trends = []
     active_series = 0
@@ -329,6 +417,16 @@ def build_digest(store: Store, cfg: Config, now: datetime | None = None) -> dict
              f"cheapest: {vol_note['cheapest'][0]} "
              f"{vol_note['cheapest'][1]:.1f} ({vol_note['cheapest'][2]:.0f}th %ile)."]
            if vol_note else [])
+        + ([f"AI infra — negative FCF: {', '.join(ai_note['neg_fcf'])}; "
+             f"Big-6 capex {ai_note['hyper6_last_q']}; "
+             f"${ai_note['total_reported_bn']:.0f}B reported deals tracked."]
+            if ai_note and ai_note.get("neg_fcf") else [])
+        + ([f"MS universe — negative FCF: {', '.join(ms_note['neg_fcf'])}; "
+             f"money-center banks {ms_note['banks_last_q']}; "
+             f"exchanges {ms_note['exch_last_q']}; "
+             f"${ms_note['total_reported_bn']:.0f}B reported deals tracked."]
+            if ms_note and ms_note.get("banks_last_q") else [])
+        + ([_struct_bullet(struct_note)] if struct_note else [])
         + [
             f"Anomaly — {row['name']}: {row['summary']}."
             for row in anomalies[:2]
@@ -360,6 +458,14 @@ def build_digest(store: Store, cfg: Config, now: datetime | None = None) -> dict
             # fires when the vol regime or the mover board changes)
             "vol_regime": (vol_note or {}).get("regime"),
             "movers_asof": (movers_note or {}).get("asof"),
+            # AI infra (hashed so the newsletter fires when the negative-FCF
+            # set or the Nvidia deal rollup changes)
+            "ai_neg_fcf": sorted((ai_note or {}).get("neg_fcf") or []),
+            "ai_deals_bn": (ai_note or {}).get("total_reported_bn"),
+            # MS universe (hashed so the newsletter fires when the negative-FCF
+            # set or the deal rollup changes)
+            "ms_neg_fcf": sorted((ms_note or {}).get("neg_fcf") or []),
+            "ms_deals_bn": (ms_note or {}).get("total_reported_bn"),
         },
         sort_keys=True,
     ).encode("utf-8")).hexdigest()[:16]

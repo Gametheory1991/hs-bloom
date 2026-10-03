@@ -28,6 +28,9 @@ from collector.fetchers.fred import fetch_macro_history
 from collector.fetchers.gse import fetch_gse
 from collector.fetchers.home_radar import refresh_home_radar
 from collector.fetchers.hyperscaler import fetch_hyperscaler
+from collector.fetchers.ai_capex import fetch_universe_capex
+from collector.fetchers.ai_graph import fetch_universe_graph
+from collector.fetchers.tsv_watch import fetch_tsv_watch
 from collector.fetchers.macro import fetch_calendar_if_due
 from collector.fetchers.midnight import fetch_midnight
 from collector.fetchers.morpho import fetch_morpho
@@ -37,15 +40,20 @@ from collector.fetchers.ofr import fetch_ofr
 from collector.fetchers.refs import fetch_refs
 from collector.fetchers.risk import refresh_risk
 from collector.fetchers.thirteenf import fetch_thirteenf
+from collector.notify import refresh_digest_and_notify
 from collector.fetchers.tic import fetch_tic
 from collector.fetchers.voldash import refresh_voldash
 from collector.fetchers.auctions import fetch_auctions
 from collector.fetchers.dealer import fetch_dealer
+from collector.fetchers.finra_margin import fetch_finra_margin
+from collector.fetchers.finra_short import fetch_finra_short
+from collector.fetchers.ice_star import fetch_ice_star
 from collector.fetchers.refs_history import fetch_refs_history
+from collector.fetchers.trace_monthly import fetch_trace_monthly
+from collector.fetchers.trace_treasury import fetch_trace_treasury
 from collector.fetchers.zyfai import fetch_defi
 from collector.http import GetBytes, GetText, PostJson
 from collector.newsletter import SmtpCfg, deliver_newsletter
-from collector.notify import refresh_digest_and_notify
 from collector.runner import run_fetcher
 from collector.store import Store
 
@@ -81,10 +89,10 @@ def register_jobs(
         "ofr": (cfg.cadences["ofr"], partial(fetch_ofr, cfg.ofr_series, store, get_text), start),
         "cftc_pos": (cfg.cadences["cftc_pos"], partial(fetch_cftc_positioning, cfg.cftc_pos, store, get_text), start),
         "tic": (cfg.cadences["tic"], partial(fetch_tic, cfg.tic, store, get_text), start),
+        "insights": (cfg.cadences["insights"], partial(refresh_digest_and_notify, store, cfg, post_json), start),
         "thirteenf": (cfg.cadences["thirteenf"], partial(fetch_thirteenf, cfg.thirteenf, store, get_text), start),
         "auctions": (cfg.cadences["auctions"], partial(fetch_auctions, cfg.auctions, store, get_text), start),
         "dealer": (cfg.cadences["dealer"], partial(fetch_dealer, cfg.dealer, store, get_text), start),
-        "insights": (cfg.cadences["insights"], partial(refresh_digest_and_notify, store, cfg, post_json), start),
         # risk is compute-only (no HTTP): it reads whatever the data jobs have
         # stored. APScheduler has no dependency ordering, so it starts 5 min
         # after everything else — on a fresh deploy the data jobs get a head
@@ -127,6 +135,53 @@ def register_jobs(
         # equity cards from stored cycle history. One issuer never kills it.
         "hyperscaler": (cfg.cadences.get("hyperscaler", 604800), partial(fetch_hyperscaler, cfg, store, get_text),
                  start + timedelta(seconds=300)),
+        # AI capex tracker: universe-driven XBRL fundamentals (generic
+        # coverage-map template: the same code takes any universe_id).
+        # ~60 public companies x 5 tags, SEC fair access, one bad filer
+        # never fails the job. .get() guard like the rest.
+        "ai_capex": (cfg.cadences.get("ai_capex", 604800), partial(fetch_universe_capex, cfg, store, get_text, "ai_buildout"),
+                 start + timedelta(seconds=600)),
+        # AI money-flow graph: zero HTTP, overlays ai_capex financials onto
+        # the vendored press-reported deal graph. Starts after ai_capex.
+        "ai_graph": (cfg.cadences.get("ai_graph", 604800), partial(fetch_universe_graph, store, "ai_buildout"),
+                 start + timedelta(seconds=900)),
+        # batch 8: market-structure universe (brokers, ATS/dark pools,
+        # market makers, quant/prop, OMS, exchanges) — same generic
+        # universe engine as batch 7, second coverage map. ~22 public
+        # companies x 5 tags, SEC fair access.
+        "ms_capex": (cfg.cadences.get("ms_capex", 604800), partial(fetch_universe_capex, cfg, store, get_text, "market_structure"),
+                 start + timedelta(seconds=1200)),
+        # market-structure money-flow graph: zero HTTP, overlays ms_capex
+        # financials onto the vendored deal graph. Starts after ms_capex.
+        "ms_graph": (cfg.cadences.get("ms_graph", 604800), partial(fetch_universe_graph, store, "market_structure"),
+                 start + timedelta(seconds=1500)),
+        # batch 6: FINRA TRACE Treasury aggregates (daily; monthly backfill).
+        "trace_treasury": (cfg.cadences.get("trace_treasury", 86400), partial(fetch_trace_treasury, store, get_bytes),
+                 start + timedelta(seconds=2100)),
+        # batch 6: FINRA TRACE monthly corporate/agency/securitized volumes.
+        "trace_monthly": (cfg.cadences.get("trace_monthly", 30 * 86400), partial(fetch_trace_monthly, store, get_bytes),
+                 start + timedelta(seconds=2400)),
+        # batch 6: ICE Vantage daily STAR aggregate (securitized trading).
+        "ice_star": (cfg.cadences.get("ice_star", 86400), partial(fetch_ice_star, store, get_bytes),
+                 start + timedelta(seconds=2700)),
+        # batch 6: FINRA short interest, twice-monthly (weekly poll).
+        "finra_short": (cfg.cadences.get("finra_short", 604800), partial(fetch_finra_short, store, get_text),
+                 start + timedelta(seconds=3000)),
+        # batch 6: FINRA margin statistics, monthly.
+        "finra_margin": (cfg.cadences.get("finra_margin", 30 * 86400), partial(fetch_finra_margin, store, get_bytes),
+                 start + timedelta(seconds=3300)),
+        # batch 9: tokenized-securities universe — same generic universe
+        # fetchers, new universe_id. XBRL fundamentals for the 6 public
+        # names (COIN/HOOD/BLSH/BTCS/NDAQ/ICE), then the money-flow graph.
+        "tsv_capex": (cfg.cadences.get("tsv_capex", 604800), partial(fetch_universe_capex, cfg, store, get_text, "tokenized_securities"),
+                 start + timedelta(seconds=3600)),
+        "tsv_graph": (cfg.cadences.get("tsv_graph", 604800), partial(fetch_universe_graph, store, "tokenized_securities"),
+                 start + timedelta(seconds=3900)),
+        # batch 9: TSV regulatory watch — SEC press releases + Federal
+        # Register scan for TSV notices/orders (weekly; no central SEC
+        # registry exists, so this is the machine-trackable part).
+        "tsv_watch": (cfg.cadences.get("tsv_watch", 604800), partial(fetch_tsv_watch, store, get_text),
+                 start + timedelta(seconds=4200)),
         "newsletter": (cfg.cadences["insights"], partial(deliver_newsletter, store, smtp_cfg), start + timedelta(seconds=5)),
     }
     for name, (seconds, fn, next_run_time) in fetchers.items():

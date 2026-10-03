@@ -55,6 +55,8 @@ class CycleSeriesCfg:
     hidden: bool = False           # fetched + chartable but never a panel row (usrec)
     valid_range: list[float] | None = None  # drop points outside [min, max] (corrupt feeds)
     store: bool = False            # externally maintained; re-upsert only
+    external: bool = False         # fetched by a dedicated job (writes cycle:<id>
+                                 # directly); the cycle job skips these
     fred: str | None = None
     dbnomics: str | None = None    # "PROVIDER/dataset/series"
     oecd: str | None = None        # "{flow}/{key}" under the OECD rest/data base
