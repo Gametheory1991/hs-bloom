@@ -21,6 +21,7 @@ from collector.config import Config
 from collector.fetchers.bonds import fetch_bonds
 from collector.fetchers.cycle import fetch_cycle
 from collector.fetchers.cftc_pos import fetch_cftc_positioning
+from collector.fetchers.country_risk import refresh_country_risk
 from collector.fetchers.equity import fetch_equity
 from collector.fetchers.fred import fetch_macro_history
 from collector.fetchers.macro import fetch_calendar_if_due
@@ -87,6 +88,11 @@ def register_jobs(
         # the risk cadence) from breaking scheduler registration entirely.
         "risk": (cfg.cadences.get("risk", 86400), partial(refresh_risk, store),
                  start + timedelta(seconds=300)),
+        # country risk map: compute-only, reads bond/equity/cycle history.
+        # Starts after the risk engine; same graceful-degradation contract and
+        # .get() guard so an old config.yaml can't break registration.
+        "country_risk": (cfg.cadences.get("country_risk", 86400), partial(refresh_country_risk, store),
+                 start + timedelta(seconds=600)),
         "newsletter": (cfg.cadences["insights"], partial(deliver_newsletter, store, smtp_cfg), start + timedelta(seconds=5)),
     }
     for name, (seconds, fn, next_run_time) in fetchers.items():

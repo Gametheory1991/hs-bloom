@@ -183,6 +183,17 @@ def _doc_panel(store: Store, key: str, list_key: str) -> dict:
     return {list_key: doc.payload[list_key], "updated_at": doc.updated_at, "source": doc.source}
 
 
+def _country_risk_panel(store: Store) -> dict:
+    """RISK MAP tab data: per-country scores from the country_risk doc."""
+    doc = store.doc("country_risk")
+    if doc is None:
+        return {"asof": None, "countries": [], "updated_at": None, "source": None}
+    return {"asof": doc.payload.get("asof"),
+            "countries": doc.payload.get("countries", []),
+            "updated_at": doc.updated_at,
+            "source": doc.source}
+
+
 def _insights_panel(store: Store) -> dict:
     doc = store.doc("insights")
     status = store.doc("newsletter_status")
@@ -234,5 +245,6 @@ def build_dashboard(
             "refs": _refs_panel(store),
             "cycle": _cycle_panel(store, list(cycle_series), list(cycle_tabs)),
             "insights": _insights_panel(store),
+            "riskmap": _country_risk_panel(store),
         },
     }

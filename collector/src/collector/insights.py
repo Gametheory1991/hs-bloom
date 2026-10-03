@@ -114,6 +114,8 @@ def build_digest(store: Store, cfg: Config, now: datetime | None = None) -> dict
     now = now or datetime.now(timezone.utc)
     risk_doc = store.doc("risk_summary")
     risk_payload = risk_doc.payload if risk_doc else None
+    cr_doc = store.doc("country_risk")
+    cr_payload = cr_doc.payload if cr_doc else None
     anomalies = []
     trends = []
     active_series = 0
@@ -194,6 +196,9 @@ def build_digest(store: Store, cfg: Config, now: datetime | None = None) -> dict
             # the verdict is hashed so the newsletter fires when the risk
             # engine's read of the market changes, not just on new anomalies
             "risk_verdict": (risk_payload or {}).get("verdict"),
+            # country risk map buckets: the daily Drive snapshot pulls this
+            # digest, so the map data lands in Harry's Drive with it
+            "country_risk": [(c["code"], c["bucket"]) for c in (cr_payload or {}).get("countries", [])],
         },
         sort_keys=True,
     ).encode("utf-8")).hexdigest()[:16]
@@ -204,6 +209,7 @@ def build_digest(store: Store, cfg: Config, now: datetime | None = None) -> dict
         "trends": trends[:8],
         "newsletter": newsletter,
         "risk": risk_payload,
+        "country_risk": cr_payload,
     }
 
 
