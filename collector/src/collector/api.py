@@ -178,14 +178,15 @@ def create_app(store: Store, cfg: Config) -> FastAPI:
         can show the "set the key on Render" hint. idtype: TICKER | CUSIP |
         ISIN | SEDOL | FIGI.
         """
-        from collector.fetchers.openfigi import parse_mappings
 
         api_key = os.environ.get("OPENFIGI_API_KEY", "").strip()
         if not api_key:
             return {"ok": False, "error": "no_key",
                     "message": "Set OPENFIGI_API_KEY on Render (free key: openfigi.com)."}
         idtype = (idtype or "").strip().upper()
-        id_map = {"TICKER": "ID_TICKER", "CUSIP": "ID_CUSIP",
+        # idType values verified live 2026-10-03: TICKER must be "TICKER"
+        # (ID_TICKER returns nothing); CUSIP/ISIN/SEDOL need the ID_ prefix.
+        id_map = {"TICKER": "TICKER", "CUSIP": "ID_CUSIP",
                   "ISIN": "ID_ISIN", "SEDOL": "ID_SEDOL", "FIGI": "ID_BB_GLOBAL"}
         if idtype not in id_map:
             return {"ok": False, "error": "bad_idtype",
@@ -196,9 +197,12 @@ def create_app(store: Store, cfg: Config) -> FastAPI:
                     "message": "Enter an identifier (max 64 chars)."}
         import httpx
         try:
+            job = {"idType": id_map[idtype], "idValue": idvalue}
+            if idtype == "TICKER":
+                job["exchCode"] = "US"  # bare tickers are ambiguous w/o exchange
             resp = httpx.post(
                 "https://api.openfigi.com/v3/mapping",
-                json=[{"idType": id_map[idtype], "idValue": idvalue}],
+                json=[job],
                 headers={"X-OPENFIGI-APIKEY": api_key,
                          "Content-Type": "application/json"},
                 timeout=20)
@@ -214,17 +218,22 @@ def create_app(store: Store, cfg: Config) -> FastAPI:
         except ValueError:
             return {"ok": False, "error": "upstream",
                     "message": "OpenFIGI returned non-JSON."}
-        mapped = parse_mappings(results)
-        rows = []
-        for ticker, m in mapped.items():
-            rows.append({
-                "name": m.get("name"), "ticker": ticker,
-                "figi": m.get("figi"), "composite_figi": m.get("compositeFIGI"),
-                "security_type": m.get("securityType"),
-                "exchange_code": m.get("exchCode"),
-                "market_sector": m.get("marketSector"),
-                "share_class_figi": m.get("shareClassFIGI"),
-            })
+        # Flatten all candidate listings; US listings first, cap at 8.
+        # (parse_mappings collapses to one row per ticker — fine for the
+        # batch job, but the interactive lookup should show the candidates.)
+        cands = []
+        for job_res in results:
+            if isinstance(job_res, dict):
+                cands.extend(job_res.get("data") or [])
+        cands.sort(key=lambda m: 0 if m.get("exchCode") == "US" else 1)
+        rows = [{
+            "name": m.get("name"), "ticker": m.get("ticker"),
+            "figi": m.get("figi"), "composite_figi": m.get("compositeFIGI"),
+            "security_type": m.get("securityType"),
+            "exchange_code": m.get("exchCode"),
+            "market_sector": m.get("marketSector"),
+            "share_class_figi": m.get("shareClassFIGI"),
+        } for m in cands[:8]]
         return {"ok": True, "idtype": idtype, "idvalue": idvalue,
                 "count": len(rows), "results": rows}
 
