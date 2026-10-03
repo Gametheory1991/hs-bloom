@@ -20,13 +20,17 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from collector.config import Config
 from collector.fetchers.bonds import fetch_bonds
 from collector.fetchers.cycle import fetch_cycle
+from collector.fetchers.cftc_pos import fetch_cftc_positioning
 from collector.fetchers.equity import fetch_equity
 from collector.fetchers.fred import fetch_macro_history
 from collector.fetchers.macro import fetch_calendar_if_due
 from collector.fetchers.midnight import fetch_midnight
 from collector.fetchers.morpho import fetch_morpho
 from collector.fetchers.news import fetch_news
+from collector.fetchers.ofr import fetch_ofr
 from collector.fetchers.refs import fetch_refs
+from collector.fetchers.thirteenf import fetch_thirteenf
+from collector.fetchers.tic import fetch_tic
 from collector.fetchers.refs_history import fetch_refs_history
 from collector.fetchers.zyfai import fetch_defi
 from collector.http import GetBytes, GetText, PostJson
@@ -63,6 +67,10 @@ def register_jobs(
         "refs_history": (cfg.cadences["refs_history"], partial(fetch_refs_history, cfg.refs, store, get_text), start),
         "morpho": (cfg.cadences["morpho"], partial(fetch_morpho, cfg.defi, store, post_json), start),
         "cycle": (cfg.cadences["cycle"], partial(fetch_cycle, cfg.cycle_series, store, fred_api_key, get_text, get_bytes), start),
+        "ofr": (cfg.cadences["ofr"], partial(fetch_ofr, cfg.ofr_series, store, get_text), start),
+        "cftc_pos": (cfg.cadences["cftc_pos"], partial(fetch_cftc_positioning, cfg.cftc_pos, store, get_text), start),
+        "tic": (cfg.cadences["tic"], partial(fetch_tic, cfg.tic, store, get_text), start),
+        "thirteenf": (cfg.cadences["thirteenf"], partial(fetch_thirteenf, cfg.thirteenf, store, get_text), start),
         "insights": (cfg.cadences["insights"], partial(refresh_digest, store, cfg), start),
         "newsletter": (cfg.cadences["insights"], partial(deliver_newsletter, store, smtp_cfg), start + timedelta(seconds=5)),
     }

@@ -55,6 +55,7 @@ class CycleSeriesCfg:
     cftc: str | None = None        # CFTC contract market code
     cboe: str | None = None        # exact ratio name in the CBOE daily JSON
     aaii: str | None = None        # "bull_bear_spread"
+    ofr: str | None = None         # OFR Hedge Fund Monitor mnemonic (dataset=fpf)
     yahoo_ratio: list[str] | None = None  # [numerator, denominator] yahoo symbols
 
 
@@ -173,6 +174,39 @@ class RefsCfg:
 
 
 @dataclass(frozen=True)
+class OfrSeriesCfg:
+    id: str       # short id for docs, e.g. "hf-gav"
+    name: str
+    mnemonic: str  # OFR mnemonic, e.g. FPF-ALLQHF_GAV_SUM
+    unit: str
+
+
+@dataclass(frozen=True)
+class CftcPosCfg:
+    dataset: str  # tff | cit | disagg (see fetchers/cftc_pos.py DATASETS)
+    code: str     # CFTC contract market code
+    label: str
+    groups: list[str]  # per-dataset group keys, see fetchers/cftc_pos.py COLUMNS
+
+
+@dataclass(frozen=True)
+class TicCfg:
+    countries: list[str]  # holder names as in TIC Table 5; Grand Total always added
+
+
+@dataclass(frozen=True)
+class ThirteenFWatchCfg:
+    name: str
+    cik: str  # zero-padded to 10 digits at use
+
+
+@dataclass(frozen=True)
+class ThirteenFCfg:
+    user_agent: str  # SEC mandates a descriptive UA with contact; no default is safe
+    watchlist: list[ThirteenFWatchCfg]
+
+
+@dataclass(frozen=True)
 class Config:
     db_path: str
     calendar_url: str
@@ -190,6 +224,10 @@ class Config:
     midnight_base: str
     defi: DefiCfg
     refs: RefsCfg
+    ofr_series: list[OfrSeriesCfg]
+    cftc_pos: list[CftcPosCfg]
+    tic: TicCfg
+    thirteenf: ThirteenFCfg
 
 
 def load_config(path: str | Path) -> Config:
@@ -217,6 +255,13 @@ def load_config(path: str | Path) -> Config:
             )
             for t in raw["cycle_tabs"]
         ],
+        ofr_series=[OfrSeriesCfg(**s) for s in raw["ofr_series"]],
+        cftc_pos=[CftcPosCfg(**c) for c in raw["cftc_pos"]],
+        tic=TicCfg(countries=list(raw["tic"]["countries"])),
+        thirteenf=ThirteenFCfg(
+            user_agent=raw["thirteenf"]["user_agent"],
+            watchlist=[ThirteenFWatchCfg(**w) for w in raw["thirteenf"]["watchlist"]],
+        ),
         calendar_map=[CalendarMapEntry(**m) for m in raw["calendar_map"]],
         feeds=[FeedCfg(**f) for f in raw["feeds"]],
         zyfai_base=raw["zyfai_base"],
