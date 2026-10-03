@@ -13,6 +13,7 @@ const COLORS = {
   nodata: "#3a4350",
   land: "#161c22",
 };
+export { COLORS };
 const STROKE = "#0a0e0a";
 const STALE_MINUTES = 2880; // 2x the daily country_risk cadence
 
@@ -33,7 +34,7 @@ const INPUT_LABELS = {
 };
 
 // Equirectangular projection into a 1000x500 viewBox.
-const project = (lon, lat) => [
+export const project = (lon, lat) => [
   ((lon + 180) / 360) * 1000,
   ((90 - lat) / 180) * 500,
 ];
@@ -51,6 +52,7 @@ function featurePath(g) {
     return g.coordinates.map((poly) => poly.map(ringPath).join("")).join("");
   return "";
 }
+export { featurePath };
 
 function detailCard(c) {
   if (!c) return `<div class="map-detail empty">TAP A COUNTRY FOR ITS BREAKDOWN</div>`;
