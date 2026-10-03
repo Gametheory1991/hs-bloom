@@ -17,6 +17,10 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "pytest-asyncio>=0.23"]
+# Postgres persistence for the collector store: set DATABASE_URL and install
+# this extra (e.g. on Render: pip install -e ".[postgres]"). SQLite remains
+# the zero-dependency default when DATABASE_URL is unset.
+postgres = ["psycopg[binary]>=3.1"]
 
 [build-system]
 requires = ["setuptools>=68"]
