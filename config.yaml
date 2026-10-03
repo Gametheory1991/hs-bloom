@@ -265,6 +265,16 @@ cycle_series:      # market-cycle series (spec 2026-08-24); exactly one source k
   - { id: fut-gc,  name: "GC (gold fut)",          unit: px, yahoo: "GC=F" }
   - { id: fut-si,  name: "SI (silver fut)",        unit: px, yahoo: "SI=F" }
   - { id: fut-hg,  name: "HG (copper fut)",        unit: px, yahoo: "HG=F" }
+  # ---- SOFR 3M futures strip (Yahoo .CME expiry symbols; verified live 2026-10-03) ----
+  # Used by the central-bank tab for the implied Fed-funds path (implied = 100 - price).
+  # Contract codes roll: refresh this list as expiries pass (currently covers Oct-26 → Mar-28).
+  - { id: sofr-v26, name: "SOFR 3M Oct-26", unit: px, yahoo: "SR3V26.CME" }
+  - { id: sofr-z26, name: "SOFR 3M Dec-26", unit: px, yahoo: "SR3Z26.CME" }
+  - { id: sofr-h27, name: "SOFR 3M Mar-27", unit: px, yahoo: "SR3H27.CME" }
+  - { id: sofr-m27, name: "SOFR 3M Jun-27", unit: px, yahoo: "SR3M27.CME" }
+  - { id: sofr-u27, name: "SOFR 3M Sep-27", unit: px, yahoo: "SR3U27.CME" }
+  - { id: sofr-z27, name: "SOFR 3M Dec-27", unit: px, yahoo: "SR3Z27.CME" }
+  - { id: sofr-h28, name: "SOFR 3M Mar-28", unit: px, yahoo: "SR3H28.CME" }
   # ---- batch 6: H.4.1 foreign custody (WLCSDL not live on FRED; WMTSECL1 is the live successor — see CHANGES.md) ----
   - { id: cust-ust, name: "Foreign custody: marketable UST $m (H.4.1)", unit: "$m", fred: WMTSECL1 }
   # ---- batch 6: 13F net flows (externally maintained by the thirteenf job; `store: true` re-upserts) ----
