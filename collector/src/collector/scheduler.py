@@ -29,12 +29,14 @@ from collector.fetchers.gse import fetch_gse
 from collector.fetchers.macro import fetch_calendar_if_due
 from collector.fetchers.midnight import fetch_midnight
 from collector.fetchers.morpho import fetch_morpho
+from collector.fetchers.movers import fetch_movers
 from collector.fetchers.news import fetch_news
 from collector.fetchers.ofr import fetch_ofr
 from collector.fetchers.refs import fetch_refs
 from collector.fetchers.risk import refresh_risk
 from collector.fetchers.thirteenf import fetch_thirteenf
 from collector.fetchers.tic import fetch_tic
+from collector.fetchers.voldash import refresh_voldash
 from collector.fetchers.auctions import fetch_auctions
 from collector.fetchers.dealer import fetch_dealer
 from collector.fetchers.refs_history import fetch_refs_history
@@ -104,6 +106,15 @@ def register_jobs(
         # graceful-degradation contract and .get() guard.
         "xcorr": (cfg.cadences.get("xcorr", 86400), partial(refresh_xcorr, store),
                  start + timedelta(seconds=900)),
+        # vol dashboard: compute-only, reads cycle:/idx: vol + price history.
+        # Starts after xcorr; same contract and .get() guard.
+        "voldash": (cfg.cadences.get("voldash", 86400), partial(refresh_voldash, store),
+                 start + timedelta(seconds=1200)),
+        # single-stock sigma movers: ~600 Yahoo chart requests, polite spacing
+        # (~8 min), weekly. Per-symbol isolation; a throttled symbol degrades
+        # to a thinner list, never a failed job. .get() guard like the rest.
+        "movers": (cfg.cadences.get("movers", 604800), partial(fetch_movers, store, get_text),
+                 start + timedelta(seconds=1500)),
         "newsletter": (cfg.cadences["insights"], partial(deliver_newsletter, store, smtp_cfg), start + timedelta(seconds=5)),
     }
     for name, (seconds, fn, next_run_time) in fetchers.items():

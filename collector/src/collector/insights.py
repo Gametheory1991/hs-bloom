@@ -193,6 +193,49 @@ def _mbs_note(store: Store, gse_payload: dict | None) -> dict | None:
     return note
 
 
+def _vol_note(store: Store) -> dict | None:
+    """Vol dashboard read-out: regime line + most extreme implied readings."""
+    doc = store.doc("voldash")
+    if doc is None:
+        return None
+    p = doc.payload
+    rows = p.get("rows") or []
+    priced = [r for r in rows if r.get("pctile_1y") is not None]
+    if not priced:
+        return None
+    richest = max(priced, key=lambda r: r["pctile_1y"])
+    cheapest = min(priced, key=lambda r: r["pctile_1y"])
+    return {
+        "asof": p.get("asof"),
+        "regime": p.get("regime"),
+        "n_rich": p.get("n_rich", 0),
+        "n_cheap": p.get("n_cheap", 0),
+        "richest": (richest["ticker"], richest["implied"], richest["pctile_1y"]),
+        "cheapest": (cheapest["ticker"], cheapest["implied"], cheapest["pctile_1y"]),
+        "beta_vix_spx": (p.get("beta") or {}).get("vix_spx"),
+    }
+
+
+def _movers_note(store: Store) -> dict | None:
+    """Single-stock extremes: the single most positive/negative z-move per
+    index across both windows."""
+    doc = store.doc("movers")
+    if doc is None:
+        return None
+    out = {"asof": doc.payload.get("asof"), "indexes": {}}
+    for idx_id, idx in (doc.payload.get("indexes") or {}).items():
+        extremes = {}
+        for win in ("win5d", "win20d"):
+            w = idx.get(win) or {}
+            up = (w.get("up") or [None])[0]
+            down = (w.get("down") or [None])[0]
+            extremes[win] = {"up": up, "down": down}
+        out["indexes"][idx_id] = {"label": idx.get("label"), **extremes}
+    if not out["indexes"]:
+        return None
+    return out
+
+
 def build_digest(store: Store, cfg: Config, now: datetime | None = None) -> dict:
     now = now or datetime.now(timezone.utc)
     risk_doc = store.doc("risk_summary")
@@ -204,6 +247,8 @@ def build_digest(store: Store, cfg: Config, now: datetime | None = None) -> dict
     gse_doc = store.doc("gse")
     gse_payload = gse_doc.payload if gse_doc else None
     mbs_note = _mbs_note(store, gse_payload)
+    vol_note = _vol_note(store)
+    movers_note = _movers_note(store)
     anomalies = []
     trends = []
     active_series = 0
@@ -279,6 +324,11 @@ def build_digest(store: Store, cfg: Config, now: datetime | None = None) -> dict
             + "."
         ] if xc_extreme else [])
         + ([f"MBS plumbing — {mbs_note['stress']}"] if mbs_note and mbs_note.get("stress") else [])
+        + ([f"Vol — {vol_note['regime']}. Richest: {vol_note['richest'][0]} "
+             f"{vol_note['richest'][1]:.1f} ({vol_note['richest'][2]:.0f}th %ile); "
+             f"cheapest: {vol_note['cheapest'][0]} "
+             f"{vol_note['cheapest'][1]:.1f} ({vol_note['cheapest'][2]:.0f}th %ile)."]
+           if vol_note else [])
         + [
             f"Anomaly — {row['name']}: {row['summary']}."
             for row in anomalies[:2]
@@ -306,6 +356,10 @@ def build_digest(store: Store, cfg: Config, now: datetime | None = None) -> dict
             ),
             # MBS stress read-out (real GSE data only)
             "mbs_stress": (mbs_note or {}).get("stress"),
+            # vol regime + single-stock extremes (hashed so the newsletter
+            # fires when the vol regime or the mover board changes)
+            "vol_regime": (vol_note or {}).get("regime"),
+            "movers_asof": (movers_note or {}).get("asof"),
         },
         sort_keys=True,
     ).encode("utf-8")).hexdigest()[:16]
@@ -319,6 +373,8 @@ def build_digest(store: Store, cfg: Config, now: datetime | None = None) -> dict
         "country_risk": cr_payload,
         "xcorr": xc_payload,
         "mbs": mbs_note,
+        "vol": vol_note,
+        "movers": movers_note,
     }
 
 

@@ -54,6 +54,7 @@ class CycleSeriesCfg:
     oecd: str | None = None        # "{flow}/{key}" under the OECD rest/data base
     cftc: str | None = None        # CFTC contract market code
     cboe: str | None = None        # exact ratio name in the CBOE daily JSON
+    cftc_oi: str | None = None    # CFTC contract market code -> total futures open interest
     aaii: str | None = None        # "bull_bear_spread"
     ofr: str | None = None         # OFR Hedge Fund Monitor mnemonic (dataset=fpf)
     yahoo: str | None = None       # single Yahoo symbol, daily closes (e.g. MBB, ^VIX3M)

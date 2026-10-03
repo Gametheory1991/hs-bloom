@@ -244,10 +244,12 @@ def _xcorr_panel(store: Store) -> dict:
     p = doc.payload
     return {"asof": p.get("asof"), "labels": p.get("labels", []),
             "keys": p.get("keys", []),
+            "groups": p.get("groups", []),
             "matrix_60d": p.get("matrix_60d", []),
             "matrix_252d": p.get("matrix_252d", []),
             "n_obs_60d": p.get("n_obs_60d"), "n_obs_252d": p.get("n_obs_252d"),
-            "pairs": p.get("pairs", []), "rvol": p.get("rvol", []),
+            "pairs": p.get("pairs", []), "pair_hist": p.get("pair_hist", {}),
+            "rvol": p.get("rvol", []),
             "updated_at": doc.updated_at, "source": doc.source}
 
 
@@ -275,6 +277,33 @@ def _insights_panel(store: Store) -> dict:
         "updated_at": doc.updated_at,
         "source": doc.source,
     }
+
+
+def _movers_panel(store: Store) -> dict:
+    """Single-stock sigma movers (weekly): top-10 +/- 5d and 20d z-moves."""
+    doc = store.doc("movers")
+    if doc is None:
+        return {"asof": None, "indexes": {}, "updated_at": None, "source": None}
+    return {"asof": doc.payload.get("asof"),
+            "indexes": doc.payload.get("indexes", {}),
+            "updated_at": doc.updated_at,
+            "source": doc.source}
+
+
+def _voldash_panel(store: Store) -> dict:
+    """Vol dashboard: implied-vs-realized table, VIX/VVIX, spot-vol betas."""
+    doc = store.doc("voldash")
+    if doc is None:
+        return {"asof": None, "rows": [], "vix_hist": [], "vvix_hist": [],
+                "beta": {}, "beta_hist": {"vix_spx": [], "vvix_vix": []},
+                "regime": None, "updated_at": None, "source": None}
+    p = doc.payload
+    return {"asof": p.get("asof"), "rows": p.get("rows", []),
+            "vix_hist": p.get("vix_hist", []), "vvix_hist": p.get("vvix_hist", []),
+            "beta": p.get("beta", {}),
+            "beta_hist": p.get("beta_hist", {"vix_spx": [], "vvix_vix": []}),
+            "regime": p.get("regime"),
+            "updated_at": doc.updated_at, "source": doc.source}
 
 
 def build_dashboard(
@@ -305,5 +334,7 @@ def build_dashboard(
             "riskmap": _country_risk_panel(store),
             "gse": _gse_panel(store),
             "xcorr": _xcorr_panel(store),
+            "movers": _movers_panel(store),
+            "voldash": _voldash_panel(store),
         },
     }
