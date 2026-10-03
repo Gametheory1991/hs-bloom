@@ -7,6 +7,8 @@ import { renderNews } from "./panels/news.js";
 import { renderCycle } from "./panels/cycle.js";
 import { renderRiskMap } from "./panels/riskmap.js";
 import { renderXcorr } from "./panels/xcorr.js";
+import { renderVol } from "./panels/vol.js";
+import { renderMovers } from "./panels/movers.js";
 import { renderRefs } from "./panels/refs.js";
 import { renderInsights } from "./panels/insights.js";
 import { initNotifications, notifyInsights } from "./notifications.js";
@@ -14,7 +16,7 @@ import { initChat } from "./chat.js";
 import { initTabs } from "./tabs.js";
 
 const POLL_MS = 60_000;
-const STALE_MINUTES = { equity: 20, bonds: 130, macro: 390, news: 40, defi: 35, midnight: 35, refs: 35, insights: 70, riskmap: 2880, xcorr: 2880, gse: 86400 };  // ~2x cadence
+const STALE_MINUTES = { equity: 20, bonds: 130, macro: 390, news: 40, defi: 35, midnight: 35, refs: 35, insights: 70, riskmap: 2880, xcorr: 2880, gse: 86400, vol: 2880, movers: 10080 };  // ~2x cadence
 
 const EMPTY = { rows: [], updated_at: null, source: null };
 
@@ -51,6 +53,8 @@ async function tick() {
     renderRiskMap(p.riskmap ?? { countries: [], asof: null, updated_at: null, source: null });
     renderXcorr(p.xcorr ?? { labels: [], matrix_60d: [], pairs: [], rvol: [] },
                 p.gse ?? { series: [] });
+    renderVol(p.voldash ?? { rows: [], vix_hist: [], vvix_hist: [], beta: {}, beta_hist: {} });
+    renderMovers(p.movers ?? { indexes: {}, asof: null, updated_at: null, source: null });
     renderInsights(p.insights ?? { alerts: [], trends: [], newsletter: { headline: "No digest yet", bullets: [] } });
     foot("equity", "equity", { ...p.equity, source: p.equity.rows[0]?.source });
     foot("bonds", "bonds", p.bonds);
