@@ -10,6 +10,7 @@ from statistics import mean, pstdev
 from collector.changes import apply_transform, ref_close
 from collector.config import Config
 from collector.store import Store
+from collector.alert_config import scaled_thresholds
 
 ANOMALY_Z = 2.2
 TREND_Z = 1.15
@@ -340,6 +341,9 @@ def build_digest(store: Store, cfg: Config, now: datetime | None = None) -> dict
     anomalies = []
     trends = []
     active_series = 0
+    # per-type tuning (alert_config doc): threshold_mult scales the trigger
+    # thresholds; muted types are filtered at send time in notify.py
+    anomaly_z, trend_z = scaled_thresholds(store, ANOMALY_Z, TREND_Z)
     for item in _series_catalog(cfg):
         points = apply_transform(store.points(item.store_id), item.transform)
         if len(points) < 2:
@@ -353,7 +357,7 @@ def build_digest(store: Store, cfg: Config, now: datetime | None = None) -> dict
             if sigma > 0:
                 level_mean = mean(baseline)
                 z_score = round((latest_value - level_mean) / sigma, 2)
-                if abs(z_score) >= ANOMALY_Z:
+                if abs(z_score) >= anomaly_z:
                     anomalies.append({
                         "id": f"anomaly:{item.series_id}",
                         "series_id": item.series_id,
@@ -370,7 +374,7 @@ def build_digest(store: Store, cfg: Config, now: datetime | None = None) -> dict
                 if ref_1m is not None:
                     delta = round(latest_value - ref_1m, 2)
                     trend_score = round(abs(delta) / sigma, 2)
-                    if delta != 0 and trend_score >= TREND_Z:
+                    if delta != 0 and trend_score >= trend_z:
                         trends.append({
                             "id": f"trend:{item.series_id}",
                             "series_id": item.series_id,

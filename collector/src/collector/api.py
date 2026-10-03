@@ -33,9 +33,21 @@ class ChatRequest(BaseModel):
     history: list[dict[str, str]] = []
 
 
+class AlertConfigUpdate(BaseModel):
+    id: str
+    threshold_mult: float | None = None
+    muted: bool | None = None
+
+
+class BriefcheckReport(BaseModel):
+    checked_at: str
+    checked_count: int = 0
+    mismatches: list[dict] = []
+
+
 def create_app(store: Store, cfg: Config) -> FastAPI:
     app = FastAPI(title="os-bloom collector", docs_url=None, redoc_url=None)
-    app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET", "POST"])
+    app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET", "POST", "PUT"])
     series_by_id = {s.id: s for s in cfg.series}
     cycle_by_id = {s.id: s for s in cfg.cycle_series}
     index_names = {i.symbol: i.name for i in cfg.indexes}
@@ -168,5 +180,38 @@ def create_app(store: Store, cfg: Config) -> FastAPI:
                         "unit": ccfg.unit, "kind": r.kind})
             rows.append(row)
         return {"rows": rows}
+
+    @app.get("/api/alerts/config")
+    def alerts_config() -> dict:
+        """Per-alert-type tuning: [{id, label, threshold_mult, muted}]."""
+        from collector.alert_config import get_config
+
+        return {"types": list(get_config(store).values())}
+
+    @app.put("/api/alerts/config")
+    def update_alerts_config(req: AlertConfigUpdate) -> dict:
+        """Update one alert type's threshold_mult and/or muted flag."""
+        from collector.alert_config import set_config
+
+        try:
+            entry = set_config(store, req.id,
+                               threshold_mult=req.threshold_mult, muted=req.muted)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+        return {"type": entry}
+
+    @app.post("/api/briefcheck")
+    def briefcheck_store(report: BriefcheckReport) -> dict:
+        """Accept a briefcheck.py JSON report; stored as doc briefcheck_latest."""
+        store.put_doc("briefcheck_latest", report.model_dump(), "briefcheck")
+        return {"stored": True}
+
+    @app.get("/api/briefcheck")
+    def briefcheck_get() -> dict:
+        """Latest briefcheck report, or 404 when none has been posted yet."""
+        doc = store.doc("briefcheck_latest")
+        if doc is None:
+            raise HTTPException(status_code=404, detail="no briefcheck report yet")
+        return doc.payload
 
     return app

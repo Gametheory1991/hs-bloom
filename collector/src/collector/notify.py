@@ -11,6 +11,7 @@ import logging
 import os
 
 from collector import http as _http
+from collector.alert_config import is_muted
 from collector.config import Config
 from collector.store import Store
 
@@ -18,6 +19,9 @@ log = logging.getLogger(__name__)
 
 SENT_DOC = "telegram_sent"
 MAX_PER_DIGEST = 8  # more than this -> one summary message instead of a flood
+
+# digest kind -> alert_config type id
+KIND_TO_TYPE = {"ALERT": "anomaly", "TREND": "trend"}
 
 
 def _creds() -> tuple[str, str] | None:
@@ -69,7 +73,11 @@ async def push_new_alerts(store: Store, post_json=None) -> int:
         store.put_doc(SENT_DOC, {"ids": sorted(current_ids)}, "telegram")
         return 0
     new = [(k, a) for k, a in items if a["id"] not in sent]
+    # per-type tuning: muted types never send (still counted as seen so they
+    # don't queue up while muted)
+    new = [(k, a) for k, a in new if not is_muted(store, KIND_TO_TYPE.get(k, k))]
     if not new:
+        store.put_doc(SENT_DOC, {"ids": sorted(sent | current_ids)}, "telegram")
         return 0
     if _creds() is None:
         # Not configured: advance the baseline so we don't queue forever.
