@@ -1,15 +1,16 @@
 """Wraps every fetcher run: status recording + total error isolation."""
 from __future__ import annotations
 
+import inspect
 import logging
 from datetime import datetime, timezone
-from typing import Awaitable, Callable
+from typing import Awaitable, Callable, Union
 
 from collector.store import Store
 
 log = logging.getLogger(__name__)
 
-FetchFn = Callable[[], Awaitable[str]]  # returns active source label on success
+FetchFn = Callable[[], Union[Awaitable[str], str]]  # returns active source label on success
 
 JOB_RUNS_DOC = "job_runs"  # doc key: {job_name: last_success_iso}
 
@@ -20,7 +21,9 @@ def _now() -> str:
 
 async def run_fetcher(name: str, store: Store, fn: FetchFn) -> None:
     try:
-        active_source = await fn()
+        result = fn()
+        # refresh_xcorr / refresh_voldash are sync; everything else is async
+        active_source = await result if inspect.isawaitable(result) else result
         store.record_success(name, active_source)
         # persist last-run so the scheduler can catch up overdue jobs on boot
         doc = store.doc(JOB_RUNS_DOC)
