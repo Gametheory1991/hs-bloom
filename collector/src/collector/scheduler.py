@@ -26,6 +26,8 @@ from collector.fetchers.country_risk import refresh_country_risk
 from collector.fetchers.equity import fetch_equity
 from collector.fetchers.fred import fetch_macro_history
 from collector.fetchers.gse import fetch_gse
+from collector.fetchers.home_radar import refresh_home_radar
+from collector.fetchers.hyperscaler import fetch_hyperscaler
 from collector.fetchers.macro import fetch_calendar_if_due
 from collector.fetchers.midnight import fetch_midnight
 from collector.fetchers.morpho import fetch_morpho
@@ -115,6 +117,16 @@ def register_jobs(
         # to a thinner list, never a failed job. .get() guard like the rest.
         "movers": (cfg.cadences.get("movers", 604800), partial(fetch_movers, store, get_text),
                  start + timedelta(seconds=1500)),
+        # market radar: compute-only, reads stored history (risk, vol, movers,
+        # country risk, cycle). Starts after movers; same graceful-degradation
+        # contract and .get() guard.
+        "home_radar": (cfg.cadences.get("home_radar", 86400), partial(refresh_home_radar, store),
+                 start + timedelta(seconds=1800)),
+        # hyperscaler desk: weekly EDGAR debt-offering scan (6 submissions
+        # requests + per-424B2 prospectus fetches, polite 0.5s gaps) plus
+        # equity cards from stored cycle history. One issuer never kills it.
+        "hyperscaler": (cfg.cadences.get("hyperscaler", 604800), partial(fetch_hyperscaler, cfg, store, get_text),
+                 start + timedelta(seconds=300)),
         "newsletter": (cfg.cadences["insights"], partial(deliver_newsletter, store, smtp_cfg), start + timedelta(seconds=5)),
     }
     for name, (seconds, fn, next_run_time) in fetchers.items():

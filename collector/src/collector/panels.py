@@ -306,6 +306,31 @@ def _voldash_panel(store: Store) -> dict:
             "updated_at": doc.updated_at, "source": doc.source}
 
 
+def _radar_panel(store: Store) -> dict:
+    """Market radar: multi-indicator percentile snapshot for the HOME tab."""
+    doc = store.doc("home_radar")
+    if doc is None:
+        return {"as_of": None, "regime": "UNKNOWN", "verdict": None,
+                "indicators": [], "updated_at": None, "source": None}
+    p = doc.payload
+    return {"as_of": p.get("as_of"), "regime": p.get("regime", "UNKNOWN"),
+            "verdict": p.get("verdict"),
+            "indicators": p.get("indicators", []),
+            "updated_at": doc.updated_at, "source": doc.source}
+
+
+def _hyper_panel(store: Store) -> dict:
+    """Hyperscaler desk: debt issuance + equity cards."""
+    doc = store.doc("hyper")
+    if doc is None:
+        return {"as_of": None, "issuances": [], "equities": [],
+                "note": None, "updated_at": None, "source": None}
+    p = doc.payload
+    return {"as_of": p.get("as_of"), "issuances": p.get("issuances", []),
+            "equities": p.get("equities", []), "note": p.get("note"),
+            "updated_at": doc.updated_at, "source": doc.source}
+
+
 def build_dashboard(
     store: Store,
     indexes: list[IndexCfg],
@@ -336,5 +361,7 @@ def build_dashboard(
             "xcorr": _xcorr_panel(store),
             "movers": _movers_panel(store),
             "voldash": _voldash_panel(store),
+            "radar": _radar_panel(store),
+            "hyper": _hyper_panel(store),
         },
     }

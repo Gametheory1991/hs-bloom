@@ -28,7 +28,14 @@ No throat-clearing.
 - When asked about anomalies or movers, lead with the signal, then the \
 likely driver, then what would confirm or refute it.
 - Keep answers short enough to read on a phone. Use a few tight bullets \
-when listing."""
+when listing.
+- You always receive a MARKET SNAPSHOT pack (regime, stress scores, vol, \
+single-stock movers, country risk, hyperscaler issuance, macro calendar, \
+headlines). Use it; don't ask for data it already contains.
+- For a single stock ticker you get its sigma-move stats from the weekly \
+movers run. You have NO earnings/estimates/fundamentals feed — when asked \
+for EPS, earnings, or valuation, say price/positioning only and name the \
+gap."""
 
 GEMINI_URL_TEMPLATE = (
     "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
@@ -111,14 +118,177 @@ def _latest_line(store: Store, store_id: str, name: str, unit: str,
     return f"{name}: {_fmt(points[latest], unit)} ({latest.isoformat()})"
 
 
+def _doc(store: Store, key: str) -> dict:
+    doc = store.doc(key)
+    return doc.payload if doc else {}
+
+
+def build_analyst_pack(store: Store) -> str:
+    """Compact live context pack injected before every market question.
+
+    Regime, stress scores, vol highlights, top sigma-movers, country-risk
+    extremes, hyperscaler issuance, this week's macro calendar, headlines.
+    Budget: well under 3k tokens (~4-6k chars).
+    """
+    lines = []
+    risk = _doc(store, "risk_summary")
+    comp = risk.get("components", {}) if risk else {}
+    lines.append("MARKET SNAPSHOT:")
+    lines.append(
+        f"Regime: {risk.get('regime', 'UNKNOWN')}. "
+        f"{risk.get('verdict', 'no verdict yet')}"
+    )
+    basis = (comp.get("basis_stress") or {}).get("value")
+    auction = (comp.get("auction_stress") or {}).get("value")
+    rec = (comp.get("recession_prob") or {}).get("value")
+    lines.append(
+        f"Stress — basis-trade: {basis if basis is not None else 'n/a'}/100, "
+        f"auction: {auction if auction is not None else 'n/a'}/100, "
+        f"recession prob: {rec if rec is not None else 'n/a'}%."
+    )
+
+    vd = _doc(store, "voldash")
+    if vd.get("rows"):
+        rows = [r for r in vd["rows"] if r.get("pctile_1y") is not None]
+        if rows:
+            richest = max(rows, key=lambda r: r["pctile_1y"])
+            cheapest = min(rows, key=lambda r: r["pctile_1y"])
+            lines.append(
+                f"Vol — {vd.get('regime', 'n/a')}. Richest: {richest['ticker']} "
+                f"{richest['implied']:.1f} ({richest['pctile_1y']:.0f}th %ile); "
+                f"cheapest: {cheapest['ticker']} {cheapest['implied']:.1f} "
+                f"({cheapest['pctile_1y']:.0f}th %ile)."
+            )
+
+    mv = _doc(store, "movers")
+    for idx_id in ("spx", "ndx"):
+        idx = (mv.get("indexes") or {}).get(idx_id) or {}
+        label = idx.get("label", idx_id.upper())
+
+        def _ext(win: str, side: str) -> str:
+            rows = ((idx.get(win) or {}).get(side)) or []
+            if not rows:
+                return "n/a"
+            r = rows[0]
+            return f"{r['symbol']} {r['z']:+.2f}\u03c3 ({r['ret_pct']:+.1f}%)"
+
+        if idx:
+            lines.append(
+                f"Movers {label} — 5d up: {_ext('win5d', 'up')}, down: "
+                f"{_ext('win5d', 'down')}; 20d up: {_ext('win20d', 'up')}, "
+                f"down: {_ext('win20d', 'down')}."
+            )
+
+    cr = _doc(store, "country_risk")
+    countries = cr.get("countries") or []
+    red = [c["code"] for c in countries if c.get("bucket") == "red"]
+    green = [c["code"] for c in countries if c.get("bucket") == "green"]
+    if countries:
+        lines.append(
+            f"Country risk — red zone: {', '.join(red) if red else 'none'}; "
+            f"stable: {', '.join(green) if green else 'none'} "
+            f"({len(countries)} scored)."
+        )
+
+    hyper = _doc(store, "hyper")
+    iss = hyper.get("issuances") or []
+    if iss:
+        bits = []
+        for e in iss[:3]:
+            tranches = e.get("tranches") or []
+            if tranches:
+                t0 = tranches[0]
+                size = (f"${t0['principal_usd'] / 1e9:.1f}B" if t0.get("principal_usd")
+                        else "")
+                bits.append(
+                    f"{e['issuer']} {e['form']} {e['filing_date']}: "
+                    f"{t0['coupon_pct']:.3f}% {t0.get('maturity_year') or 'n/a'} "
+                    f"{size}".strip()
+                )
+            else:
+                bits.append(f"{e['issuer']} {e['form']} {e['filing_date']}")
+        lines.append("Hyperscaler issuance (90d): " + "; ".join(bits) + ".")
+    else:
+        lines.append("Hyperscaler issuance (90d): none filed.")
+
+    cal = _doc(store, "macro_calendar")
+    releases = (cal.get("releases") or [])[:5]
+    if releases:
+        lines.append("Macro this week: " + "; ".join(
+            f"{r.get('country', '')} {r.get('event', '')} "
+            f"({str(r.get('time', ''))[:16]})".strip()
+            for r in releases
+        ) + ".")
+
+    news = _doc(store, "news")
+    items = (news.get("items") or [])[:5]
+    if items:
+        lines.append("Headlines: " + " | ".join(
+            str(i.get("title", ""))[:90] for i in items))
+    return "\n".join(lines)
+
+
+def _constituents() -> set[str]:
+    """SPX + NDX tickers from the vendored lists (same source as movers)."""
+    try:
+        from importlib.resources import files
+        out: set[str] = set()
+        for fn in ("sp500.txt", "ndx100.txt"):
+            text = files("collector.data").joinpath(fn).read_text()
+            out.update(line.strip().upper()
+                       for line in text.splitlines() if line.strip())
+        return out
+    except Exception:  # noqa: BLE001 — missing data degrades lookup only
+        return set()
+
+
+def company_card(store: Store, message: str) -> str | None:
+    """Single-stock Q&A: sigma-move stats + vol context for a ticker.
+
+    Returns None when the message names no known constituent. Never invents
+    fundamentals — price/positioning only.
+    """
+    tickers = _constituents()
+    if not tickers:
+        return None
+    tokens = re.findall(r"\b[A-Z]{1,5}\b", message.upper())
+    symbol = next((t for t in tokens if t in tickers), None)
+    if symbol is None:
+        return None
+    mv = _doc(store, "movers")
+    uni = (mv.get("all") or {}).get(symbol)
+    lines = [f"COMPANY: {symbol}"]
+    if uni:
+        lines.append(
+            f"Weekly movers run ({mv.get('asof', 'n/a')}): 5d move "
+            f"{uni['z5']:+.2f}\u03c3 ({uni['ret5']:+.1f}%), 20d move "
+            f"{uni['z20']:+.2f}\u03c3 ({uni['ret20']:+.1f}%). "
+            f"Universe: {uni['idx'].upper()}."
+        )
+    else:
+        lines.append("Not in the latest weekly movers run (may have been "
+                     "skipped or the run hasn't completed).")
+    vd = _doc(store, "voldash")
+    if vd.get("regime"):
+        lines.append(f"Vol context: {vd['regime']}.")
+    if re.search(r"\b(eps|earnings|estimate|p/e|valuation|revenue)\b",
+                 message.lower()):
+        lines.append("No earnings/estimates feed — price and positioning "
+                     "only; fundamentals not available in this terminal.")
+    return "\n".join(lines)
+
+
 def build_context(store: Store, cfg: Config, message: str) -> tuple[str, list[str]]:
     """Assemble the grounded context block for a chat question.
 
     Returns (context_text, series_ids_used). The digest comes from the
     stored insights doc (built by the insights scheduler job), never
-    recomputed here.
+    recomputed here. A compact analyst pack (regime, stress, vol, movers,
+    country risk, issuance, calendar, headlines) is always prepended; a
+    company card is appended when the message names a known constituent.
     """
-    lines = ["LATEST VALUES (terminal data):"]
+    lines = [build_analyst_pack(store), ""]
+    lines.append("LATEST VALUES (terminal data):")
     for s in cfg.series:
         line = _latest_line(store, f"macro:{s.id}", s.name, s.unit, s.transform)
         if line:
@@ -178,6 +348,9 @@ def build_context(store: Store, cfg: Config, message: str) -> tuple[str, list[st
         step = max(1, len(ordered) // MAX_HISTORY_POINTS)
         for d, v in ordered[::step]:
             lines.append(f"{d.isoformat()}: {v:.4g}")
+    card = company_card(store, message)
+    if card:
+        lines.append(f"\n{card}")
     return "\n".join(lines), series_ids
 
 
