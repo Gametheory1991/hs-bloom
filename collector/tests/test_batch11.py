@@ -379,3 +379,27 @@ def test_figi_lookup_proxies_openfigi(tmp_path, monkeypatch):
     row = body["results"][0]
     assert row["ticker"] == "AAPL" and row["figi"] == "BBG000BPH459"
     assert row["composite_figi"] is None or isinstance(row["composite_figi"], str)
+
+
+def test_figi_lookup_ticker_uses_bare_ticker_idtype_with_us_exchange(tmp_path, monkeypatch):
+    """Regression: ID_TICKER returns zero rows from OpenFIGI; TICKER+US works."""
+    import httpx as _httpx
+    monkeypatch.setenv("OPENFIGI_API_KEY", "test-key")
+    results = json.loads((FIX / "openfigi_mapping_sample.json").read_text())
+
+    class Resp:
+        status_code = 200
+        def json(self):
+            return results
+
+    seen = {}
+
+    def fake_post(url, json=None, headers=None, timeout=None):
+        seen["job"] = json[0]
+        return Resp()
+
+    monkeypatch.setattr(_httpx, "post", fake_post)
+    client = _figi_client(tmp_path, monkeypatch)
+    body = client.get("/api/figi/lookup", params={"idtype": "TICKER", "idvalue": "AAPL"}).json()
+    assert body["ok"] is True
+    assert seen["job"] == {"idType": "TICKER", "idValue": "AAPL", "exchCode": "US"}
