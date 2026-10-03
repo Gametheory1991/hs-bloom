@@ -38,6 +38,7 @@ def test_register_jobs_creates_all_jobs_with_config_cadences(tmp_path):
         "gse", "xcorr", "voldash", "movers", "home_radar", "hyperscaler",
         "ai_capex", "ai_graph", "ms_capex", "ms_graph", "trace_treasury", "trace_monthly", "ice_star",
         "finra_short", "finra_margin", "tsv_capex", "tsv_graph", "tsv_watch", "newsletter",
+        "worldbank", "usaspending", "coingecko", "openfigi", "finnhub",
     }
     assert jobs["equity"].trigger.interval.total_seconds() == 300
     assert jobs["news"].trigger.interval.total_seconds() == 600
@@ -51,6 +52,11 @@ def test_register_jobs_creates_all_jobs_with_config_cadences(tmp_path):
     assert jobs["cycle"].trigger.interval.total_seconds() == 86400
     assert jobs["insights"].trigger.interval.total_seconds() == 1800
     assert jobs["newsletter"].trigger.interval.total_seconds() == 1800
+    assert jobs["worldbank"].trigger.interval.total_seconds() == 604800
+    assert jobs["usaspending"].trigger.interval.total_seconds() == 604800
+    assert jobs["coingecko"].trigger.interval.total_seconds() == 86400
+    assert jobs["openfigi"].trigger.interval.total_seconds() == 604800
+    assert jobs["finnhub"].trigger.interval.total_seconds() == 86400
     assert all(j.misfire_grace_time == 30 for j in jobs.values())
 
 
@@ -61,4 +67,4 @@ def test_main_builds_app(tmp_path, monkeypatch):
 
     app, scheduler = build()
     assert app.title == "os-bloom collector"
-    assert len(scheduler.get_jobs()) == 39
+    assert len(scheduler.get_jobs()) == 44
