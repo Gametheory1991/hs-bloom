@@ -19,11 +19,13 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from collector.config import Config
 from collector.fetchers.bonds import fetch_bonds
+from collector.fetchers.correlation import refresh_xcorr
 from collector.fetchers.cycle import fetch_cycle
 from collector.fetchers.cftc_pos import fetch_cftc_positioning
 from collector.fetchers.country_risk import refresh_country_risk
 from collector.fetchers.equity import fetch_equity
 from collector.fetchers.fred import fetch_macro_history
+from collector.fetchers.gse import fetch_gse
 from collector.fetchers.macro import fetch_calendar_if_due
 from collector.fetchers.midnight import fetch_midnight
 from collector.fetchers.morpho import fetch_morpho
@@ -44,6 +46,7 @@ from collector.runner import run_fetcher
 from collector.store import Store
 
 MACRO_HISTORY_SECONDS = 86400  # daily; not config — no reason to tune it
+GSE_SECONDS = 30 * 86400  # monthly; the GSE summaries release ~25d after month-end
 
 
 def register_jobs(
@@ -93,6 +96,14 @@ def register_jobs(
         # .get() guard so an old config.yaml can't break registration.
         "country_risk": (cfg.cadences.get("country_risk", 86400), partial(refresh_country_risk, store),
                  start + timedelta(seconds=600)),
+        # GSE retained portfolios: monthly PDFs from Fannie Mae + Freddie Mac
+        # (needs pdftotext; see fetchers/gse.py). .get() guard like the risk job.
+        "gse": (cfg.cadences.get("gse", GSE_SECONDS), partial(fetch_gse, store, get_bytes), start),
+        # cross-asset correlations + realized vol: compute-only, reads
+        # idx:/yield:/cycle: history. Starts after country_risk; same
+        # graceful-degradation contract and .get() guard.
+        "xcorr": (cfg.cadences.get("xcorr", 86400), partial(refresh_xcorr, store),
+                 start + timedelta(seconds=900)),
         "newsletter": (cfg.cadences["insights"], partial(deliver_newsletter, store, smtp_cfg), start + timedelta(seconds=5)),
     }
     for name, (seconds, fn, next_run_time) in fetchers.items():

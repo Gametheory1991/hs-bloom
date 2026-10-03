@@ -4,7 +4,7 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from statistics import mean, pstdev
 
 from collector.changes import apply_transform, ref_close
@@ -70,6 +70,11 @@ def _series_catalog(cfg: Config) -> list[DigestSeries]:
             DigestSeries(f.id, f"ref:{f.id}", f.label, "%")
             for f in cfg.refs.funding
         ],
+        # GSE retained portfolios ($M, monthly): hardcoded — the gse job has
+        # no config block, its store keys are fixed (see fetchers/gse.py).
+        DigestSeries("gse-fannie", "gse:fannie-retained", "Fannie Mae retained portfolio", "$m"),
+        DigestSeries("gse-freddie", "gse:freddie-retained", "Freddie Mac retained portfolio", "$m"),
+        DigestSeries("gse-freddie-agency", "gse:freddie-agency", "Freddie Mac agency MBS in portfolio", "$m"),
     ]
     deduped: list[DigestSeries] = []
     seen: set[str] = set()
@@ -86,6 +91,8 @@ def _fmt_value(value: float, unit: str) -> str:
         return f"{value:.2f}%"
     if unit == "px":
         return f"{value:,.1f}"
+    if unit == "$m":  # GSE retained portfolios, $ millions -> $ billions
+        return f"${value / 1000:,.1f}B"
     if unit in {"k", "m", "idx", "pts", "ratio"}:
         return f"{value:.2f}"
     return f"{value:.0f}" if float(value).is_integer() else f"{value:.2f}"
@@ -110,12 +117,93 @@ def _coverage(store: Store, tracked_series: int, active_series: int) -> dict:
     }
 
 
+def _ref_on_or_before(hist: dict, asof: date, days_back: int) -> float | None:
+    """Latest point on or before asof - days_back (ref_close has no 3m horizon)."""
+    target = asof - timedelta(days=days_back)
+    prior = [d for d in hist if d <= target]
+    return hist[max(prior)] if prior else None
+
+
+def _mbs_note(store: Store, gse_payload: dict | None) -> dict | None:
+    """MBS plumbing read-out, only when the GSE data is real.
+
+    Fannie Mae + Freddie Mac retained portfolios ($M, monthly) plus the MBB
+    price 3m move. Surfaces the "who is buying mortgages" story (record MBB
+    outflows, GSEs on hold) without inventing flow quantities."""
+    if not gse_payload:
+        return None
+    try:
+        pts_mbb = store.points("cycle:mbb-us")
+    except Exception:  # noqa: BLE001
+        pts_mbb = {}
+    series = []
+    total = 0.0
+    chg_3m_total: float | None = 0.0
+    for doc_key, store_key, label in (
+        ("fannie_retained", "gse:fannie-retained", "Fannie Mae"),
+        ("freddie_retained", "gse:freddie-retained", "Freddie Mac"),
+    ):
+        entry = (gse_payload or {}).get(doc_key) or {}
+        value = entry.get("value_usd_m")
+        asof = entry.get("date")
+        if value is None or asof is None:
+            continue
+        total += value
+        try:
+            hist = store.points(store_key)
+        except Exception:  # noqa: BLE001
+            hist = {}
+        chg = None
+        if hist:
+            asof_d = datetime.fromisoformat(asof).date()
+            ref = _ref_on_or_before(hist, asof_d, 90)
+            chg = None if ref is None else round(value - ref, 1)
+        if chg is None:
+            chg_3m_total = None
+        elif chg_3m_total is not None:
+            chg_3m_total += chg
+        series.append({"label": label, "value_usd_m": value, "asof": asof,
+                       "chg_3m_m": chg})
+    if not series:
+        return None
+    mbb_chg = None
+    if pts_mbb:
+        asof_d = max(pts_mbb)
+        ref = _ref_on_or_before(pts_mbb, asof_d, 90)
+        if ref:
+            mbb_chg = round(100.0 * (pts_mbb[asof_d] - ref) / ref, 2)
+    note = {
+        "asof": series[0]["asof"],
+        "combined_retained_usd_m": round(total, 1),
+        "combined_chg_3m_m": chg_3m_total,
+        "series": series,
+        "mbb_3m_pct": mbb_chg,
+    }
+    if chg_3m_total is not None and chg_3m_total < 0 and (mbb_chg or 0) < 0:
+        note["stress"] = (
+            f"GSE retained portfolios shrinking "
+            f"(${chg_3m_total / 1000:+.1f}B 3m) while MBB is down {mbb_chg:.1f}% 3m — "
+            f"mortgage demand is leaving, not arriving."
+        )
+    elif chg_3m_total is not None and chg_3m_total < 0:
+        note["stress"] = (
+            f"GSE retained portfolios shrinking "
+            f"(${chg_3m_total / 1000:+.1f}B 3m) — no marginal GSE bid for MBS."
+        )
+    return note
+
+
 def build_digest(store: Store, cfg: Config, now: datetime | None = None) -> dict:
     now = now or datetime.now(timezone.utc)
     risk_doc = store.doc("risk_summary")
     risk_payload = risk_doc.payload if risk_doc else None
     cr_doc = store.doc("country_risk")
     cr_payload = cr_doc.payload if cr_doc else None
+    xc_doc = store.doc("xcorr")
+    xc_payload = xc_doc.payload if xc_doc else None
+    gse_doc = store.doc("gse")
+    gse_payload = gse_doc.payload if gse_doc else None
+    mbs_note = _mbs_note(store, gse_payload)
     anomalies = []
     trends = []
     active_series = 0
@@ -167,6 +255,8 @@ def build_digest(store: Store, cfg: Config, now: datetime | None = None) -> dict
     trends.sort(key=lambda row: row["trend_score"], reverse=True)
     coverage = _coverage(store, tracked_series=len(_series_catalog(cfg)), active_series=active_series)
     lead = anomalies[0]["name"] if anomalies else trends[0]["name"] if trends else "No strong moves yet"
+    xc_pairs = (xc_payload or {}).get("pairs", [])
+    xc_extreme = [p for p in xc_pairs if p.get("extreme")]
     newsletter = {
         "headline": (
             f"{len(anomalies)} anomalies and {len(trends)} strong trends across "
@@ -179,7 +269,17 @@ def build_digest(store: Store, cfg: Config, now: datetime | None = None) -> dict
             f"Cross-market coverage: {coverage['defi_rows']} DeFi rows, "
             f"{coverage['midnight_rows']} Midnight maturities, "
             f"{coverage['morpho_rows']} Morpho markets, {coverage['refs_rows']} rate refs.",
-        ] + [
+        ]
+        + ([
+            "Correlation regime: "
+            + "; ".join(
+                f"{p['label']} {p['corr_60d']:+.2f} (60d)"
+                for p in xc_extreme[:3]
+            )
+            + "."
+        ] if xc_extreme else [])
+        + ([f"MBS plumbing — {mbs_note['stress']}"] if mbs_note and mbs_note.get("stress") else [])
+        + [
             f"Anomaly — {row['name']}: {row['summary']}."
             for row in anomalies[:2]
         ] + [
@@ -199,6 +299,13 @@ def build_digest(store: Store, cfg: Config, now: datetime | None = None) -> dict
             # country risk map buckets: the daily Drive snapshot pulls this
             # digest, so the map data lands in Harry's Drive with it
             "country_risk": [(c["code"], c["bucket"]) for c in (cr_payload or {}).get("countries", [])],
+            # extreme cross-asset correlations: the newsletter fires when the
+            # correlation regime flips, not just on new anomalies
+            "xcorr_extreme": sorted(
+                f"{p['id']}:{p['corr_60d']:+.2f}" for p in xc_extreme
+            ),
+            # MBS stress read-out (real GSE data only)
+            "mbs_stress": (mbs_note or {}).get("stress"),
         },
         sort_keys=True,
     ).encode("utf-8")).hexdigest()[:16]
@@ -210,6 +317,8 @@ def build_digest(store: Store, cfg: Config, now: datetime | None = None) -> dict
         "newsletter": newsletter,
         "risk": risk_payload,
         "country_risk": cr_payload,
+        "xcorr": xc_payload,
+        "mbs": mbs_note,
     }
 
 

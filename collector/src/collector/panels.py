@@ -194,6 +194,63 @@ def _country_risk_panel(store: Store) -> dict:
             "source": doc.source}
 
 
+def _gse_panel(store: Store) -> dict:
+    """GSE retained-portfolio balances (Fannie Mae + Freddie Mac, $M monthly).
+
+    Latest value plus 3m/12m changes computed from the stored month-end
+    history; a series with no data yet degrades to null cells."""
+    doc = store.doc("gse")
+    out = {"updated_at": doc.updated_at if doc else None,
+           "source": doc.source if doc else None, "series": []}
+
+    def ref_back(pts: dict, asof, days: int):
+        target = asof - timedelta(days=days)
+        prior = [d for d in pts if d <= target]
+        return pts[max(prior)] if prior else None
+
+    for key, label in (
+        ("gse:fannie-retained", "Fannie Mae retained"),
+        ("gse:freddie-retained", "Freddie Mac retained"),
+        ("gse:freddie-agency", "Freddie Mac agency MBS"),
+    ):
+        try:
+            pts = store.points(key)
+        except Exception:  # noqa: BLE001
+            pts = {}
+        if not pts:
+            out["series"].append({"id": key, "label": label, "value_m": None,
+                                  "asof": None, "chg_3m_m": None, "chg_12m_m": None})
+            continue
+        asof = max(pts)
+        value = pts[asof]
+        ref_3m = ref_back(pts, asof, 90)
+        ref_12m = ref_back(pts, asof, 365)
+        out["series"].append({
+            "id": key, "label": label, "value_m": value,
+            "asof": asof.isoformat(),
+            "chg_3m_m": None if ref_3m is None else round(value - ref_3m, 1),
+            "chg_12m_m": None if ref_12m is None else round(value - ref_12m, 1),
+        })
+    return out
+
+
+def _xcorr_panel(store: Store) -> dict:
+    """Cross-asset correlation matrices + regime pairs + realized vol."""
+    doc = store.doc("xcorr")
+    if doc is None:
+        return {"asof": None, "labels": [], "keys": [], "matrix_60d": [],
+                "matrix_252d": [], "pairs": [], "rvol": [],
+                "updated_at": None, "source": None}
+    p = doc.payload
+    return {"asof": p.get("asof"), "labels": p.get("labels", []),
+            "keys": p.get("keys", []),
+            "matrix_60d": p.get("matrix_60d", []),
+            "matrix_252d": p.get("matrix_252d", []),
+            "n_obs_60d": p.get("n_obs_60d"), "n_obs_252d": p.get("n_obs_252d"),
+            "pairs": p.get("pairs", []), "rvol": p.get("rvol", []),
+            "updated_at": doc.updated_at, "source": doc.source}
+
+
 def _insights_panel(store: Store) -> dict:
     doc = store.doc("insights")
     status = store.doc("newsletter_status")
@@ -246,5 +303,7 @@ def build_dashboard(
             "cycle": _cycle_panel(store, list(cycle_series), list(cycle_tabs)),
             "insights": _insights_panel(store),
             "riskmap": _country_risk_panel(store),
+            "gse": _gse_panel(store),
+            "xcorr": _xcorr_panel(store),
         },
     }

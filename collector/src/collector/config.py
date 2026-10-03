@@ -56,6 +56,7 @@ class CycleSeriesCfg:
     cboe: str | None = None        # exact ratio name in the CBOE daily JSON
     aaii: str | None = None        # "bull_bear_spread"
     ofr: str | None = None         # OFR Hedge Fund Monitor mnemonic (dataset=fpf)
+    yahoo: str | None = None       # single Yahoo symbol, daily closes (e.g. MBB, ^VIX3M)
     yahoo_ratio: list[str] | None = None  # [numerator, denominator] yahoo symbols
 
 
