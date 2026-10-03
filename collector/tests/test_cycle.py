@@ -97,6 +97,18 @@ async def test_fetch_cycle_unconfigured_source_reports_error(tmp_path):
         await fetch_cycle(series, store, "k", get_text, get_text)
 
 
+async def test_fetch_cycle_skips_external_series(tmp_path):
+    store = Store(tmp_path / "t.db")
+    series = [CycleSeriesCfg(id="trace-ust-par", name="T", unit="$bn",
+                             external=True)]
+
+    async def get_text(url, params=None, headers=None):
+        raise AssertionError("external series must not be fetched")
+
+    assert await fetch_cycle(series, store, "k", get_text, get_text) == "cycle"
+    assert store.points("cycle:trace-ust-par") == {}
+
+
 async def test_fetch_cycle_valid_range_drops_corrupt_points(tmp_path):
     store = Store(tmp_path / "t.db")
     series = [CycleSeriesCfg(id="ism", name="ISM", unit="idx", dbnomics="ISM/pmi/pm",

@@ -48,6 +48,12 @@ def _install_stubs(monkeypatch):
         monkeypatch.setitem(sys.modules, f"collector.fetchers.{name}",
                             types.ModuleType(f"collector.fetchers.{name}"))
     monkeypatch.setitem(sys.modules, "collector.fetchers.yahoo", yahoo)
+    # `from collector.fetchers import yahoo` binds the package attribute, not
+    # sys.modules: patch the attribute too or an earlier import of the real
+    # module leaks through (order-dependent failure).
+    import collector.fetchers as _pkg
+
+    monkeypatch.setattr(_pkg, "yahoo", yahoo, raising=False)
     # force re-import of cycle with the stubs in place
     sys.modules.pop("collector.fetchers.cycle", None)
     import collector.fetchers.cycle as cycle_mod

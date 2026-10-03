@@ -47,6 +47,12 @@ def _install_yahoo(monkeypatch, by_symbol):
 
     yahoo.fetch_chart = fetch_chart
     monkeypatch.setitem(sys.modules, "collector.fetchers.yahoo", yahoo)
+    # `from collector.fetchers import yahoo` binds the package attribute, not
+    # sys.modules: patch the attribute too or an earlier import of the real
+    # module leaks through (order-dependent failure).
+    import collector.fetchers as _pkg
+
+    monkeypatch.setattr(_pkg, "yahoo", yahoo, raising=False)
 
 
 @pytest.fixture(autouse=True)

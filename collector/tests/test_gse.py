@@ -150,12 +150,10 @@ def test_pdftotext_missing_gives_clear_error(monkeypatch):
         gse._pdftotext(b"%PDF-1.4")
 
 
-def test_millennium_snippet():
-    """The 13F snippet carries Millennium's EDGAR-verified CIK."""
-    raw = yaml.safe_load(
-        (Path(__file__).parent.parent.parent / "millennium-13f-snippet.yaml").read_text()
-    )
-    (entry,) = raw["thirteenf"]["watchlist_add"]
-    assert entry["name"] == "Millennium Management"
-    assert entry["cik"] == "0001273087"  # verified live 2026-10-03 via EDGAR
-    assert len(entry["cik"]) == 10 and entry["cik"].isdigit()
+def test_millennium_watchlist_cik():
+    """The 13F watchlist carries Millennium's EDGAR-verified CIK."""
+    from collector.config import load_config
+    cfg = load_config(Path(__file__).parent.parent.parent / "config.yaml")
+    by_name = {w.name: w for w in cfg.thirteenf.watchlist}
+    assert by_name["Millennium Management"].cik == "0001273087"  # verified live 2026-10-03 via EDGAR
+    assert len(by_name["Millennium Management"].cik) == 10

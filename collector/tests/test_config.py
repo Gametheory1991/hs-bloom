@@ -11,12 +11,16 @@ def test_load_real_config():
     spx = cfg.indexes[0]
     assert (spx.symbol, spx.yahoo) == ("SPX", "^GSPC")
     assert spx.yahoo == "^GSPC"
-    assert {b.country for b in cfg.bonds} == {"US", "DE"}
+    assert {b.country for b in cfg.bonds} == {
+        "US", "DE", "FR", "IT", "ES", "NL", "BE", "UK", "JP", "CA", "AU", "CH", "SE"
+    }
     us = next(b for b in cfg.bonds if b.country == "US")
     assert us.fred == "DGS10"
     de = next(b for b in cfg.bonds if b.country == "DE")
     assert de.bundesbank == "D.I.ZST.ZI.EUR.S1311.B.A604.R10XX.R.A.A._Z._Z.A"
-    assert not any(b.country == "UK" for b in cfg.bonds)  # no keyless gilt source
+    # UK via FRED monthly OECD MEI is fine (the old exclusion was about
+    # scraping the BoE IADB daily CSV, whose path robots.txt disallows).
+    assert any(b.country == "UK" and b.fred == "IRLTLT01GBM156N" for b in cfg.bonds)
     assert cfg.cadences["equity"] == 300
     assert cfg.max_news == 15
     ids = [s.id for s in cfg.series]
@@ -105,13 +109,19 @@ def test_cycle_config():
     assert by_id["vix"].transform == "none"  # default
     # every source entry has exactly one source key
     for s in cfg.cycle_series:
-        sources = [s.fred, s.dbnomics, s.oecd, s.cftc, s.cboe, s.aaii, s.yahoo_ratio]
-        assert sum(x is not None for x in sources) == 1, s.id
+        sources = [s.fred, s.dbnomics, s.oecd, s.cftc, s.cboe, s.cftc_oi,
+                   s.aaii, s.ofr, s.yahoo, s.yahoo_ratio,
+                   s.fred_spread, s.fred_ratio, s.eia_wpsr,
+                   (True if s.wei else None)]
+        if s.external or s.store:
+            assert sum(x is not None for x in sources) == 0, s.id
+        else:
+            assert sum(x is not None for x in sources) == 1, s.id
     # every tab row references an existing series; overlays too
     tabs = {t.id: t for t in cfg.cycle_tabs}
-    assert list(tabs) == ["risk", "econ", "credit", "profit", "pos"]
+    assert list(tabs) == ["risk", "econ", "credit", "profit", "pos", "quant", "etf", "struct"]
     for t in cfg.cycle_tabs:
-        assert t.label == t.id.upper()
+        assert t.label == t.id.upper() or (t.id == "etf" and t.label == "ETFS")
         for p in t.panels:
             for r in p.rows:
                 assert r.series in by_id, r.series

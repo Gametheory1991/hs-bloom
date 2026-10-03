@@ -90,3 +90,25 @@ def test_series_catalog_includes_gse():
 
 def test_fmt_value_millions():
     assert _fmt_value(172596.0, "$m") == "$172.6B"
+
+
+def test_market_structure_note_none_when_empty():
+    from collector.insights import _market_structure_note
+    assert _market_structure_note(FakeStore()) is None
+
+
+def test_market_structure_note_formats_values():
+    from collector.insights import _market_structure_note, _struct_bullet
+    store = FakeStore({
+        "cycle:finra-margin-debit": {date(2026, 8, 1): 1453832.0},
+        "cycle:trace-ust-par": {date(2026, 10, 1): 1743.8},
+        "cycle:trace-corp-par": {date(2026, 8, 31): 1130155.0},
+        "cycle:finra-short-total": {date(2026, 9, 15): 12.5e9},
+    })
+    note = _market_structure_note(store)
+    assert note is not None
+    bullet = _struct_bullet(note)
+    assert "margin debt $1.45T (2026-08)" in bullet
+    assert "Treasury TRACE $1,744B/d (10-01)" in bullet
+    assert "corp TRACE $1.13T/mo (2026-08)" in bullet
+    assert "short interest 12.5B sh (09-15)" in bullet

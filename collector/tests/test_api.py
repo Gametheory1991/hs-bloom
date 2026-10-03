@@ -21,10 +21,10 @@ def test_dashboard_shape_on_empty_store(tmp_path):
     body = client.get("/api/dashboard").json()
     assert set(body["panels"].keys()) == {
         "macro", "equity", "bonds", "news", "defi", "midnight", "morpho", "refs", "cycle",
-        "insights",
+        "insights", "ai_flow", "ms_flow", "gse", "hyper", "movers", "radar", "riskmap", "voldash", "xcorr", "tsv",
     }
     assert [t["id"] for t in body["panels"]["cycle"]["tabs"]] == [
-        "risk", "econ", "credit", "profit", "pos",
+        "risk", "econ", "credit", "profit", "pos", "quant", "etf", "struct",
     ]
 
 
@@ -88,7 +88,7 @@ def test_series_endpoint_serves_bond_and_cb_ids(tmp_path):
     assert y3m["unit"] == "%" and y3m["points"] == [["2026-07-08", 3.89]]
     cb = client.get("/api/series/USCB?range=max").json()
     assert cb["name"] == "FED" and cb["points"] == [["2026-07-08", 3.75]]
-    assert client.get("/api/series/JP10Y").status_code == 404  # not in config
+    assert client.get("/api/series/BR10Y").status_code == 404  # not in config
 
 
 def test_series_bad_range_422(tmp_path):
