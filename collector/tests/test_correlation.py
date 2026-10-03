@@ -101,35 +101,44 @@ def test_refresh_xcorr_end_to_end():
     store = Store(":memory:")
     n = 300
     spx = _walk(n, start=5000.0, seed=11)
-    ndx = [v * (1 + 0.001 * i / n) for i, v in enumerate(spx)]  # tracks SPX
+    iwm = [v * (1 + 0.001 * i / n) for i, v in enumerate(spx)]  # tracks SPX
     vix = _walk(n, start=18.0, seed=23)
     y10 = [4.0 + 0.5 * math.sin(i / 25.0) for i in range(n)]
     hy = [4.5 + 0.02 * i / n for i in range(n)]
     usd = _walk(n, start=120.0, seed=31)
+    uso = _walk(n, start=75.0, seed=41)
+    eurusd = _walk(n, start=1.08, seed=43)
     _load(store, "idx:SPX", spx)
-    _load(store, "idx:NDX", ndx)
+    _load(store, "cycle:iwm", iwm)
     _load(store, "cycle:vix", vix)
     _load(store, "yield:US10Y", y10)
     _load(store, "cycle:hy-oas", hy)
     _load(store, "cycle:usd-broad", usd)
+    _load(store, "cycle:uso", uso)
+    _load(store, "cycle:eur-usd", eurusd)
 
     assert refresh_xcorr(store) == "xcorr"
     doc = store.doc("xcorr")
     p = doc.payload
-    assert p["labels"] == ["SPX", "NDX", "US 10Y", "VIX", "HY OAS", "USD broad"]  # UNIVERSE order
-    assert len(p["matrix_60d"]) == 6 and len(p["matrix_60d"][0]) == 6
-    assert len(p["matrix_252d"]) == 6
+    # CBOE-style grouped matrix order (batch 4): only seeded MATRIX keys appear
+    assert p["labels"] == ["SPX", "RTY", "Tsy 10Y", "Oil", "EURUSD"]
+    assert [g[0] for g in p["groups"]] == ["Equities", "Rates", "Commodities",
+                                          "Foreign Exchange"]
+    assert len(p["matrix_60d"]) == 5 and len(p["matrix_60d"][0]) == 5
+    assert len(p["matrix_252d"]) == 5
     # diagonal is 1.0, matrix is symmetric
-    for i in range(6):
+    for i in range(5):
         assert p["matrix_60d"][i][i] == 1.0
-        for j in range(6):
+        for j in range(5):
             assert p["matrix_60d"][i][j] == p["matrix_60d"][j][i]
-    # NDX tracks SPX -> very high 60d correlation
+    # RTY tracks SPX -> very high 60d correlation
     assert p["matrix_60d"][0][1] > 0.9
-    # regime pairs written with history
+    # regime pairs written with history (+ batch-4 pair history for the UI)
     by_id = {q["id"]: q for q in p["pairs"]}
-    assert set(by_id) >= {"spx-ust10y", "hy-spx", "usd-spx", "vix-spx"}
+    assert set(by_id) >= {"spx-ust10y", "hy-spx", "usd-spx", "vix-spx",
+                          "spx-uso"}
     assert store.points("xcorr:spx-ust10y")
+    assert p["pair_hist"]["spx-ust10y"]
     # realized vol written for the series we loaded
     assert store.points("rvol:spx:21d")
     assert store.points("rvol:spx:63d")
