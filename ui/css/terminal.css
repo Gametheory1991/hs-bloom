@@ -231,3 +231,16 @@ path.map-country:hover { stroke: var(--amber); stroke-width: 1.6; }
   width: 72px; height: 5px; background: var(--line); border-radius: 3px; flex: none;
 }
 .pctbar div { height: 100%; background: var(--amber); border-radius: 3px; }
+
+/* VOL tab: CBOE-style implied-vs-realized table */
+.voltable { border-collapse: collapse; font-size: 12px; width: 100%; }
+.voltable th {
+  color: var(--amber); font-size: 10px; letter-spacing: 1px; text-align: right;
+  padding: 4px 6px; border-bottom: 1px solid var(--line); white-space: nowrap;
+}
+.voltable th:first-child, .voltable td:first-child { text-align: left; }
+.voltable td { padding: 4px 6px; text-align: right; border-bottom: 1px dotted var(--line); }
+.voltable td.rich { background: rgba(239, 83, 80, 0.22); color: #ffb3b8; font-weight: 700; }
+.voltable td.cheap { background: rgba(76, 175, 80, 0.18); color: #a5d6a7; font-weight: 700; }
+.up { color: var(--up); }
+.down { color: var(--down); }
