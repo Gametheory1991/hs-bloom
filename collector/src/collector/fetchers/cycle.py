@@ -26,6 +26,8 @@ async def _fetch_one(
         return await oecd.fetch_series(cfg.oecd, get_text)
     if cfg.cftc:
         return await cftc.fetch_net_noncommercial(cfg.cftc, get_text)
+    if cfg.cftc_oi:
+        return await cftc.fetch_open_interest(cfg.cftc_oi, get_text)
     if cfg.cboe:
         return await cboe.fetch_ratio_history(cfg.cboe, get_text, today=today)
     if cfg.aaii:

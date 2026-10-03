@@ -6,9 +6,11 @@ real fetcher code on live main: `idx:<SYM>` in fetchers/equity.py,
 and writes:
 
   doc "xcorr":
-    asof, universe labels, 60d and 252d Pearson correlation matrices,
-    six regime-relevant pairs (60d/252d corr, percentile of the 60d corr vs
-    its own history, extreme flag at |corr| >= 0.7), realized-vol table.
+    asof, CBOE-style ordered labels + group headers, 60d and 252d Pearson
+    correlation matrices (MATRIX subset), regime pairs (60d/252d corr,
+    percentile of the 60d corr vs its own history, extreme flag at
+    |corr| >= 0.7), trailing-1y history per pair for the UI time series,
+    realized-vol table.
   history "xcorr:<pair>"   one point per run (60d corr of the regime pair)
   history "rvol:<key>:21d" / "rvol:<key>:63d"  annualized realized vol, %
 
@@ -42,30 +44,71 @@ EXTREME_AT = 0.7  # |corr_60d| at/above this is flagged as an extreme regime
 
 # (store key, label, change kind). Kinds: "logret" for prices/vol indexes,
 # "diff" for yields and spreads (native units: pp for %, idx points for VIX).
+# The full universe feeds realized vol and regime pairs; MATRIX_KEYS below
+# defines the CBOE-style ordered subset drawn as the triangular matrix.
 UNIVERSE: list[tuple[str, str, str]] = [
     ("idx:SPX", "SPX", "logret"),
     ("idx:NDX", "NDX", "logret"),
     ("idx:SX5E", "SX5E", "logret"),
     ("idx:NKX", "Nikkei", "logret"),
+    ("cycle:iwm", "RTY", "logret"),
+    ("cycle:eem", "EEM", "logret"),
     ("yield:US10Y", "US 10Y", "diff"),
     ("yield:DE10Y", "DE 10Y", "diff"),
+    ("cycle:ust30y", "US 30Y", "diff"),
     ("cycle:vix", "VIX", "logret"),
     ("cycle:vix3m", "VIX3M", "logret"),
+    ("cycle:vvix", "VVIX", "logret"),
+    ("cycle:gvz", "GVZ", "logret"),
+    ("cycle:ovx", "OVX", "logret"),
     ("cycle:ig-oas", "IG OAS", "diff"),
     ("cycle:hy-oas", "HY OAS", "diff"),
     ("cycle:usd-broad", "USD broad", "logret"),
     ("cycle:eur-usd", "EUR/USD", "logret"),
     ("cycle:usd-jpy", "USD/JPY", "logret"),
+    ("cycle:gbp-usd", "GBP/USD", "logret"),
     ("cycle:tlt-shy", "TLT/SHY", "logret"),
+    ("cycle:tlt", "TLT", "logret"),
     ("cycle:mbb-us", "MBB", "logret"),
     ("cycle:hyg", "HYG", "logret"),
+    ("cycle:lqd", "LQD", "logret"),
     ("cycle:gld", "GLD", "logret"),
+    ("cycle:slv", "SLV", "logret"),
+    ("cycle:uso", "USO", "logret"),
+    ("cycle:cu", "Copper", "logret"),
     ("cycle:btc", "BTC", "logret"),
 ]
 
+# CBOE Macro Volatility Digest layout: grouped, triangular, 1M window.
+# (store key, matrix label, group). Groups: (label, first idx, one-past-last).
+MATRIX: list[tuple[str, str, str]] = [
+    ("idx:SPX", "SPX", "Equities"),
+    ("cycle:iwm", "RTY", "Equities"),
+    ("idx:SX5E", "SX5E", "Equities"),
+    ("idx:NKX", "NKY", "Equities"),
+    ("cycle:eem", "MXEF", "Equities"),
+    ("cycle:lqd", "IBIG (IG)", "Corporate Credit"),
+    ("cycle:hyg", "IBHY (HY)", "Corporate Credit"),
+    ("yield:US10Y", "Tsy 10Y", "Rates"),
+    ("cycle:ust30y", "Tsy 30Y", "Rates"),
+    ("cycle:uso", "Oil", "Commodities"),
+    ("cycle:gld", "Gold", "Commodities"),
+    ("cycle:cu", "Copper", "Commodities"),
+    ("cycle:eur-usd", "EURUSD", "Foreign Exchange"),
+    ("cycle:usd-jpy", "USDJPY", "Foreign Exchange"),
+    ("cycle:gbp-usd", "GBPUSD", "Foreign Exchange"),
+]
+
 # Regime-relevant pairs: (pair id, label, key A, label A, key B, label B).
+# First six mirror the CBOE digest's cross-asset time series; the rest are
+# the terminal's own regime gauges.
 PAIRS: list[tuple[str, str, str, str, str, str]] = [
-    ("spx-ust10y", "Stocks vs bonds", "idx:SPX", "SPX", "yield:US10Y", "US 10Y"),
+    ("spx-ust10y", "Equity-Rates", "idx:SPX", "SPX", "yield:US10Y", "Tsy 10Y"),
+    ("spx-lqd", "Equity-Corp Bonds", "idx:SPX", "SPX", "cycle:lqd", "LQD (IG)"),
+    ("spx-uso", "Equity-Oil", "idx:SPX", "SPX", "cycle:uso", "Oil"),
+    ("spx-gld", "Equity-Gold", "idx:SPX", "SPX", "cycle:gld", "Gold"),
+    ("sx5e-eurusd", "Equity-FX (EU)", "idx:SX5E", "SX5E", "cycle:eur-usd", "EUR/USD"),
+    ("nkx-usdjpy", "Equity-FX (JP)", "idx:NKX", "Nikkei", "cycle:usd-jpy", "USD/JPY"),
     ("hy-spx", "Credit vs equity", "cycle:hy-oas", "HY OAS", "idx:SPX", "SPX"),
     ("usd-spx", "USD vs stocks", "cycle:usd-broad", "USD broad", "idx:SPX", "SPX"),
     ("vix-spx", "Vol vs stocks", "cycle:vix", "VIX", "idx:SPX", "SPX"),
@@ -77,13 +120,22 @@ PAIRS: list[tuple[str, str, str, str, str, str]] = [
 RVOL: list[tuple[str, str, str, str]] = [
     ("idx:SPX", "S&P 500", "spx", "%"),
     ("idx:NDX", "Nasdaq 100", "ndx", "%"),
+    ("cycle:iwm", "Russell 2000", "rty", "%"),
+    ("cycle:eem", "Emerging Mkts", "eem", "%"),
+    ("cycle:tlt", "TLT (20Y+ UST)", "tlt", "%"),
     ("cycle:tlt-shy", "TLT/SHY", "tlt-shy", "%"),
     ("cycle:mbb-us", "MBB", "mbb", "%"),
     ("cycle:hyg", "HYG", "hyg", "%"),
+    ("cycle:lqd", "LQD", "lqd", "%"),
     ("cycle:gld", "Gold", "gld", "%"),
+    ("cycle:slv", "Silver", "slv", "%"),
+    ("cycle:uso", "Oil (USO)", "uso", "%"),
+    ("cycle:cu", "Copper", "cu", "%"),
     ("cycle:btc", "Bitcoin", "btc", "%"),
     ("cycle:eur-usd", "EUR/USD", "eur-usd", "%"),
+    ("cycle:gbp-usd", "GBP/USD", "gbp-usd", "%"),
     ("yield:US10Y", "US 10Y yield", "us10y", "pp"),
+    ("cycle:ust30y", "US 30Y yield", "us30y", "pp"),
 ]
 
 TRADING_DAYS = 252
@@ -170,6 +222,20 @@ def refresh_xcorr(store: Store, today: date | None = None) -> str:
         labels[key] = label
 
     keys = list(changes)
+    # CBOE-style matrix: ordered subset, group headers for the triangular UI.
+    mkeys = [k for k, _, _ in MATRIX if k in changes]
+    mlabels = [lbl for k, lbl, _ in MATRIX if k in changes]
+    mgroups: list[list] = []
+    _gseen: dict[str, list] = {}
+    for k, lbl, grp in MATRIX:
+        if k not in changes:
+            continue
+        i = mkeys.index(k)
+        if grp not in _gseen:
+            _gseen[grp] = [grp, i, i + 1]
+        else:
+            _gseen[grp][2] = i + 1
+    mgroups = list(_gseen.values())
     matrices: dict[str, list[list[float | None]]] = {}
     n_obs: dict[str, int] = {}
     for window, min_obs, tag in (
@@ -178,9 +244,9 @@ def refresh_xcorr(store: Store, today: date | None = None) -> str:
     ):
         mat: list[list[float | None]] = []
         n = 0
-        for ka in keys:
+        for ka in mkeys:
             row: list[float | None] = []
-            for kb in keys:
+            for kb in mkeys:
                 if ka == kb:
                     row.append(1.0)
                     continue
@@ -192,6 +258,7 @@ def refresh_xcorr(store: Store, today: date | None = None) -> str:
         n_obs[tag] = n
 
     pairs = []
+    pair_hist: dict[str, list[list]] = {}
     for pid, plabel, ka, la, kb, kb_label in PAIRS:
         if ka not in changes or kb not in changes:
             continue
@@ -206,6 +273,10 @@ def refresh_xcorr(store: Store, today: date | None = None) -> str:
             hist = {}
         pct = _pctile(sorted(hist.values()), c60)
         store.upsert_points(hist_key, [(today, c60)])
+        hist[today] = c60
+        # trailing 1y of the 60d rolling correlation for the UI time series
+        tail = sorted(hist.items())[-WIN_LONG:]
+        pair_hist[pid] = [[d.isoformat(), v] for d, v in tail]
         pairs.append({
             "id": pid,
             "label": plabel,
@@ -233,13 +304,15 @@ def refresh_xcorr(store: Store, today: date | None = None) -> str:
 
     doc = {
         "asof": today.isoformat(),
-        "labels": [labels[k] for k in keys],
-        "keys": keys,
+        "labels": mlabels,
+        "keys": mkeys,
+        "groups": mgroups,
         "matrix_60d": matrices.get("60d", []),
         "matrix_252d": matrices.get("252d", []),
         "n_obs_60d": n_obs.get("60d", 0),
         "n_obs_252d": n_obs.get("252d", 0),
         "pairs": pairs,
+        "pair_hist": pair_hist,
         "rvol": rvol,
     }
     store.put_doc(DOC_KEY, doc, source=SOURCE)
