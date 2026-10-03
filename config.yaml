@@ -29,6 +29,18 @@ cadences:          # seconds between fetcher runs
   home_radar: 86400 # market radar compute; daily (no external HTTP)
   hyperscaler: 604800 # hyperscaler desk; weekly (6 SEC submissions + 424B2 fetches)
 
+  ai_capex: 604800   # AI buildout universe XBRL capex/financials; weekly (quarterly data)
+  ai_graph: 604800   # AI money-flow knowledge graph; weekly (zero HTTP, overlays ai_capex)
+  trace_treasury: 86400  # FINRA Treasury TRACE aggregates; daily file ~8pm ET
+  trace_monthly: 2592000 # FINRA TRACE monthly volume; 3rd biz day after month-end
+  ice_star: 86400        # ICE Vantage daily STAR zip (agency/non-agency securitized)
+  finra_short: 604800    # FINRA short interest 2x/month; weekly poll
+  finra_margin: 2592000  # FINRA margin stats; single file, full history to 1997
+  ms_capex: 604800       # market-structure universe XBRL financials; weekly (quarterly data)
+  ms_graph: 604800       # market-structure money-flow graph; weekly (zero HTTP, overlays ms_capex)
+  tsv_capex: 604800      # tokenized-securities universe XBRL fundamentals; weekly
+  tsv_graph: 604800      # tokenized-securities money-flow graph; weekly (zero HTTP)
+  tsv_watch: 604800      # TSV regulatory scan (SEC press + Federal Register); weekly
 indexes:           # all served by yahoo
   - { symbol: SPX,  name: "S&P 500",       yahoo: "^GSPC" }
   - { symbol: NDX,  name: "Nasdaq 100",    yahoo: "^NDX" }   # validate-in-smoke
@@ -304,6 +316,143 @@ cycle_series:      # market-cycle series (spec 2026-08-24); exactly one source k
   - { id: hy-ig-ratio,    name: "HY OAS / IG OAS",     unit: ratio, fred_ratio: [BAMLH0A0HYM2, BAMLC0A0CM] }
   - { id: emb-lemb-ratio, name: "EMB/LEMB",            unit: ratio, yahoo_ratio: [EMB, LEMB] }
 
+  # ---- batch 7: AI buildout universe (60 tickers, verified live 2026-10-03) ----
+  - { id: ai-nvda, name: "Nvidia", unit: idx, yahoo: "NVDA" }
+  - { id: ai-avgo, name: "Broadcom", unit: idx, yahoo: "AVGO" }
+  - { id: ai-amd, name: "AMD", unit: idx, yahoo: "AMD" }
+  - { id: ai-intc, name: "Intel", unit: idx, yahoo: "INTC" }
+  - { id: ai-mrvl, name: "Marvell", unit: idx, yahoo: "MRVL" }
+  - { id: ai-arm, name: "Arm", unit: idx, yahoo: "ARM" }
+  - { id: ai-tsm, name: "TSMC", unit: idx, yahoo: "TSM" }
+  - { id: ai-asml, name: "ASML", unit: idx, yahoo: "ASML" }
+  - { id: ai-amat, name: "Applied Materials", unit: idx, yahoo: "AMAT" }
+  - { id: ai-lrcx, name: "Lam Research", unit: idx, yahoo: "LRCX" }
+  - { id: ai-klac, name: "KLA", unit: idx, yahoo: "KLAC" }
+  - { id: ai-mu, name: "Micron", unit: idx, yahoo: "MU" }
+  - { id: ai-msft, name: "Microsoft", unit: idx, yahoo: "MSFT" }
+  - { id: ai-googl, name: "Alphabet", unit: idx, yahoo: "GOOGL" }
+  - { id: ai-amzn, name: "Amazon", unit: idx, yahoo: "AMZN" }
+  - { id: ai-meta, name: "Meta", unit: idx, yahoo: "META" }
+  - { id: ai-orcl, name: "Oracle", unit: idx, yahoo: "ORCL" }
+  - { id: ai-aapl, name: "Apple", unit: idx, yahoo: "AAPL" }
+  - { id: ai-crwv, name: "CoreWeave", unit: idx, yahoo: "CRWV" }
+  - { id: ai-nbis, name: "Nebius", unit: idx, yahoo: "NBIS" }
+  - { id: ai-hut, name: "Hut 8", unit: idx, yahoo: "HUT" }
+  - { id: ai-iren, name: "IREN", unit: idx, yahoo: "IREN" }
+  - { id: ai-clsk, name: "CleanSpark", unit: idx, yahoo: "CLSK" }
+  - { id: ai-cifr, name: "Cipher Mining", unit: idx, yahoo: "CIFR" }
+  - { id: ai-wulf, name: "TeraWulf", unit: idx, yahoo: "WULF" }
+  - { id: ai-btdr, name: "Bitdeer", unit: idx, yahoo: "BTDR" }
+  - { id: ai-apld, name: "Applied Digital", unit: idx, yahoo: "APLD" }
+  - { id: ai-dlr, name: "Digital Realty", unit: idx, yahoo: "DLR" }
+  - { id: ai-eqix, name: "Equinix", unit: idx, yahoo: "EQIX" }
+  - { id: ai-ceg, name: "Constellation Energy", unit: idx, yahoo: "CEG" }
+  - { id: ai-vst, name: "Vistra", unit: idx, yahoo: "VST" }
+  - { id: ai-nrg, name: "NRG Energy", unit: idx, yahoo: "NRG" }
+  - { id: ai-tln, name: "Talen Energy", unit: idx, yahoo: "TLN" }
+  - { id: ai-oklo, name: "Oklo", unit: idx, yahoo: "OKLO" }
+  - { id: ai-smr, name: "NuScale", unit: idx, yahoo: "SMR" }
+  - { id: ai-ccj, name: "Cameco", unit: idx, yahoo: "CCJ" }
+  - { id: ai-uuuu, name: "Energy Fuels", unit: idx, yahoo: "UUUU" }
+  - { id: ai-leu, name: "Centrus Energy", unit: idx, yahoo: "LEU" }
+  - { id: ai-gev, name: "GE Vernova", unit: idx, yahoo: "GEV" }
+  - { id: ai-vrt, name: "Vertiv", unit: idx, yahoo: "VRT" }
+  - { id: ai-etn, name: "Eaton", unit: idx, yahoo: "ETN" }
+  - { id: ai-hubb, name: "Hubbell", unit: idx, yahoo: "HUBB" }
+  - { id: ai-emr, name: "Emerson", unit: idx, yahoo: "EMR" }
+  - { id: ai-mod, name: "Modine", unit: idx, yahoo: "MOD" }
+  - { id: ai-tt, name: "Trane", unit: idx, yahoo: "TT" }
+  - { id: ai-carr, name: "Carrier", unit: idx, yahoo: "CARR" }
+  - { id: ai-jci, name: "Johnson Controls", unit: idx, yahoo: "JCI" }
+  - { id: ai-nvt, name: "nVent Electric", unit: idx, yahoo: "NVT" }
+  - { id: ai-powl, name: "Powell Industries", unit: idx, yahoo: "POWL" }
+  - { id: ai-anet, name: "Arista", unit: idx, yahoo: "ANET" }
+  - { id: ai-csco, name: "Cisco", unit: idx, yahoo: "CSCO" }
+  - { id: ai-cien, name: "Ciena", unit: idx, yahoo: "CIEN" }
+  - { id: ai-stx, name: "Seagate", unit: idx, yahoo: "STX" }
+  - { id: ai-wdc, name: "Western Digital", unit: idx, yahoo: "WDC" }
+  - { id: ai-sndk, name: "SanDisk", unit: idx, yahoo: "SNDK" }
+  - { id: ai-dell, name: "Dell", unit: idx, yahoo: "DELL" }
+  - { id: ai-smci, name: "Super Micro", unit: idx, yahoo: "SMCI" }
+  - { id: ai-hpe, name: "HPE", unit: idx, yahoo: "HPE" }
+  - { id: ai-eme, name: "EMCOR", unit: idx, yahoo: "EME" }
+  - { id: ai-fix, name: "Comfort Systems", unit: idx, yahoo: "FIX" }
+  # ---- batch 6: ICE BofA effective yields on FRED (daily) ----
+  - { id: ig-yield,    name: "US IG effective yield", unit: "%", fred: BAMLC0A0CMEY }
+  - { id: hy-yield,    name: "US HY effective yield", unit: "%", fred: BAMLH0A0HYM2EY }
+  # ---- batch 6: FINRA TRACE Treasury (daily; external: dedicated job writes cycle:<id>) ----
+  - { id: trace-ust-par,         name: "Treasury TRACE par $bn",       unit: "$bn", external: true }
+  - { id: trace-ust-trades,      name: "Treasury TRACE trades",        unit: "k",   external: true }
+  - { id: trace-ust-bills-par,   name: "Treasury TRACE bills par $bn", unit: "$bn", external: true }
+  - { id: trace-ust-coupons-par, name: "Treasury TRACE coupons par $bn", unit: "$bn", external: true }
+  - { id: trace-ust-tips-par,    name: "Treasury TRACE TIPS par $bn",  unit: "$bn", external: true }
+  # ---- batch 6: FINRA TRACE monthly (external) ----
+  - { id: trace-corp-par,    name: "Corp TRACE par $M",    unit: "$M", external: true }
+  - { id: trace-corp-trades, name: "Corp TRACE trades",    unit: "k",  external: true }
+  - { id: trace-tba-par,     name: "TBA TRACE par $M",     unit: "$M", external: true }
+  - { id: trace-mbs-par,     name: "MBS TRACE par $M",     unit: "$M", external: true }
+  - { id: trace-agcy-par,    name: "Agency TRACE par $M",  unit: "$M", external: true }
+  - { id: trace-cmo-par,     name: "CMO TRACE par $M",     unit: "$M", external: true }
+  - { id: trace-abs-par,     name: "ABS TRACE par $M",     unit: "$M", external: true }
+  - { id: trace-absx-par,    name: "ABSX TRACE par $M",    unit: "$M", external: true }
+  # ---- batch 6: ICE Vantage STAR (daily; external) ----
+  - { id: ice-star-agency-par,        name: "ICE STAR agency par $bn",       unit: "$bn", external: true }
+  - { id: ice-star-agency-trades,     name: "ICE STAR agency trades",        unit: "k",   external: true }
+  - { id: ice-star-nonagency-par,     name: "ICE STAR non-agency par $bn",   unit: "$bn", external: true }
+  - { id: ice-star-nonagency-trades,  name: "ICE STAR non-agency trades",    unit: "k",   external: true }
+  # ---- batch 6: FINRA short interest (2x/month; external) ----
+  - { id: finra-short-total, name: "Total short interest (shares)", unit: "sh", external: true }
+  - { id: short-MSFT,  name: "MSFT short interest",  unit: "sh", external: true }
+  - { id: short-NVDA,  name: "NVDA short interest",  unit: "sh", external: true }
+  - { id: short-AAPL,  name: "AAPL short interest",  unit: "sh", external: true }
+  - { id: short-AMZN,  name: "AMZN short interest",  unit: "sh", external: true }
+  - { id: short-GOOGL, name: "GOOGL short interest", unit: "sh", external: true }
+  - { id: short-META,  name: "META short interest",  unit: "sh", external: true }
+  # ---- batch 6: FINRA margin stats (monthly; external) ----
+  - { id: finra-margin-debit,         name: "Margin debt $M",        unit: "$M", external: true }
+  - { id: finra-margin-credit-cash,   name: "Free credit cash $M",   unit: "$M", external: true }
+  - { id: finra-margin-credit-margin, name: "Free credit margin $M",  unit: "$M", external: true }
+  # ---- batch 8: market-structure universe (22 tickers, verified live 2026-10-03) ----
+  - { id: ms-stt,  name: "State Street",        unit: idx, yahoo: "STT" }
+  - { id: ms-blk,  name: "BlackRock",           unit: idx, yahoo: "BLK" }
+  - { id: ms-ssnc, name: "SS&C Technologies",   unit: idx, yahoo: "SSNC" }
+  - { id: ms-br,   name: "Broadridge",          unit: idx, yahoo: "BR" }
+  - { id: ms-tw,   name: "Tradeweb",            unit: idx, yahoo: "TW" }
+  - { id: ms-mktx, name: "MarketAxess",         unit: idx, yahoo: "MKTX" }
+  - { id: ms-virt, name: "Virtu Financial",     unit: idx, yahoo: "VIRT" }
+  - { id: ms-schw, name: "Charles Schwab",      unit: idx, yahoo: "SCHW" }
+  - { id: ms-ibkr, name: "Interactive Brokers", unit: idx, yahoo: "IBKR" }
+  - { id: ms-hood, name: "Robinhood",           unit: idx, yahoo: "HOOD" }
+  - { id: ms-ms,   name: "Morgan Stanley",      unit: idx, yahoo: "MS" }
+  - { id: ms-gs,   name: "Goldman Sachs",       unit: idx, yahoo: "GS" }
+  - { id: ms-jpm,  name: "JPMorgan Chase",      unit: idx, yahoo: "JPM" }
+  - { id: ms-bac,  name: "Bank of America",     unit: idx, yahoo: "BAC" }
+  - { id: ms-c,    name: "Citigroup",           unit: idx, yahoo: "C" }
+  - { id: ms-bcs,  name: "Barclays",            unit: idx, yahoo: "BCS" }
+  - { id: ms-ubs,  name: "UBS Group",           unit: idx, yahoo: "UBS" }
+  - { id: ms-lpla, name: "LPL Financial",       unit: idx, yahoo: "LPLA" }
+  - { id: ms-cme,  name: "CME Group",           unit: idx, yahoo: "CME" }
+  - { id: ms-ice,  name: "ICE",                 unit: idx, yahoo: "ICE" }
+  - { id: ms-ndaq, name: "Nasdaq",              unit: idx, yahoo: "NDAQ" }
+  - { id: ms-cboe, name: "Cboe Global Markets", unit: idx, yahoo: "CBOE" }
+  # ---- batch 9: TSV-related listed equities (verified live 2026-10-03) ----
+  - { id: tsv-coin, name: "Coinbase", unit: idx, yahoo: "COIN" }
+  - { id: tsv-hood, name: "Robinhood", unit: idx, yahoo: "HOOD" }
+  - { id: tsv-blsh, name: "Bullish", unit: idx, yahoo: "BLSH" }
+  - { id: tsv-btcs, name: "BTCS Inc.", unit: idx, yahoo: "BTCS" }
+  - { id: tsv-ndaq, name: "Nasdaq", unit: idx, yahoo: "NDAQ" }
+  - { id: tsv-ice, name: "Intercontinental Exchange", unit: idx, yahoo: "ICE" }
+  # ---- batch 10: TRACE extensions (verified live 2026-10-03) ----
+  - { id: trace-ust-frns-par,  name: "Treasury TRACE FRN par $bn",         unit: "$bn",  external: true }
+  - { id: trace-ust-onrun-par, name: "Treasury TRACE on-the-run par $bn",  unit: "$bn",  external: true }
+  - { id: trace-ust-offrun-par, name: "Treasury TRACE off-the-run par $bn", unit: "$bn", external: true }
+  - { id: trace-conv-par,      name: "Convertible TRACE par $M",          unit: "$M",   external: true }
+  - { id: trace-conv-trades,   name: "Convertible TRACE trades",          unit: "k",    external: true }
+  - { id: trace-chrc-par,      name: "Church-plan TRACE par $M",          unit: "$M",   external: true }
+  - { id: trace-chrc-trades,   name: "Church-plan TRACE trades",          unit: "k",    external: true }
+  - { id: trace-eln-par,       name: "Equity-linked note TRACE par $M",   unit: "$M",   external: true }
+  - { id: trace-eln-trades,    name: "Equity-linked note TRACE trades",   unit: "k",    external: true }
+  - { id: trace-corp-cust-share, name: "Corp TRACE customer par share",   unit: ratio, external: true }
 cycle_tabs:        # layout only; rows reference cycle_series ids
   - id: risk
     label: RISK
@@ -379,6 +528,8 @@ cycle_tabs:        # layout only; rows reference cycle_series ids
           - { series: hy-ig-ratio }
           - { series: nfci }
           - { series: bank-lending }
+          - { series: ig-yield }
+          - { series: hy-yield }
   - id: profit
     label: PROFIT
     panels:
@@ -465,6 +616,57 @@ cycle_tabs:        # layout only; rows reference cycle_series ids
         rows:
           - { series: cu-au-ratio }
 
+  - id: struct
+    label: STRUCT
+    panels:
+      - title: "TRACE — TREASURY (FINRA, DAILY)"
+        rows:
+          - { series: trace-ust-par }
+          - { series: trace-ust-trades }
+          - { series: trace-ust-bills-par }
+          - { series: trace-ust-coupons-par }
+          - { series: trace-ust-tips-par }
+          - { series: trace-ust-frns-par }
+          - { series: trace-ust-onrun-par }
+          - { series: trace-ust-offrun-par }
+      - title: "TRACE — CORPORATE & SECURITIZED (FINRA, MONTHLY)"
+        rows:
+          - { series: trace-corp-par }
+          - { series: trace-corp-trades }
+          - { series: trace-tba-par }
+          - { series: trace-mbs-par }
+          - { series: trace-agcy-par }
+          - { series: trace-cmo-par }
+          - { series: trace-abs-par }
+          - { series: trace-absx-par }
+          - { series: trace-conv-par }
+          - { series: trace-conv-trades }
+          - { series: trace-chrc-par }
+          - { series: trace-chrc-trades }
+          - { series: trace-eln-par }
+          - { series: trace-eln-trades }
+          - { series: trace-corp-cust-share }
+      - title: "ICE VANTAGE SECURITIZED (DAILY)"
+        rows:
+          - { series: ice-star-agency-par }
+          - { series: ice-star-agency-trades }
+          - { series: ice-star-nonagency-par }
+          - { series: ice-star-nonagency-trades }
+      - title: "SHORT INTEREST (FINRA, 2×/MONTH)"
+        rows:
+          - { series: finra-short-total }
+          - { series: short-MSFT }
+          - { series: short-NVDA }
+          - { series: short-AAPL }
+          - { series: short-AMZN }
+          - { series: short-GOOGL }
+          - { series: short-META }
+      - title: "MARGIN DEBT (FINRA, MONTHLY)"
+        rows:
+          - { series: finra-margin-debit }
+          - { series: finra-margin-credit-cash }
+          - { series: finra-margin-credit-margin }
+
 calendar_map:      # first match wins — keep Core before CPI
   - { country: USD, match: "Core CPI",     series: us-core-cpi-yoy }
   - { country: USD, match: "CPI",          series: us-cpi-yoy }
@@ -534,6 +736,12 @@ dealer:                # NY Fed Primary Dealer Statistics; values in $millions, 
   - { id: ust-net,          name: "Dealer net outright UST position $m", keyid: PDPOSGST-TOT, unit: "$m" }
   - { id: ust-fail-deliver, name: "UST fails to deliver $m",            keyid: PDFTD-USTET,  unit: "$m" }
   - { id: ust-fail-receive, name: "UST fails to receive $m",             keyid: PDFTR-USTET,  unit: "$m" }
+
+  # NY Fed corporate-bond dealer stats (verified live 2026-10-03, $M, weekly)
+  - { id: corp-net,     name: "Dealer net outright corp bond position $m", keyid: PDPOSCS-TOT,       unit: "$m" }
+  - { id: corp-trade,   name: "Dealer corp bond trading $m",               keyid: PDTRCS-TOT,        unit: "$m" }
+  - { id: corp-hy-pos,   name: "Dealer net HY corp bond position $m",       keyid: PDPOSCSBND-G10,    unit: "$m" }
+  - { id: corp-ig-pos,   name: "Dealer net IG corp bond position $m",      keyid: PDPOSCSBND-BELG10, unit: "$m" }
 
 feeds:             # RSS bundle; a dead feed is skipped silently
   - { name: FT,          url: "https://www.ft.com/rss/home" }
