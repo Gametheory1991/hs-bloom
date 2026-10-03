@@ -14,6 +14,10 @@ cadences:          # seconds between fetcher runs
   morpho: 900
   cycle: 86400   # daily; weekly sources just re-upsert (idempotent)
   insights: 1800
+  ofr: 86400        # OFR Hedge Fund Monitor; daily max per OFR guidance (series are quarterly)
+  cftc_pos: 604800  # CFTC TFF/CIT/disaggregated positioning; weekly (Tuesdays)
+  tic: 604800       # TIC major foreign holders; monthly release
+  thirteenf: 604800 # SEC 13F-HR watchlist; quarterly filings, weekly poll
 
 indexes:           # all served by yahoo
   - { symbol: SPX,  name: "S&P 500",       yahoo: "^GSPC" }
@@ -32,12 +36,34 @@ bonds:
   - { country: US, tenor: 3M,  fred: DGS3MO }
   - { country: DE, tenor: 10Y, bundesbank: "D.I.ZST.ZI.EUR.S1311.B.A604.R10XX.R.A.A._Z._Z.A" }
   - { country: DE, tenor: 3M,  ecb: "YC.B.U2.EUR.4F.G_N_A.SV_C_YM.SR_3M" }  # euro-area AAA curve; ≈ Bunds at the short end
-  # No UK row: the only keyless daily gilt source is the BoE IADB CSV export,
-  # whose path robots.txt disallows.
+  # G10 + euro majors via FRED OECD MEI harmonized 10Y (monthly). Verified IDs:
+  # FR/GB/JP/DE/IT confirmed against FRED; CA/AU/CH/SE/ES/NL/BE follow the same
+  # IRLTLT01{CC}M156N pattern. Monthly freq: levels populate, but 1d/1w bp
+  # changes will read null for these rows (panels degrade gracefully).
+  # UK via FRED monthly is fine — the repo's UK exclusion was specifically about
+  # scraping the BoE IADB daily CSV (robots.txt), not about FRED.
+  - { country: FR, tenor: 10Y, fred: IRLTLT01FRM156N }
+  - { country: IT, tenor: 10Y, fred: IRLTLT01ITM156N }
+  - { country: ES, tenor: 10Y, fred: IRLTLT01ESM156N }
+  - { country: NL, tenor: 10Y, fred: IRLTLT01NLM156N }
+  - { country: BE, tenor: 10Y, fred: IRLTLT01BEM156N }
+  - { country: UK, tenor: 10Y, fred: IRLTLT01GBM156N }
+  - { country: JP, tenor: 10Y, fred: IRLTLT01JPM156N }
+  - { country: CA, tenor: 10Y, fred: IRLTLT01CAM156N }
+  - { country: AU, tenor: 10Y, fred: IRLTLT01AUM156N }
+  - { country: CH, tenor: 10Y, fred: IRLTLT01CHM156N }
+  - { country: SE, tenor: 10Y, fred: IRLTLT01SEM156N }
 
 cb_rates:          # policy rates for the WORLD BONDS matrix; country must match a bonds row
   - { country: US, label: FED, fred: DFEDTARU }
   - { country: DE, label: ECB, fred: ECBDFR }
+  - { country: FR, label: ECB, fred: ECBDFR }
+  - { country: IT, label: ECB, fred: ECBDFR }
+  - { country: ES, label: ECB, fred: ECBDFR }
+  - { country: NL, label: ECB, fred: ECBDFR }
+  - { country: BE, label: ECB, fred: ECBDFR }
+  # No UK/JP/CA/AU/CH/SE policy-rate rows: no verified keyless daily FRED series
+  # for BoE/BoJ/BoC/RBA/SNB/Riksbank policy rates; those cells stay null.
 
 series:            # macro click-through charts; transform per changes.apply_transform
   - { id: us-cpi-yoy,       name: "US CPI YoY %",            fred: CPIAUCSL,           unit: "%",   transform: yoy }
@@ -52,6 +78,30 @@ series:            # macro click-through charts; transform per changes.apply_tra
   - { id: ez-unemployment,  name: "EZ Unemployment %",       fred: LRHUTTTTEZM156S,    unit: "%",   transform: none }
   - { id: ez-gdp,           name: "EZ Real GDP QoQ %",       fred: CLVMEURSCAB1GQEA19, unit: "%",   transform: pct_prev }
   - { id: ez-ecb-rate,      name: "ECB Deposit Rate %",      fred: ECBDFR,             unit: "%",   transform: none }
+
+  # ---- extended FRED coverage (added 2026-10-03) ----
+  - { id: us-housing-starts,        name: "US Housing Starts",                fred: HOUST,          unit: "k",   transform: none }
+  - { id: us-building-permits,      name: "US Building Permits",              fred: PERMIT,         unit: "k",   transform: none }
+  - { id: us-case-shiller-yoy,      name: "US Case-Shiller Home Prices YoY %",fred: CSUSHPINSA,     unit: "%",   transform: yoy }
+  - { id: us-mortgage-30y,          name: "US 30Y Mortgage Rate %",           fred: MORTGAGE30US,   unit: "%",   transform: none }
+  - { id: us-existing-home-sales,   name: "US Existing Home Sales",           fred: EXHOSLUSM495S,  unit: "k",   transform: none }
+  - { id: us-avg-hourly-earnings-yoy, name: "US Avg Hourly Earnings YoY %",   fred: CES0500000003,  unit: "%",   transform: yoy }
+  - { id: us-u6-unemployment,       name: "US U-6 Unemployment %",            fred: U6RATE,          unit: "%",   transform: none }
+  - { id: us-prime-age-lfpr,        name: "US Prime-Age LFPR %",              fred: LNS11300060,     unit: "%",   transform: none }
+  - { id: us-quits-rate,            name: "US Quits Rate %",                  fred: JTSQUR,          unit: "%",   transform: none }
+  - { id: fed-total-assets,         name: "Fed Total Assets $m",              fred: WALCL,           unit: "$m",  transform: none }
+  - { id: fed-reserve-balances,     name: "Fed Reserve Balances $m",          fred: WRESBAL,         unit: "$m",  transform: none }
+  - { id: fed-on-rrp,               name: "Fed ON RRP $bn",                   fred: RRPONTSYD,       unit: "$bn", transform: none }
+  - { id: us-federal-debt,          name: "US Federal Debt $m",               fred: GFDEBTN,         unit: "$m",  transform: none }
+  - { id: us-federal-deficit,       name: "US Federal Budget Balance $m",     fred: FYFSD,           unit: "$m",  transform: none }
+  - { id: wti-crude,                name: "WTI Crude $",                      fred: DCOILWTICO,      unit: "$",   transform: none }
+  - { id: brent-crude,              name: "Brent Crude $",                    fred: DCOILBRENTEU,     unit: "$",   transform: none }
+  - { id: eur-usd,                  name: "EUR/USD",                          fred: DEXUSEU,          unit: "fx",  transform: none }
+  - { id: usd-jpy,                  name: "USD/JPY",                          fred: DEXJPUS,          unit: "fx",  transform: none }
+  - { id: us-2y-yield,              name: "US 2Y Yield %",                    fred: DGS2,             unit: "%",   transform: none }
+  - { id: us-30y-yield,             name: "US 30Y Yield %",                   fred: DGS30,            unit: "%",  transform: none }
+  - { id: us-5y-breakeven,          name: "US 5Y Breakeven %",                fred: T5YIE,            unit: "%",  transform: none }
+  - { id: us-umich-infl-exp,        name: "UMich 1Y Inflation Expectations %", fred: MICH,           unit: "%",   transform: none }
 
 cycle_series:      # market-cycle series (spec 2026-08-24); exactly one source key each
   # ---- hidden infrastructure ----
@@ -101,6 +151,35 @@ cycle_series:      # market-cycle series (spec 2026-08-24); exactly one source k
   - { id: cot-crude,    name: "Crude net non-commercial",  unit: contracts, cftc: "067651" }
   - { id: cot-usd,      name: "USD idx net non-commercial",unit: contracts, cftc: "098662" }
   - { id: cot-gbp,      name: "GBP net non-commercial",    unit: contracts, cftc: "096742" }
+  # ---- QUANT ---- (added 2026-10-03: quant hedge-fund tab)
+  # Treasury futures positioning — CFTC legacy COT, net non-commercial (long-short), weekly.
+  # NOTE: the cftc fetcher reads the legacy futures-only report; the finer
+  # "leveraged funds" split (CFTC Traders in Financial Futures) is NOT reachable
+  # via config alone — the free OFR Hedge Fund Monitor API has it
+  # (TFF-LF_TREAS_NET_POSITION) but needs a small ofr.py fetcher (code change).
+  - { id: cot-ust-2y,   name: "UST 2Y futures net non-commercial",     unit: contracts, cftc: "042601" }
+  - { id: cot-ust-5y,   name: "UST 5Y futures net non-commercial",     unit: contracts, cftc: "044601" }
+  - { id: cot-ust-10y,  name: "UST 10Y futures net non-commercial",    unit: contracts, cftc: "043602" }
+  - { id: cot-ust-30y,  name: "UST 30Y bond futures net non-commercial", unit: contracts, cftc: "020601" }
+  # Basis-trade funding leg — FRED, daily
+  - { id: sofr,   name: "SOFR (repo funding rate)",     unit: "%",  fred: SOFR }
+  - { id: obfr,   name: "Overnight bank funding rate", unit: "%",  fred: OBFR }
+  - { id: iorb,   name: "Interest on reserve balances", unit: "%", fred: IORB }
+  - { id: rrp-on, name: "ON RRP take-up",               unit: bn,   fred: RRPONTSYD }
+  # Duration-flow momentum via ETF price ratios (cycle_series has no plain
+  # yahoo: key). Rising TLT/SHY = duration bid; falling = redemptions/shorts.
+  # Real ETF flow quantities have no free machine-readable feed fitting the
+  # fetchers (stockanalysis/iShares/etfdb all bot-walled) — this is a proxy.
+  - { id: tlt-shy, name: "TLT/SHY (long-duration momentum)", unit: ratio, yahoo_ratio: [TLT, SHY] }
+  - { id: ief-shy, name: "IEF/SHY (belly momentum)",        unit: ratio, yahoo_ratio: [IEF, SHY] }
+  # ---- OFR Hedge Fund Monitor on the QUANT tab ----
+  # Mnemonics verified live 2026-10-03 (dataset=fpf, quarterly). Raw values are
+  # USD (trillions); unit "$" is honest — charts will show full dollar figures.
+  # NOTE: hf-top10-lev duplicates the ofr_series job below under another store
+  # key; harmless (one extra quarterly fetch) and keeps the tab self-contained.
+  - { id: hf-repo-borrow,   name: "HF repo borrowing $",       unit: "$", ofr: FPF-BORROW_REPO_SUM }
+  - { id: hf-treasury-long, name: "HF long UST exposure $",    unit: "$", ofr: FPF-ASSETCLASS_LTREASURY_SUM }
+  - { id: hf-top10-lev,     name: "Top-10 HF leverage ratio",  unit: "x", ofr: FPF-ALLQHF_GAVN10_LEVERAGERATIO_AVERAGE }
 
 cycle_tabs:        # layout only; rows reference cycle_series ids
   - id: risk
@@ -174,6 +253,29 @@ cycle_tabs:        # layout only; rows reference cycle_series ids
           - { series: cot-crude }
           - { series: cot-usd,     overlay: usd-broad }
           - { series: cot-gbp }
+  - id: quant
+    label: QUANT
+    panels:
+      - title: "TREASURY FUTURES POSITIONING (CFTC)"
+        rows:
+          - { series: cot-ust-10y, overlay: cot-ust-30y }
+          - { series: cot-ust-2y }
+          - { series: cot-ust-5y }
+          - { series: cot-ust-30y }
+      - title: "BASIS-TRADE FUNDING"
+        rows:
+          - { series: sofr, overlay: iorb }
+          - { series: obfr }
+          - { series: rrp-on }
+      - title: "DURATION FLOW MOMENTUM (ETF PRICE PROXY)"
+        rows:
+          - { series: tlt-shy }
+          - { series: ief-shy }
+      - title: "HEDGE FUND LEVERAGE & UST EXPOSURE (OFR, QUARTERLY)"
+        rows:
+          - { series: hf-repo-borrow }
+          - { series: hf-treasury-long }
+          - { series: hf-top10-lev }
 
 calendar_map:      # first match wins — keep Core before CPI
   - { country: USD, match: "Core CPI",     series: us-core-cpi-yoy }
@@ -189,6 +291,40 @@ calendar_map:      # first match wins — keep Core before CPI
   - { country: EUR, match: "Unemployment", series: ez-unemployment }
   - { country: EUR, match: "GDP",          series: ez-gdp }
   - { country: EUR, match: "Main Refinancing Rate", series: ez-ecb-rate }
+
+ofr_series:         # OFR Hedge Fund Monitor, dataset=fpf (SEC Form PF aggregates); keyless, quarterly
+  # Raw values are USD — unit "$" is honest (NOT "$tn"; the API returns raw dollars).
+  - { id: hf-gav,           name: "HF gross assets $",                 mnemonic: FPF-ALLQHF_GAV_SUM,                    unit: "$" }
+  - { id: hf-count,         name: "Qualifying hedge funds",            mnemonic: FPF-ALLQHF_COUNT,                     unit: "count" }
+  - { id: hf-top10-share,   name: "Top-10 share of HF gross assets %", mnemonic: FPF-ALLQHF_GAVN10_GAV_SHARE,           unit: "%" }
+  - { id: hf-top10-lev,     name: "Top-10 HF leverage ratio",          mnemonic: FPF-ALLQHF_GAVN10_LEVERAGERATIO_AVERAGE, unit: "x" }
+  - { id: hf-top10-borrow,  name: "Top-10 HF borrowing % of total",    mnemonic: FPF-ALLQHF_GAVN10_BORROWING_PERCENT,   unit: "%" }
+  - { id: hf-fin-liq-7d,    name: "HF financing maturing <=7d $",      mnemonic: FPF-ALLQHF_FINANCINGLIQUIDITYLE7_SUM,  unit: "$" }
+  - { id: hf-cash-ratio,    name: "Top-10 HF unencumbered cash %",     mnemonic: FPF-ALLQHF_GAVN10_CASHRATIO_AVERAGE,    unit: "%" }
+  - { id: hf-fin-90d-plus,  name: "HF financing maturing 90d+ %",      mnemonic: FPF-ALLQHF_FINANCINGLIQUIDTYGT90_PERCENT, unit: "%" }
+  - { id: hf-stress-eq-p5,  name: "HF -20% equity shock, 5th pct %",   mnemonic: FPF-ALLQHF_EQDOWN20P_P5,                unit: "%" }
+  - { id: hf-stress-eq-p50, name: "HF -20% equity shock, median %",   mnemonic: FPF-ALLQHF_EQDOWN20P_P50,              unit: "%" }
+  - { id: hf-stress-cds-p5, name: "HF -250bp credit shock, 5th pct %", mnemonic: FPF-ALLQHF_CDSDOWN250BPS_P5,            unit: "%" }
+  - { id: hf-gates,         name: "HF net assets gated %",             mnemonic: FPF-ALLQHF_CURRENTLYGATES_PERCENT,     unit: "%" }
+  - { id: hf-suspensions,   name: "HF net assets suspended %",         mnemonic: FPF-ALLQHF_CURRENTLYSUSPENSIONS_PERCENT, unit: "%" }
+
+cftc_pos:            # Socrata; dataset tff|cit|disagg; groups per dataset (see fetchers/cftc_pos.py COLUMNS)
+  - { dataset: tff,    code: "13874A", label: "E-mini S&P 500", groups: [lev_money, asset_mgr, dealer] }
+  - { dataset: tff,    code: "098662", label: "US Dollar Index", groups: [lev_money, asset_mgr, dealer] }
+  - { dataset: disagg, code: "088691", label: "Gold",             groups: [m_money, swap] }
+  - { dataset: disagg, code: "067651", label: "WTI Crude",        groups: [m_money, swap] }
+
+tic:                 # TIC Table 5 (slt_table5.txt), monthly, values in $bn; Grand Total always stored
+  countries: [Japan, United Kingdom, "China, Mainland", Belgium, "Cayman Islands", Luxembourg, Canada, Ireland, France, Taiwan]
+
+thirteenf:           # SEC EDGAR 13F-HR; quarterly filings (<=45d lag); UA is mandatory — set a real contact before deploy
+  user_agent: "os-bloom/1.0 contact admin@example.com"
+  watchlist:
+    - { name: "Berkshire Hathaway",      cik: "0001067983" }
+    - { name: "Bridgewater Associates",  cik: "0001350694" }
+    - { name: "Renaissance Technologies", cik: "0001037389" }
+    - { name: "Pershing Square",         cik: "0001336528" }
+    - { name: "Scion Asset Management",  cik: "0001649339" }
 
 feeds:             # RSS bundle; a dead feed is skipped silently
   - { name: FT,          url: "https://www.ft.com/rss/home" }
