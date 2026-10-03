@@ -1,4 +1,4 @@
-import { getDashboard } from "./api.js";
+import { getDashboard, getScorecard } from "./api.js";
 import { fmtAge, fmtClock, isStale } from "./fmt.js";
 import { defiFootData, initDefiViewToggle, renderDefi, renderMidnight } from "./panels/defi.js";
 import { renderBonds, renderEquity } from "./panels/equity.js";
@@ -15,9 +15,13 @@ import { renderTsv } from "./panels/tsv.js";
 import { renderXcorr } from "./panels/xcorr.js";
 import { renderVol } from "./panels/vol.js";
 import { renderMovers } from "./panels/movers.js";
-import { renderFutures } from "./panels/futures.js";
+import { renderFutures, FUTURES } from "./panels/futures.js";
 import { renderFlows } from "./panels/flows.js";
 import { renderScorecard } from "./panels/scorecard.js";
+import { renderCentral } from "./panels/central.js";
+import { renderAlerts } from "./panels/alerts.js";
+import { renderBriefcheck } from "./panels/briefcheck.js";
+import { initPalette, updateIndex } from "./palette.js";
 import { initHealth } from "./health.js";
 import { renderRefs } from "./panels/refs.js";
 import { renderInsights } from "./panels/insights.js";
@@ -31,6 +35,40 @@ const STALE_MINUTES = { equity: 20, bonds: 130, macro: 390, news: 40, defi: 35, 
 const EMPTY = { rows: [], updated_at: null, source: null };
 
 let lastDash = null; // last successful payload, for the view-toggle re-render (no re-fetch)
+
+// Command-palette index: tabs + panels + series, rebuilt from live payloads
+// (never hardcoded). Series entries deep-link to their tab.
+const PANEL_ENTRIES = [
+  ["MARKET RADAR", "mkt"], ["ALERTS / NEWSLETTER", "mkt"], ["ALERT TUNING", "mkt"],
+  ["BRIEFING × TERMINAL CHECK", "mkt"], ["TOP NEWS", "mkt"],
+  ["FUTURES — FRONT-MONTH", "futures"], ["FLOWS — 13F NET FLOWS", "flows"],
+  ["SCORECARD — 1D/1M/3M/1Y + 1Y Z", "scorecard"], ["CENTRAL — FED WATCH", "central"],
+];
+
+function buildIndex(dash) {
+  const idx = [];
+  document.querySelectorAll("[data-tab-link]").forEach((a) =>
+    idx.push({ label: `${a.textContent.trim()} tab`, sub: "tab", hash: `#/${a.dataset.tabLink}` }));
+  for (const [label, tab] of PANEL_ENTRIES)
+    idx.push({ label, sub: "panel", hash: `#/${tab}` });
+  for (const t of dash?.panels?.cycle?.tabs ?? [])
+    for (const p of t.panels ?? [])
+      for (const r of p.rows ?? [])
+        if (r.name) idx.push({ label: r.name, sub: `series · ${t.id}`, hash: `#/${t.id}` });
+  return idx;
+}
+
+async function refreshSearchIndex() {
+  const base = buildIndex(lastDash);
+  try {
+    const sc = await getScorecard();
+    for (const r of sc.rows ?? [])
+      if (r.name) base.push({ label: r.name, sub: "series · scorecard", hash: "#/scorecard" });
+  } catch { /* scorecard down — tabs/series index still works */ }
+  for (const [, sym, label] of FUTURES)
+    base.push({ label: `${sym} — ${label}`, sub: "futures", hash: "#/futures" });
+  updateIndex(base);
+}
 
 function foot(panelId, name, data) {
   const el = document.querySelector(`#panel-${panelId} .panel-foot`);
@@ -88,6 +126,7 @@ async function tick() {
     foot("tsv", "tsv", p.tsv ?? { updated_at: null, source: null });
     await notifyInsights(p.insights);
     document.getElementById("clock").textContent = `as of ${fmtClock(dash.as_of)} UTC`;
+    updateIndex(buildIndex(dash));
     banner.classList.add("hidden");
   } catch (err) {
     banner.textContent = `COLLECTOR UNREACHABLE — ${err.message}`;
@@ -99,10 +138,15 @@ initTabs();
 initNotifications();
 initChat();
 initHealth();
+initPalette();
 renderFutures();
 renderFlows();
 renderScorecard();
-setInterval(() => { renderFutures(); renderFlows(); renderScorecard(); }, 15 * 60_000);
+renderCentral();
+renderAlerts();
+renderBriefcheck();
+refreshSearchIndex();
+setInterval(() => { renderFutures(); renderFlows(); renderScorecard(); renderCentral(); renderBriefcheck(); refreshSearchIndex(); }, 15 * 60_000);
 initDefiViewToggle(() => {
   if (lastDash) renderDefiPanel(lastDash.panels);
 });
