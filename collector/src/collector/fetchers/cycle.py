@@ -3,6 +3,7 @@ isolation (a bad id or a dead file URL degrades that series only — the
 summary error raises at the end so /healthz surfaces it)."""
 from __future__ import annotations
 
+import asyncio
 from datetime import date
 
 from collector.config import CycleSeriesCfg
@@ -98,11 +99,31 @@ async def fetch_cycle(
     today: date | None = None,
 ) -> str:
     errors: list[str] = []
+    last_was_yahoo = False
     for cfg in series:
         if cfg.external:
             continue  # a dedicated job owns cycle:<id> for these
+        is_yahoo = bool(cfg.yahoo or cfg.yahoo_ratio)
+        # Yahoo throttles fast sequential hits (HTTP 429 storm on boot with
+        # 200+ symbols). Pace consecutive Yahoo calls ~0.6s apart.
+        if is_yahoo and last_was_yahoo:
+            await asyncio.sleep(0.6)
+        last_was_yahoo = is_yahoo
         try:
             pts = await _fetch_one(cfg, fred_api_key, get_text, get_bytes, store, today)
+        except Exception as exc:  # noqa: BLE001 — per-series isolation
+            # one retry on rate-limit after a backoff, before recording failure
+            if "HTTP 429" in str(exc):
+                await asyncio.sleep(15)
+                try:
+                    pts = await _fetch_one(cfg, fred_api_key, get_text, get_bytes, store, today)
+                except Exception as exc2:  # noqa: BLE001
+                    errors.append(f"{cfg.id}: {exc2}")
+                    continue
+            else:
+                errors.append(f"{cfg.id}: {exc}")
+                continue
+        try:
             if cfg.valid_range:
                 lo, hi = cfg.valid_range
                 pts = [(d, v) for d, v in pts if lo <= v <= hi]
