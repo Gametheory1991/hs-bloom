@@ -1,0 +1,717 @@
+{
+ "universe_id": "market_structure",
+ "title": "Market structure",
+ "as_of": "2026-10-03",
+ "_schema_note": "Generic coverage-map schema (same as ai_buildout): verticals -> companies [{id, name, ticker?, cik?, kind}], edges (press-reported, per-edge source + confidence), aggregates, risk_notes. The XBRL fetcher and graph renderer take universe_id and must not hardcode AI/market-structure specifics.",
+ "verticals": [
+  {
+   "id": "oms",
+   "label": "OMS providers",
+   "group": "Trading tech",
+   "companies": [
+    {
+     "id": "bloomberg-aim",
+     "name": "Bloomberg AIM",
+     "kind": "private"
+    },
+    {
+     "id": "charles-river",
+     "name": "Charles River / State Street",
+     "kind": "private"
+    },
+    {
+     "id": "blackrock",
+     "name": "BlackRock / Aladdin",
+     "kind": "public",
+     "ticker": "BLK",
+     "cik": "0002012383"
+    },
+    {
+     "id": "ssc",
+     "name": "SS&C Technologies / Eze",
+     "kind": "public",
+     "ticker": "SSNC",
+     "cik": "0001402436"
+    },
+    {
+     "id": "simcorp",
+     "name": "SimCorp",
+     "kind": "private"
+    },
+    {
+     "id": "enfusion",
+     "name": "Enfusion",
+     "kind": "private"
+    },
+    {
+     "id": "broadridge",
+     "name": "Broadridge",
+     "kind": "public",
+     "ticker": "BR",
+     "cik": "0001383312"
+    },
+    {
+     "id": "state-street",
+     "name": "State Street",
+     "kind": "public",
+     "ticker": "STT",
+     "cik": "0000093751"
+    },
+    {
+     "id": "deutsche-boerse",
+     "name": "Deutsche Börse",
+     "kind": "public",
+     "ticker": "DB1.DE"
+    }
+   ]
+  },
+  {
+   "id": "ats",
+   "label": "ATS / dark pools & venues",
+   "group": "Venues",
+   "companies": [
+    {
+     "id": "ubs-ats",
+     "name": "UBS ATS",
+     "kind": "private"
+    },
+    {
+     "id": "sigma-x",
+     "name": "Sigma X (Goldman Sachs)",
+     "kind": "private"
+    },
+    {
+     "id": "ms-pool",
+     "name": "MS Pool (Morgan Stanley)",
+     "kind": "private"
+    },
+    {
+     "id": "barclays-lx",
+     "name": "Barclays LX",
+     "kind": "private"
+    },
+    {
+     "id": "citadel-connect",
+     "name": "Citadel Connect",
+     "kind": "private"
+    },
+    {
+     "id": "luminex",
+     "name": "Luminex",
+     "kind": "private"
+    },
+    {
+     "id": "intelligentcross",
+     "name": "IntelligentCross",
+     "kind": "private"
+    },
+    {
+     "id": "tradeweb",
+     "name": "Tradeweb",
+     "kind": "public",
+     "ticker": "TW",
+     "cik": "0001758730"
+    },
+    {
+     "id": "marketaxess",
+     "name": "MarketAxess",
+     "kind": "public",
+     "ticker": "MKTX",
+     "cik": "0001278021"
+    }
+   ]
+  },
+  {
+   "id": "market-makers",
+   "label": "Market makers",
+   "group": "Liquidity",
+   "companies": [
+    {
+     "id": "citadel-securities",
+     "name": "Citadel Securities",
+     "kind": "private"
+    },
+    {
+     "id": "virtu",
+     "name": "Virtu Financial",
+     "kind": "public",
+     "ticker": "VIRT",
+     "cik": "0001592386"
+    },
+    {
+     "id": "jane-street",
+     "name": "Jane Street",
+     "kind": "private"
+    },
+    {
+     "id": "susquehanna",
+     "name": "Susquehanna / SIG",
+     "kind": "private"
+    },
+    {
+     "id": "imc",
+     "name": "IMC",
+     "kind": "private"
+    },
+    {
+     "id": "optiver",
+     "name": "Optiver",
+     "kind": "private"
+    },
+    {
+     "id": "flow-traders",
+     "name": "Flow Traders",
+     "kind": "private"
+    },
+    {
+     "id": "hudson-river",
+     "name": "Hudson River Trading",
+     "kind": "private"
+    }
+   ]
+  },
+  {
+   "id": "nblp",
+   "label": "Non-bank liquidity providers",
+   "group": "Liquidity",
+   "companies": [
+    {
+     "id": "xtx",
+     "name": "XTX Markets",
+     "kind": "private"
+    },
+    {
+     "id": "jump",
+     "name": "Jump Trading",
+     "kind": "private"
+    },
+    {
+     "id": "tower",
+     "name": "Tower Research",
+     "kind": "private"
+    },
+    {
+     "id": "drw",
+     "name": "DRW",
+     "kind": "private"
+    },
+    {
+     "id": "xr-trading",
+     "name": "XR Trading",
+     "kind": "private"
+    },
+    {
+     "id": "maven",
+     "name": "Maven Securities",
+     "kind": "private"
+    }
+   ]
+  },
+  {
+   "id": "quant",
+   "label": "Quant / prop trading",
+   "group": "Quant",
+   "companies": [
+    {
+     "id": "renaissance",
+     "name": "Renaissance Technologies",
+     "kind": "private"
+    },
+    {
+     "id": "de-shaw",
+     "name": "D.E. Shaw",
+     "kind": "private"
+    },
+    {
+     "id": "two-sigma",
+     "name": "Two Sigma",
+     "kind": "private"
+    },
+    {
+     "id": "citadel",
+     "name": "Citadel",
+     "kind": "private"
+    },
+    {
+     "id": "millennium",
+     "name": "Millennium Management",
+     "kind": "private"
+    },
+    {
+     "id": "pdt",
+     "name": "PDT Partners",
+     "kind": "private"
+    },
+    {
+     "id": "winton",
+     "name": "Winton",
+     "kind": "private"
+    }
+   ]
+  },
+  {
+   "id": "brokers",
+   "label": "Retail brokers / wirehouses",
+   "group": "Brokers & banks",
+   "companies": [
+    {
+     "id": "schwab",
+     "name": "Charles Schwab",
+     "kind": "public",
+     "ticker": "SCHW",
+     "cik": "0000316709"
+    },
+    {
+     "id": "ibkr",
+     "name": "Interactive Brokers",
+     "kind": "public",
+     "ticker": "IBKR",
+     "cik": "0001381197"
+    },
+    {
+     "id": "robinhood",
+     "name": "Robinhood",
+     "kind": "public",
+     "ticker": "HOOD",
+     "cik": "0001783879"
+    },
+    {
+     "id": "morgan-stanley",
+     "name": "Morgan Stanley",
+     "kind": "public",
+     "ticker": "MS",
+     "cik": "0000895421"
+    },
+    {
+     "id": "goldman-sachs",
+     "name": "Goldman Sachs",
+     "kind": "public",
+     "ticker": "GS",
+     "cik": "0000886982"
+    },
+    {
+     "id": "jpmorgan",
+     "name": "JPMorgan Chase",
+     "kind": "public",
+     "ticker": "JPM",
+     "cik": "0000019617"
+    },
+    {
+     "id": "bank-of-america",
+     "name": "Bank of America",
+     "kind": "public",
+     "ticker": "BAC",
+     "cik": "0000070858"
+    },
+    {
+     "id": "citigroup",
+     "name": "Citigroup",
+     "kind": "public",
+     "ticker": "C",
+     "cik": "0000831001"
+    },
+    {
+     "id": "barclays",
+     "name": "Barclays",
+     "kind": "public",
+     "ticker": "BCS",
+     "cik": "0000312069"
+    },
+    {
+     "id": "ubs",
+     "name": "UBS Group",
+     "kind": "public",
+     "ticker": "UBS",
+     "cik": "0001610520"
+    },
+    {
+     "id": "lpl",
+     "name": "LPL Financial",
+     "kind": "public",
+     "ticker": "LPLA",
+     "cik": "0001397911"
+    }
+   ]
+  },
+  {
+   "id": "exchanges",
+   "label": "Exchanges",
+   "group": "Venues",
+   "companies": [
+    {
+     "id": "cme",
+     "name": "CME Group",
+     "kind": "public",
+     "ticker": "CME",
+     "cik": "0001156375"
+    },
+    {
+     "id": "ice",
+     "name": "Intercontinental Exchange",
+     "kind": "public",
+     "ticker": "ICE",
+     "cik": "0001571949"
+    },
+    {
+     "id": "nasdaq",
+     "name": "Nasdaq",
+     "kind": "public",
+     "ticker": "NDAQ",
+     "cik": "0001120193"
+    },
+    {
+     "id": "cboe",
+     "name": "Cboe Global Markets",
+     "kind": "public",
+     "ticker": "CBOE",
+     "cik": "0001374310"
+    },
+    {
+     "id": "memx",
+     "name": "MEMX",
+     "kind": "private"
+    }
+   ]
+  }
+ ],
+ "edges": [
+  {
+   "from": "state-street",
+   "to": "charles-river",
+   "kind": "acquire",
+   "amount_bn": 2.6,
+   "date": "2018-07",
+   "label": "All-cash acquisition of Charles River Development",
+   "source": "State Street press release",
+   "confidence": "confirmed"
+  },
+  {
+   "from": "deutsche-boerse",
+   "to": "simcorp",
+   "kind": "acquire",
+   "amount_bn": 3.9,
+   "date": "2023-09",
+   "label": "DKK 735/share takeover, ~EUR 3.9B",
+   "source": "SimCorp press release",
+   "confidence": "confirmed"
+  },
+  {
+   "from": "virtu",
+   "to": "itg",
+   "kind": "acquire",
+   "amount_bn": 1.0,
+   "date": "2019-03",
+   "label": "$30.30/share; POSIT ATS",
+   "source": "Virtu press release",
+   "confidence": "confirmed"
+  },
+  {
+   "from": "virtu",
+   "to": "kcg",
+   "kind": "acquire",
+   "amount_bn": 1.4,
+   "date": "2017-07",
+   "label": "KCG Holdings",
+   "source": "Virtu/company history",
+   "confidence": "reported"
+  },
+  {
+   "from": "schwab",
+   "to": "td-ameritrade",
+   "kind": "acquire",
+   "amount_bn": 22.0,
+   "date": "2020-10",
+   "label": "All-stock; ~$6T combined client assets",
+   "source": "Charles Schwab",
+   "confidence": "confirmed"
+  },
+  {
+   "from": "morgan-stanley",
+   "to": "etrade",
+   "kind": "acquire",
+   "amount_bn": 13.0,
+   "date": "2020-10",
+   "label": "All-stock",
+   "source": "Nasdaq",
+   "confidence": "confirmed"
+  },
+  {
+   "from": "cboe",
+   "to": "bats",
+   "kind": "acquire",
+   "amount_bn": 3.4,
+   "date": "2017-02",
+   "label": "Cash + stock",
+   "source": "Cboe IR",
+   "confidence": "confirmed"
+  },
+  {
+   "from": "nasdaq",
+   "to": "adenza",
+   "kind": "acquire",
+   "amount_bn": 10.5,
+   "date": "2023-06",
+   "label": "$5.75B cash + 85.6M shares; from Thoma Bravo",
+   "source": "Nasdaq",
+   "confidence": "confirmed"
+  },
+  {
+   "from": "bank-of-america",
+   "to": "memx",
+   "kind": "invest",
+   "amount_bn": null,
+   "date": "2019-01",
+   "label": "Founding member",
+   "source": "Markets Media",
+   "confidence": "confirmed"
+  },
+  {
+   "from": "schwab",
+   "to": "memx",
+   "kind": "invest",
+   "amount_bn": null,
+   "date": "2019-01",
+   "label": "Founding member",
+   "source": "Markets Media",
+   "confidence": "confirmed"
+  },
+  {
+   "from": "citadel-securities",
+   "to": "memx",
+   "kind": "invest",
+   "amount_bn": null,
+   "date": "2019-01",
+   "label": "Founding member",
+   "source": "Markets Media",
+   "confidence": "confirmed"
+  },
+  {
+   "from": "morgan-stanley",
+   "to": "memx",
+   "kind": "invest",
+   "amount_bn": null,
+   "date": "2019-01",
+   "label": "Founding member (via E*TRADE)",
+   "source": "Markets Media",
+   "confidence": "confirmed"
+  },
+  {
+   "from": "ubs",
+   "to": "memx",
+   "kind": "invest",
+   "amount_bn": null,
+   "date": "2019-01",
+   "label": "Founding member",
+   "source": "Markets Media",
+   "confidence": "confirmed"
+  },
+  {
+   "from": "virtu",
+   "to": "memx",
+   "kind": "invest",
+   "amount_bn": null,
+   "date": "2019-01",
+   "label": "Founding member",
+   "source": "Markets Media",
+   "confidence": "confirmed"
+  },
+  {
+   "from": "blackrock",
+   "to": "memx",
+   "kind": "invest",
+   "amount_bn": null,
+   "date": "2020",
+   "label": "Strategic investor",
+   "source": "Wikipedia/MEMX",
+   "confidence": "reported"
+  },
+  {
+   "from": "citigroup",
+   "to": "memx",
+   "kind": "invest",
+   "amount_bn": null,
+   "date": "2020",
+   "label": "Strategic investor",
+   "source": "Wikipedia/MEMX",
+   "confidence": "reported"
+  },
+  {
+   "from": "jpmorgan",
+   "to": "memx",
+   "kind": "invest",
+   "amount_bn": null,
+   "date": "2020",
+   "label": "Strategic investor",
+   "source": "Wikipedia/MEMX",
+   "confidence": "reported"
+  },
+  {
+   "from": "goldman-sachs",
+   "to": "memx",
+   "kind": "invest",
+   "amount_bn": null,
+   "date": "2020",
+   "label": "Strategic investor",
+   "source": "Wikipedia/MEMX",
+   "confidence": "reported"
+  },
+  {
+   "from": "jane-street",
+   "to": "memx",
+   "kind": "invest",
+   "amount_bn": null,
+   "date": "2020",
+   "label": "Strategic investor",
+   "source": "Wikipedia/MEMX",
+   "confidence": "reported"
+  },
+  {
+   "from": "citadel-securities",
+   "to": "robinhood",
+   "kind": "pfof",
+   "amount_bn": null,
+   "date": null,
+   "label": "Principal wholesaler; payment for order flow",
+   "source": "Robinhood Rule 606 disclosures",
+   "confidence": "reported"
+  },
+  {
+   "from": "virtu",
+   "to": "robinhood",
+   "kind": "pfof",
+   "amount_bn": null,
+   "date": null,
+   "label": "Wholesaler; payment for order flow",
+   "source": "Robinhood Rule 606 disclosures",
+   "confidence": "reported"
+  },
+  {
+   "from": "citadel-securities",
+   "to": "schwab",
+   "kind": "pfof",
+   "amount_bn": null,
+   "date": null,
+   "label": "Wholesaler; payment for order flow",
+   "source": "Schwab 606 disclosures",
+   "confidence": "reported"
+  },
+  {
+   "from": "virtu",
+   "to": "schwab",
+   "kind": "pfof",
+   "amount_bn": null,
+   "date": null,
+   "label": "Wholesaler; payment for order flow",
+   "source": "Schwab 606 disclosures",
+   "confidence": "reported"
+  },
+  {
+   "from": "ubs",
+   "to": "ubs-ats",
+   "kind": "owns",
+   "amount_bn": null,
+   "date": null,
+   "label": "Operates UBS ATS dark pool",
+   "source": "UBS",
+   "confidence": "reported"
+  },
+  {
+   "from": "goldman-sachs",
+   "to": "sigma-x",
+   "kind": "owns",
+   "amount_bn": null,
+   "date": null,
+   "label": "Operates Sigma X ATS",
+   "source": "Goldman Sachs",
+   "confidence": "reported"
+  },
+  {
+   "from": "morgan-stanley",
+   "to": "ms-pool",
+   "kind": "owns",
+   "amount_bn": null,
+   "date": null,
+   "label": "Operates MS Pool ATS",
+   "source": "Morgan Stanley",
+   "confidence": "reported"
+  },
+  {
+   "from": "barclays",
+   "to": "barclays-lx",
+   "kind": "owns",
+   "amount_bn": null,
+   "date": null,
+   "label": "Operates Barclays LX ATS",
+   "source": "Barclays",
+   "confidence": "reported"
+  },
+  {
+   "from": "citadel",
+   "to": "citadel-securities",
+   "kind": "affiliate",
+   "amount_bn": null,
+   "date": null,
+   "label": "Common ownership (Ken Griffin)",
+   "source": "Company disclosures",
+   "confidence": "reported"
+  },
+  {
+   "from": "morgan-stanley",
+   "to": "pdt",
+   "kind": "spinoff",
+   "amount_bn": null,
+   "date": "2013",
+   "label": "Spun out of Morgan Stanley's PDT group",
+   "source": "Press",
+   "confidence": "reported"
+  }
+ ],
+ "aggregates": [
+  {
+   "id": "MSB6",
+   "label": "Money-center banks",
+   "members": [
+    "jpmorgan",
+    "bank-of-america",
+    "citigroup",
+    "morgan-stanley",
+    "goldman-sachs",
+    "ubs"
+   ],
+   "metric": "revenue"
+  },
+  {
+   "id": "EXCH4",
+   "label": "Exchanges",
+   "members": [
+    "cme",
+    "ice",
+    "nasdaq",
+    "cboe"
+   ],
+   "metric": "revenue"
+  }
+ ],
+ "risk_notes": [
+  {
+   "id": "oms-share",
+   "text": "OMS market share (European Institutional Equity Trading Study 2026): Bloomberg AIM 26.4%, Charles River 15.4%, BlackRock/Aladdin 11%, proprietary 11%, SS&C Eze 7.7%, SimCorp 5.5%, Enfusion 3.3%.",
+   "source": "Bloomberg Intelligence"
+  },
+  {
+   "id": "pfof",
+   "text": "Payment for order flow: Citadel Securities and Virtu are the principal wholesalers for Robinhood and Schwab retail order flow (SEC Rule 606 disclosures).",
+   "source": "Broker 606 disclosures"
+  },
+  {
+   "id": "memx",
+   "text": "MEMX (2019) was founded by 9 firms (BofA, Schwab, Citadel Securities, E*TRADE, Fidelity, Morgan Stanley, TD Ameritrade, UBS, Virtu) with >$135M initial funding; later investors include BlackRock, Citi, JPMorgan, Goldman, Jane Street.",
+   "source": "Markets Media"
+  },
+  {
+   "id": "oms-consolidation",
+   "text": "Infrastructure consolidation: State Street-Charles River ($2.6B, 2018), Deutsche Börse-SimCorp (~EUR 3.9B, 2023), Nasdaq-Adenza ($10.5B, 2023), Cboe-Bats ($3.4B, 2017) — custodians and exchanges buying the software layer.",
+   "source": "Company press releases"
+  }
+ ]
+}
