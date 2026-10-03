@@ -1,117 +1,108 @@
-## 2026-10-03 — UI+data batch: central-bank watch, command palette, alert-tuning UI, briefcheck view (subagent)
+## 2026-10-03 — Batch 11: five new data feeds (World Bank, USAspending, CoinGecko, OpenFIGI, Finnhub)
 
-**Central-bank watch tab (`central`).** New `ui/js/panels/central.js` + TABS/nav/mount
-wiring: (a) FOMC meeting calendar 2026–2027 with day-countdowns to each decision
-day — dates vendored as statics, VERIFIED 2026-10-03 against
-https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm ("Last Update:
-September 16, 2026"): 2026 → Jan 27-28, Mar 17-18*, Apr 28-29, Jun 16-17*,
-Jul 28-29, Sep 15-16*, Oct 27-28, Dec 8-9*; 2027 → Jan 26-27, Mar 16-17*,
-Apr 27-28, Jun 8-9*, Jul 27-28, Sep 14-15*, Oct 26-27, Dec 7-8* (* = with SEP);
-(b) implied Fed-funds path from the SOFR 3M futures strip — 7 new config.yaml
-cycle series (`sofr-v26` … `sofr-h28`, Yahoo `SR3V26.CME` … `SR3H28.CME`, ALL
-verified live 2026-10-03; implied 3M = 100 − price), rendered as a small SVG
-path chart + table. Refreshed on the 15-min cadence. Contract codes roll:
-strip covers Oct-26 → Mar-28 and must be re-coded as expiries pass.
-Fed speaker calendar SKIPPED — no free machine-readable source verifies.
+From the apivault.dev review Harry approved. All five endpoints verified live
+2026-10-03 before building. New fetchers in
+`collector/src/collector/fetchers/`:
 
-**Command palette (`ui/js/palette.js`).** Cmd+K / Ctrl+K (or `/` when not
-typing) opens a fuzzy-search overlay across tabs, panels, and series; Enter
-navigates (`#/tab`), up/down + Esc work, click selects. The index is built
-live by main.js from the nav DOM + dashboard cycle series + scorecard rows +
-futures list — nothing hardcoded. Styles in terminal.css, mobile-compact.
+**1. World Bank macro fundamentals** (`worldbank.py`, NEW; keyless) —
+`api.worldbank.org/v2/country/{13 ISO2}/indicator/{code}?format=json`,
+one batched call per indicator (3 calls, 2s gaps): GDP growth
+(NY.GDP.MKTP.KD.ZG), CPI inflation (FP.CPI.TOTL.ZG), unemployment
+(SL.UEM.TOTL.NE.ZS) for the 13 bond-matrix countries
+(US/DE/FR/IT/ES/NL/BE/UK/JP/CA/AU/CH/SE). Weekly. Stores
+`cycle:wb:<CC>:<gdp|cpi|unemp>` (annual points, 10y history) + a
+`worldbank` doc. Gives the world risk map real macro fundamentals instead
+of market prices alone.
+PIVOT: the brief named Econdb, but live probing showed Econdb's
+`/api/series/` returns `{"detail":"Authentication credentials were not
+provided."}` — the time-series data needs an API key despite the apivault
+"No Auth" badge. World Bank covers the same need keyless, so the fetcher
+uses World Bank (series ids use the `wb:` prefix).
 
-**Alert-tuning UI (`ui/js/panels/alerts.js`, `#panel-alerts` on mkt tab).**
-Lists alert types from `GET /api/alerts/config` (anomaly, trend) with a
-threshold-multiplier input (0.1–10) and mute toggle each; changes PUT to
-`/api/alerts/config` immediately with transient saved ✓ / error state.
+**2. USAspending.gov fiscal pulse** (`usaspending.py`, NEW; keyless) — three
+POSTs, 3s gaps, trailing 12 months: `spending_over_time` (group=month;
+monthly obligations split contracts/direct/grants), `spending_by_category/
+recipient` (top-10 recipients), `spending_by_category/awarding_agency`
+(top-10 agencies). Weekly. Stores `cycle:usaspending:oblig-{total,contract,
+grants}` (monthly $B points) + a `usaspending` doc. Note: the older
+`{"category": "recipient"}` body form 404s and a bare `/agency/` path 404s —
+the category now lives in the URL path and agencies need the
+`awarding_agency` qualifier.
 
-**Briefcheck view (`ui/js/panels/briefcheck.js`, `#panel-briefcheck` on mkt
-tab).** Reads `GET /api/briefcheck`; shows checked count, timestamp, and the
-mismatch table (metric, briefing vs terminal, deviation); 404 renders a quiet
-"no cross-check yet" empty state. Refreshed on the 15-min cadence.
+**3. CoinGecko crypto breadth** (`coingecko.py`, NEW; keyless) — one batched
+call/day: `/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=50
+&page=1&price_change_percentage=24h,7d` (well inside the ~5-15 calls/min free
+tier). Stores a `coingecko` doc (top-50 table: price, mcap, 24h vol, 24h/7d
+change, BTC dominance) + daily `cycle:coingecko:<id>:price` and `:mcap`
+points for all 50. The DEFI tab's vaults/markets views were untouched; a
+third CRYPTO toggle renders the breadth table.
 
-**Market internals SKIPPED (data).** No free machine-readable source for NYSE
-advance/decline, new highs/lows, or up/down volume (TRIN) verifies live
-2026-10-03: Nasdaq exposes no public advance/decline endpoint; NYSE/WSJ/
-MarketWatch are JS-walled; the TradingView scanner endpoint is unreachable
-from the build network (connection timeout); CNN's Fear & Greed JSON API
-bot-blocks ("I'm a teapot"). Nothing faked — no tab added. Existing breadth
-proxies remain: equal-weight/SPX ratio, 5d cross-sectional dispersion, CBOE
-put/call ratios. Revisit if a clean source appears.
+**4. OpenFIGI symbology map** (`openfigi.py`, NEW; needs free API key) —
+probing 2026-10-03: GETs to api.openfigi.com work keyless, but POST
+/v3/mapping consistently times out without a key (WAF drops unauthenticated
+POSTs). The job reads `OPENFIGI_API_KEY` from env and skips cleanly
+(`openfigi-skipped-no-key`, no failure) when absent; any request failure
+also degrades to a clean skip. With a key it POSTs the 85-ticker watchlist
+(hyperscalers + three coverage universes, see `watchlist.py`) in batches of
+25 with 3s gaps and stores the `openfigi_map` doc
+(ticker -> FIGI/ISIN/CUSIP/exchange). Free key signup:
+https://www.openfigi.com/ (free registration). Weekly.
 
-**Also:** `FUTURES` now exported from `ui/js/panels/futures.js` (palette
-index); `getAlertConfig`/`putAlertConfig`/`getBriefcheck` added to
-`ui/js/api.js`. New tests `collector/tests/test_central.py` (4 tests:
-FOMC schedule pinned to the verified federalreserve.gov dates, weekday/
-chronology guards, SOFR-strip config shape, implied-rate arithmetic).
-`node --check` clean on all touched JS.
+**5. Finnhub earnings + insider** (`finnhub.py`, NEW; needs free API key) —
+no signup performed; reads `FINNHUB_API_KEY` from env, skips cleanly when
+absent. Endpoints verified in Finnhub docs 2026-10-03 (free tier: 60
+calls/min): `/calendar/earnings?from=&to=` (free tier = 1 month history +
+new updates; one call for a 21-day window, filtered to the 85-ticker
+watchlist — backup for the 429-prone ForexFactory calendar) and
+`/stock/insider-sentiment?symbol=&from=&to=` (MSPR −100..+100; called only
+for tickers with an upcoming earnings date, ~1.5s pacing, typically <20
+calls). Daily when keyed. Stores a `finnhub` doc {earnings, insider}.
+Free key signup: https://finnhub.io/register.
 
-## 2026-10-03 — Reliability batch: Postgres persistence, boot catch-up, alert tuning, briefcheck (subagent)
+**Wiring** — scheduler jobs `worldbank`/`usaspending`/`openfigi` (weekly),
+`coingecko`/`finnhub` (daily), all with `.get()` cadence guards and
+staggered startup offsets; `panels.py` gains `worldbank`/`usaspending`/
+`finnhub` panels and extends `defi` with the crypto table; `insights.py`
+gains crypto-breadth, fiscal-pulse, and earnings digest notes (hashed into
+the digest id); UI: CRYPTO toggle on the DEFI tab, fiscal detail appended to
+the ECON tab, earnings/insider appended to the PROFIT tab (new
+`ui/js/panels/fiscal.js`, vanilla JS + inline SVG-free tables, mobile-first).
 
-**1. Postgres persistence — `collector/src/collector/store.py`.**
-`Store` now honors `DATABASE_URL`: when set it connects via psycopg and uses
-`%s` placeholders; otherwise SQLite at `db_path` exactly as before. All
-methods (`upsert_points`, `points`, `put_doc`/`doc`, `record_success`,
-`record_error`, `prune_outside_range`, `status`/`statuses`) behave identically
-on both backends. psycopg is an optional extra (`pip install -e
-".[postgres]"`) so SQLite stays the zero-dependency default; a clear
-RuntimeError is raised if DATABASE_URL is set without it.
-Enabling persistence: provision a free Postgres (Neon or Supabase), set
-`DATABASE_URL` on Render (and install the extra in the Docker image), and
-the terminal's history — radar, risk engine, universe graphs — survives
-deploys instead of rebuilding from empty `/tmp/bloom.db` each time.
-Verified: 5 new tests drive the PG path through an in-memory fake psycopg
-(placeholder style, upsert round-trip, docs, statuses, corrupt-doc
-handling, missing-driver error).
+**Config** (snippet: `batch11-config-snippet.yaml`; config.yaml itself not
+touched): 5 cadences + 52 cycle_series (39 World Bank, 3 USAspending, 10
+CoinGecko top-10 prices; all external:true; unemployment hidden) + 2 ECON
+tab panels (GLOBAL MACRO 26 rows, US FISCAL PULSE 3 rows).
 
-**2. Scheduler boot catch-up — `scheduler.py` + `runner.py`.**
-`run_fetcher` now records each success in the `job_runs` doc. On
-`register_jobs`, any staggered job whose last run is missing or older than
-its cadence gets an early first run (start + 60s, 75s apart, in dependency
-order: risk → country_risk → xcorr → voldash → movers → home_radar → …)
-instead of the hardcoded +300s…+4200s offsets. Jobs with a recent run keep
-their configured offsets. Existing scheduler tests untouched (they assert
-intervals/ids only); 3 new tests cover catch-up ordering, recent-run
-preservation, and job_runs persistence.
+**Tests** — new `collector/tests/test_batch11.py` (20 tests: parsers against
+real captured fixtures, job-level runs, graceful keyless skips, insights
+notes); `test_scheduler.py` job set + count 39 -> 44; `test_api.py`
+dashboard-shape panel keys. Full suite: 426 passed, 2 skipped (both
+pre-existing env skips: fr_FR locale, missing /tmp/wei.xlsx).
 
-**3. Alert tuning backend — `collector/src/collector/alert_config.py` (NEW).**
-Per-type config persisted in the `alert_config` doc, seeded from the two
-digest kinds notify.py emits:
-- `anomaly` — Anomaly alerts (|z| ≥ 2.2σ), `threshold_mult` 1.0, `muted` false
-- `trend` — Trend alerts (1m move ≥ 1.15σ), `threshold_mult` 1.0, `muted` false
-`threshold_mult` scales the trigger threshold in `build_digest`
-(2.0 ≈ half as many alerts); `muted` types are filtered in
-`push_new_alerts` (still counted as seen so they don't queue while muted).
-New endpoints: `GET /api/alerts/config` → `{"types": [{id, label,
-threshold_mult, muted}]}`; `PUT /api/alerts/config` with
-`{id, threshold_mult?, muted?}` → `{"type": {...}}`, 400 on unknown id or
-out-of-range multiplier (0.1–10). CORS allow_methods gained PUT. 6 new
-tests incl. end-to-end threshold scaling and muted-send suppression.
+**Honest gaps** — OpenFIGI and Finnhub do nothing until Harry adds the free
+keys as Render env vars (OPENFIGI_API_KEY, FINNHUB_API_KEY); both jobs skip
+cleanly meanwhile. Econdb is auth-walled for series data (see pivot note).
+CoinGecko free tier is rate-limited (~5-15 calls/min) — one batched call/day
+stays far clear. USAspending search endpoints are occasionally slow (one
+30s timeout seen in probing; the fetcher has no retry — a slow run logs a
+warning and the previous doc survives).
 
-**4. briefcheck.py (NEW, repo root) — briefing-vs-terminal cross-check.**
-Standalone stdlib-only script for an operator machine (OFF Render):
-`python briefcheck.py --briefing-html PATH --base-url
-https://os-bloom.onrender.com [--tolerance-pct N]`. Parses the briefing's
-tables generically by header row, maps ~45 metrics (rates/curve, plumbing,
-vol, conditions, ETFs) to `/api/scorecard` + `/api/series`, compares with
-per-unit tolerances (10bp yields/spreads, 5bp OAS, 1% levels, 5% dollar
-stocks, 2% ratios), prints a JSON report
-`{checked_at, checked_count, mismatches: [{table, metric, briefing_value,
-terminal_value, deviation, unit}]}` and exits 1 on any breach.
-Live-verified 2026-10-03 against the real briefing + production terminal:
-23 metrics checked, 16 mismatches flagged — including the briefing's stale
-SPR (400.0 vs 283.767 MMBbls) and stale front-end rates (SOFR 5.31 vs 3.87,
-UST 1M 5.25 vs 4.06; briefing carries the old rate regime).
-New endpoints: `POST /api/briefcheck` accepts that JSON report (stores doc
-`briefcheck_latest`) → `{"stored": true}`; `GET /api/briefcheck` returns it
-or 404 when none posted. 8 new tests (mocked terminal).
-Skipped: briefing tables 6–8 (futures z-scores have no terminal equivalent;
-auction dynamics are event-specific not current levels; econ calendar is
-events not values).
-
-Tests: full suite 413 passed / 15 failed / 2 skipped — the 15 failures are
-byte-identical to the pre-change pristine baseline (test_batch6_finra_ice
-fixture FileNotFoundErrors, test_tsv), zero new failures. +22 new tests.
+**Add-on (same day): interactive FIGI lookup on the dashboard** — Harry
+asked for it directly.
+- Backend: `GET /api/figi/lookup?idtype=TICKER&idvalue=AAPL`
+  (`collector/src/collector/api.py`). Proxies OpenFIGI v3 mapping with
+  OPENFIGI_API_KEY from env; id types TICKER/CUSIP/ISIN/SEDOL/FIGI
+  (FIGI -> ID_BB_GLOBAL). No key -> `{"ok": false, "error": "no_key"}`
+  with HTTP 200 (never a 500); bad idtype/idvalue and upstream failures
+  also return clean `ok: false` JSON. Reuses `parse_mappings` from
+  `fetchers/openfigi.py` (now also returns compositeFIGI).
+- UI: "FIGI LOOKUP — OPENFIGI" panel (`ui/js/panels/figi.js`, vanilla JS)
+  appended to the STRUCT tab (#cycle-struct): id-type selector + text
+  input + LOOKUP button, results table (name, ticker, FIGI, composite
+  FIGI, security type, exchange code). `cycle.js` now preserves
+  `[data-batch11]` nodes across re-renders so the form keeps its state on
+  the 60s tick. No new cadence — on-demand only. Needs OPENFIGI_API_KEY on
+  Render to function (free registration: https://www.openfigi.com/).
 
 ## 2026-10-03 — Batch 8: MARKET STRUCTURE universe (subagent)
 

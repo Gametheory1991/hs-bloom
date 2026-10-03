@@ -41,6 +41,11 @@ cadences:          # seconds between fetcher runs
   tsv_capex: 604800      # tokenized-securities universe XBRL fundamentals; weekly
   tsv_graph: 604800      # tokenized-securities money-flow graph; weekly (zero HTTP)
   tsv_watch: 604800      # TSV regulatory scan (SEC press + Federal Register); weekly
+  worldbank: 604800    # World Bank macro fundamentals; weekly (annual data)
+  usaspending: 604800  # USAspending.gov fiscal pulse; weekly (3 keyless POSTs)
+  coingecko: 86400     # CoinGecko top-50 crypto breadth; daily (1 batched call)
+  openfigi: 604800     # OpenFIGI symbology map; weekly (skips w/o OPENFIGI_API_KEY)
+  finnhub: 86400       # Finnhub earnings+insider; daily when FINNHUB_API_KEY set
 indexes:           # all served by yahoo
   - { symbol: SPX,  name: "S&P 500",       yahoo: "^GSPC" }
   - { symbol: NDX,  name: "Nasdaq 100",    yahoo: "^NDX" }   # validate-in-smoke
@@ -265,16 +270,6 @@ cycle_series:      # market-cycle series (spec 2026-08-24); exactly one source k
   - { id: fut-gc,  name: "GC (gold fut)",          unit: px, yahoo: "GC=F" }
   - { id: fut-si,  name: "SI (silver fut)",        unit: px, yahoo: "SI=F" }
   - { id: fut-hg,  name: "HG (copper fut)",        unit: px, yahoo: "HG=F" }
-  # ---- SOFR 3M futures strip (Yahoo .CME expiry symbols; verified live 2026-10-03) ----
-  # Used by the central-bank tab for the implied Fed-funds path (implied = 100 - price).
-  # Contract codes roll: refresh this list as expiries pass (currently covers Oct-26 → Mar-28).
-  - { id: sofr-v26, name: "SOFR 3M Oct-26", unit: px, yahoo: "SR3V26.CME" }
-  - { id: sofr-z26, name: "SOFR 3M Dec-26", unit: px, yahoo: "SR3Z26.CME" }
-  - { id: sofr-h27, name: "SOFR 3M Mar-27", unit: px, yahoo: "SR3H27.CME" }
-  - { id: sofr-m27, name: "SOFR 3M Jun-27", unit: px, yahoo: "SR3M27.CME" }
-  - { id: sofr-u27, name: "SOFR 3M Sep-27", unit: px, yahoo: "SR3U27.CME" }
-  - { id: sofr-z27, name: "SOFR 3M Dec-27", unit: px, yahoo: "SR3Z27.CME" }
-  - { id: sofr-h28, name: "SOFR 3M Mar-28", unit: px, yahoo: "SR3H28.CME" }
   # ---- batch 6: H.4.1 foreign custody (WLCSDL not live on FRED; WMTSECL1 is the live successor — see CHANGES.md) ----
   - { id: cust-ust, name: "Foreign custody: marketable UST $m (H.4.1)", unit: "$m", fred: WMTSECL1 }
   # ---- batch 6: 13F net flows (externally maintained by the thirteenf job; `store: true` re-upserts) ----
@@ -463,6 +458,61 @@ cycle_series:      # market-cycle series (spec 2026-08-24); exactly one source k
   - { id: trace-eln-par,       name: "Equity-linked note TRACE par $M",   unit: "$M",   external: true }
   - { id: trace-eln-trades,    name: "Equity-linked note TRACE trades",   unit: "k",    external: true }
   - { id: trace-corp-cust-share, name: "Corp TRACE customer par share",   unit: ratio, external: true }
+
+  # ---- batch 11: World Bank macro + USAspending + CoinGecko (verified live 2026-10-03) ----
+  - { id: "wb:US:gdp",   name: "US GDP growth %",        unit: "%", external: true }
+  - { id: "wb:US:cpi",   name: "US CPI inflation %",     unit: "%", external: true }
+  - { id: "wb:US:unemp", name: "US unemployment %",      unit: "%", external: true, hidden: true }
+  - { id: "wb:DE:gdp",   name: "Germany GDP growth %",   unit: "%", external: true }
+  - { id: "wb:DE:cpi",   name: "Germany CPI inflation %", unit: "%", external: true }
+  - { id: "wb:DE:unemp", name: "Germany unemployment %", unit: "%", external: true, hidden: true }
+  - { id: "wb:FR:gdp",   name: "France GDP growth %",    unit: "%", external: true }
+  - { id: "wb:FR:cpi",   name: "France CPI inflation %", unit: "%", external: true }
+  - { id: "wb:FR:unemp", name: "France unemployment %",  unit: "%", external: true, hidden: true }
+  - { id: "wb:IT:gdp",   name: "Italy GDP growth %",     unit: "%", external: true }
+  - { id: "wb:IT:cpi",   name: "Italy CPI inflation %",  unit: "%", external: true }
+  - { id: "wb:IT:unemp", name: "Italy unemployment %",   unit: "%", external: true, hidden: true }
+  - { id: "wb:ES:gdp",   name: "Spain GDP growth %",     unit: "%", external: true }
+  - { id: "wb:ES:cpi",   name: "Spain CPI inflation %",  unit: "%", external: true }
+  - { id: "wb:ES:unemp", name: "Spain unemployment %",   unit: "%", external: true, hidden: true }
+  - { id: "wb:NL:gdp",   name: "Netherlands GDP growth %", unit: "%", external: true }
+  - { id: "wb:NL:cpi",   name: "Netherlands CPI inflation %", unit: "%", external: true }
+  - { id: "wb:NL:unemp", name: "Netherlands unemployment %", unit: "%", external: true, hidden: true }
+  - { id: "wb:BE:gdp",   name: "Belgium GDP growth %",   unit: "%", external: true }
+  - { id: "wb:BE:cpi",   name: "Belgium CPI inflation %", unit: "%", external: true }
+  - { id: "wb:BE:unemp", name: "Belgium unemployment %", unit: "%", external: true, hidden: true }
+  - { id: "wb:UK:gdp",   name: "UK GDP growth %",        unit: "%", external: true }
+  - { id: "wb:UK:cpi",   name: "UK CPI inflation %",     unit: "%", external: true }
+  - { id: "wb:UK:unemp", name: "UK unemployment %",      unit: "%", external: true, hidden: true }
+  - { id: "wb:JP:gdp",   name: "Japan GDP growth %",     unit: "%", external: true }
+  - { id: "wb:JP:cpi",   name: "Japan CPI inflation %",  unit: "%", external: true }
+  - { id: "wb:JP:unemp", name: "Japan unemployment %",   unit: "%", external: true, hidden: true }
+  - { id: "wb:CA:gdp",   name: "Canada GDP growth %",    unit: "%", external: true }
+  - { id: "wb:CA:cpi",   name: "Canada CPI inflation %", unit: "%", external: true }
+  - { id: "wb:CA:unemp", name: "Canada unemployment %",  unit: "%", external: true, hidden: true }
+  - { id: "wb:AU:gdp",   name: "Australia GDP growth %", unit: "%", external: true }
+  - { id: "wb:AU:cpi",   name: "Australia CPI inflation %", unit: "%", external: true }
+  - { id: "wb:AU:unemp", name: "Australia unemployment %", unit: "%", external: true, hidden: true }
+  - { id: "wb:CH:gdp",   name: "Switzerland GDP growth %", unit: "%", external: true }
+  - { id: "wb:CH:cpi",   name: "Switzerland CPI inflation %", unit: "%", external: true }
+  - { id: "wb:CH:unemp", name: "Switzerland unemployment %", unit: "%", external: true, hidden: true }
+  - { id: "wb:SE:gdp",   name: "Sweden GDP growth %",    unit: "%", external: true }
+  - { id: "wb:SE:cpi",   name: "Sweden CPI inflation %", unit: "%", external: true }
+  - { id: "wb:SE:unemp", name: "Sweden unemployment %",  unit: "%", external: true, hidden: true }
+  - { id: "usaspending:oblig-total",    name: "Federal obligations $B/mo",          unit: "$B", external: true }
+  - { id: "usaspending:oblig-contract", name: "Federal contract obligations $B/mo", unit: "$B", external: true }
+  - { id: "usaspending:oblig-grants",   name: "Federal grant obligations $B/mo",    unit: "$B", external: true }
+  - { id: "coingecko:bitcoin:price",  name: "Bitcoin $",  unit: "USD", external: true }
+  - { id: "coingecko:ethereum:price", name: "Ethereum $", unit: "USD", external: true }
+  - { id: "coingecko:tether:price",   name: "Tether $",   unit: "USD", external: true }
+  - { id: "coingecko:bnb:price",      name: "BNB $",      unit: "USD", external: true }
+  - { id: "coingecko:solana:price",    name: "Solana $",   unit: "USD", external: true }
+  - { id: "coingecko:xrp:price",      name: "XRP $",      unit: "USD", external: true }
+  - { id: "coingecko:dogecoin:price", name: "Dogecoin $", unit: "USD", external: true }
+  - { id: "coingecko:cardano:price",  name: "Cardano $",   unit: "USD", external: true }
+  - { id: "coingecko:tron:price",     name: "Tron $",     unit: "USD", external: true }
+  - { id: "coingecko:usd-coin:price", name: "USDC $",     unit: "USD", external: true }
+
 cycle_tabs:        # layout only; rows reference cycle_series ids
   - id: risk
     label: RISK
@@ -517,6 +567,39 @@ cycle_tabs:        # layout only; rows reference cycle_series ids
           - { series: us-1m-bill }
           - { series: us-6m-bill }
           - { series: us-1y-bill }
+      - title: "GLOBAL MACRO — WORLD BANK (ANNUAL)"
+        rows:
+          - { series: "wb:US:gdp" }
+          - { series: "wb:US:cpi" }
+          - { series: "wb:DE:gdp" }
+          - { series: "wb:DE:cpi" }
+          - { series: "wb:FR:gdp" }
+          - { series: "wb:FR:cpi" }
+          - { series: "wb:IT:gdp" }
+          - { series: "wb:IT:cpi" }
+          - { series: "wb:ES:gdp" }
+          - { series: "wb:ES:cpi" }
+          - { series: "wb:NL:gdp" }
+          - { series: "wb:NL:cpi" }
+          - { series: "wb:BE:gdp" }
+          - { series: "wb:BE:cpi" }
+          - { series: "wb:UK:gdp" }
+          - { series: "wb:UK:cpi" }
+          - { series: "wb:JP:gdp" }
+          - { series: "wb:JP:cpi" }
+          - { series: "wb:CA:gdp" }
+          - { series: "wb:CA:cpi" }
+          - { series: "wb:AU:gdp" }
+          - { series: "wb:AU:cpi" }
+          - { series: "wb:CH:gdp" }
+          - { series: "wb:CH:cpi" }
+          - { series: "wb:SE:gdp" }
+          - { series: "wb:SE:cpi" }
+      - title: "US FISCAL PULSE — USASPENDING (MONTHLY)"
+        rows:
+          - { series: "usaspending:oblig-total" }
+          - { series: "usaspending:oblig-contract" }
+          - { series: "usaspending:oblig-grants" }
   - id: credit
     label: CREDIT
     panels:
