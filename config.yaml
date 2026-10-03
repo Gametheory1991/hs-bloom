@@ -242,6 +242,68 @@ cycle_series:      # market-cycle series (spec 2026-08-24); exactly one source k
   - { id: msft,  name: "MSFT (Microsoft)",  unit: px, yahoo: MSFT }
   - { id: aapl,  name: "AAPL (Apple)",      unit: px, yahoo: AAPL }
 
+  # ---- batch 6: front-month futures (Yahoo =F symbols; all 10 verified live 2026-10-03) ----
+  - { id: fut-es,  name: "ES (S&P 500 fut)",       unit: px, yahoo: "ES=F" }
+  - { id: fut-nq,  name: "NQ (Nasdaq 100 fut)",    unit: px, yahoo: "NQ=F" }
+  - { id: fut-ym,  name: "YM (Dow fut)",           unit: px, yahoo: "YM=F" }
+  - { id: fut-rty, name: "RTY (Russell 2000 fut)", unit: px, yahoo: "RTY=F" }
+  - { id: fut-zb,  name: "ZB (30Y T-Bond fut)",    unit: px, yahoo: "ZB=F" }
+  - { id: fut-zn,  name: "ZN (10Y T-Note fut)",    unit: px, yahoo: "ZN=F" }
+  - { id: fut-cl,  name: "CL (WTI crude fut)",     unit: px, yahoo: "CL=F" }
+  - { id: fut-gc,  name: "GC (gold fut)",          unit: px, yahoo: "GC=F" }
+  - { id: fut-si,  name: "SI (silver fut)",        unit: px, yahoo: "SI=F" }
+  - { id: fut-hg,  name: "HG (copper fut)",        unit: px, yahoo: "HG=F" }
+  # ---- batch 6: H.4.1 foreign custody (WLCSDL not live on FRED; WMTSECL1 is the live successor — see CHANGES.md) ----
+  - { id: cust-ust, name: "Foreign custody: marketable UST $m (H.4.1)", unit: "$m", fred: WMTSECL1 }
+  # ---- batch 6: 13F net flows (externally maintained by the thirteenf job; `store: true` re-upserts) ----
+  - { id: fl-berkshire,   name: "Berkshire net flow $ (13F)",    unit: "$", store: true }
+  - { id: fl-bridgewater, name: "Bridgewater net flow $ (13F)", unit: "$", store: true }
+  - { id: fl-renaissance, name: "Renaissance net flow $ (13F)", unit: "$", store: true }
+  - { id: fl-pershing,    name: "Pershing Sq net flow $ (13F)", unit: "$", store: true }
+  - { id: fl-scion,       name: "Scion net flow $ (13F)",       unit: "$", store: true }
+  - { id: fl-millennium,  name: "Millennium net flow $ (13F)",  unit: "$", store: true }
+  - { id: fl-all,         name: "Watchlist net flow $ (13F)",   unit: "$", store: true }
+
+  # ---- batch 7: briefing parity — FRED plumbing/rates (WTREGEN/DGS1MO/DGS6MO/DGS1/STLFSI4 all CSV-verified live 2026-10-03) ----
+  # WTREGEN is $m (948,674 = $948.7B w/e 2026-09-30); STLFSI4 is an index (negative = below-average stress).
+  - { id: tga,        name: "Treasury General Account $m",            unit: "$m", fred: WTREGEN }
+  - { id: us-1m-bill, name: "US 1M bill yield %",                    unit: "%",  fred: DGS1MO }
+  - { id: us-6m-bill, name: "US 6M bill yield %",                    unit: "%",  fred: DGS6MO }
+  - { id: us-1y-bill, name: "US 1Y bill yield %",                    unit: "%",  fred: DGS1 }
+  - { id: stlfsi,     name: "St. Louis Fed Financial Stress Index",  unit: idx,  fred: STLFSI4 }
+  # ---- batch 7: EIA WPSR crude stocks — table1.csv (302 -> signed URL, cp1252; verified live 2026-10-03).
+  # Replaces dead FRED series WCSSTUS1/WCESTUS1 (both 404). Values are MMBbls as printed. ----
+  - { id: spr-stocks,        name: "SPR crude stocks (MMBbls)",         unit: MMBbls, eia_wpsr: spr }
+  - { id: comm-crude-stocks, name: "Commercial crude stocks (MMBbls)",  unit: MMBbls, eia_wpsr: commercial }
+  # ---- batch 7: Weekly Economic Index — NY Fed discontinued; Dallas Fed .xlsx is the live successor
+  # (verified 2026-10-03; file lagged ~5 weeks at build time — see CHANGES.md). ----
+  - { id: wei, name: "Weekly Economic Index", unit: idx, wei: true }
+  # ---- batch 7: briefing ETF universe (all 15 Yahoo tickers verified live 2026-10-03) ----
+  - { id: etf-sgov, name: "SGOV (0-3M T-Bill)",     unit: px, yahoo: SGOV }
+  - { id: etf-bil,  name: "BIL (1-3M T-Bill)",      unit: px, yahoo: BIL }
+  - { id: etf-vgsh, name: "VGSH (short Treasury)",  unit: px, yahoo: VGSH }
+  - { id: etf-vgit, name: "VGIT (int. Treasury)",   unit: px, yahoo: VGIT }
+  - { id: etf-govt, name: "GOVT (US Treasury)",     unit: px, yahoo: GOVT }
+  - { id: etf-edv,  name: "EDV (ext. duration)",    unit: px, yahoo: EDV }
+  - { id: etf-emb,  name: "EMB (EM USD bonds)",     unit: px, yahoo: EMB }
+  - { id: etf-lemb, name: "LEMB (EM local bonds)",  unit: px, yahoo: LEMB }
+  - { id: etf-xlk,  name: "XLK (tech)",             unit: px, yahoo: XLK }
+  - { id: etf-xlf,  name: "XLF (financials)",       unit: px, yahoo: XLF }
+  - { id: etf-xle,  name: "XLE (energy)",           unit: px, yahoo: XLE }
+  - { id: etf-xli,  name: "XLI (industrials)",      unit: px, yahoo: XLI }
+  - { id: etf-xlv,  name: "XLV (healthcare)",       unit: px, yahoo: XLV }
+  - { id: etf-kre,  name: "KRE (regionals)",        unit: px, yahoo: KRE }
+  - { id: etf-smh,  name: "SMH (semis)",            unit: px, yahoo: SMH }
+  # ---- batch 7: derived spreads/ratios (computed from existing fetches, no new HTTP) ----
+  # DE 10Y via FRED IRLTLT01DEM156N (monthly; verified live) — the bond matrix uses
+  # Bundesbank daily for DE, but the spread needs one FRED-aligned series; B is carried
+  # forward to each daily A date. Units are percentage points (100bp = 1pp).
+  - { id: spr-us-de,      name: "US 10Y − DE 10Y (pp)", unit: pp, fred_spread: [DGS10, IRLTLT01DEM156N] }
+  - { id: spr-us-jp,      name: "US 10Y − JP 10Y (pp)", unit: pp, fred_spread: [DGS10, IRLTLT01JPM156N] }
+  - { id: cu-au-ratio,    name: "Copper/Gold",         unit: ratio, yahoo_ratio: ["HG=F", "GC=F"] }
+  - { id: hy-ig-ratio,    name: "HY OAS / IG OAS",     unit: ratio, fred_ratio: [BAMLH0A0HYM2, BAMLC0A0CM] }
+  - { id: emb-lemb-ratio, name: "EMB/LEMB",            unit: ratio, yahoo_ratio: [EMB, LEMB] }
+
 cycle_tabs:        # layout only; rows reference cycle_series ids
   - id: risk
     label: RISK
@@ -278,14 +340,24 @@ cycle_tabs:        # layout only; rows reference cycle_series ids
           - { series: claims }
           - { series: jolts }
           - { series: trucks }
+          - { series: wei }
           - { series: m2-yoy }
           - { series: m2-velocity }
           - { series: usd-broad }
+          - { series: tga }
+          - { series: stlfsi }
+      - title: "PETROLEUM STOCKS (EIA WPSR)"
+        rows:
+          - { series: spr-stocks }
+          - { series: comm-crude-stocks }
       - title: "INFLATION & RATES"
         rows:
           - { series: breakeven-10y }
           - { series: infl-5y5y }
           - { series: real-10y }
+          - { series: us-1m-bill }
+          - { series: us-6m-bill }
+          - { series: us-1y-bill }
   - id: credit
     label: CREDIT
     panels:
@@ -293,6 +365,10 @@ cycle_tabs:        # layout only; rows reference cycle_series ids
         rows:
           - { series: t10y3m,      overlay: vix }
           - { series: t10y2y }
+      - title: "SOVEREIGN SPREADS (pp)"
+        rows:
+          - { series: spr-us-de }
+          - { series: spr-us-jp }
       - title: "SPREADS & CONDITIONS"
         rows:
           - { series: ig-oas }
@@ -300,6 +376,7 @@ cycle_tabs:        # layout only; rows reference cycle_series ids
           - { series: eu-hy-oas }
           - { series: bbb-oas }
           - { series: ccc-oas }
+          - { series: hy-ig-ratio }
           - { series: nfci }
           - { series: bank-lending }
   - id: profit
@@ -359,6 +436,34 @@ cycle_tabs:        # layout only; rows reference cycle_series ids
           - { series: hf-repo-borrow }
           - { series: hf-treasury-long }
           - { series: hf-top10-lev }
+  - id: etf
+    label: ETFS
+    panels:
+      - title: "TREASURY ETFs"
+        rows:
+          - { series: etf-sgov }
+          - { series: etf-bil }
+          - { series: etf-vgsh }
+          - { series: etf-vgit }
+          - { series: etf-govt }
+          - { series: etf-edv }
+      - title: "CREDIT & EM ETFs"
+        rows:
+          - { series: etf-emb }
+          - { series: etf-lemb }
+          - { series: emb-lemb-ratio }
+      - title: "SECTOR ETFs"
+        rows:
+          - { series: etf-xlk }
+          - { series: etf-xlf }
+          - { series: etf-xle }
+          - { series: etf-xli }
+          - { series: etf-xlv }
+          - { series: etf-kre }
+          - { series: etf-smh }
+      - title: "RATIOS"
+        rows:
+          - { series: cu-au-ratio }
 
 calendar_map:      # first match wins — keep Core before CPI
   - { country: USD, match: "Core CPI",     series: us-core-cpi-yoy }
@@ -487,3 +592,43 @@ refs:              # RATE REFS panel: the comparables Midnight fixed rates are j
         underlying_id: pendle-underlying-cbbtc-usdc, underlying_label: "PENDLE UNDERLY" }
   funding:
     - { symbol: BTCUSDT, id: funding-binance-btc, label: "BTC FUND ANN" }
+
+scorecard:          # briefing-style 1D/1M/3M/1Y + 1Y z-score table (GET /api/scorecard)
+  # kind: pct = percent moves (prices/levels); bp = basis-point moves (yields/spreads in % or pp)
+  - { series: us10y,           kind: bp  }
+  - { series: us-1m-bill,      kind: bp  }
+  - { series: us-6m-bill,      kind: bp  }
+  - { series: us-1y-bill,      kind: bp  }
+  - { series: t10y2y,          kind: bp  }
+  - { series: t10y3m,          kind: bp  }
+  - { series: spr-us-de,       kind: bp  }
+  - { series: spr-us-jp,       kind: bp  }
+  - { series: ig-oas,          kind: bp  }
+  - { series: hy-oas,          kind: bp  }
+  - { series: hy-ig-ratio,     kind: pct }
+  - { series: tga,             kind: pct }
+  - { series: stlfsi,          kind: pct }
+  - { series: wei,             kind: pct }
+  - { series: spr-stocks,      kind: pct }
+  - { series: comm-crude-stocks, kind: pct }
+  - { series: vix,             kind: pct }
+  - { series: etf-sgov,        kind: pct }
+  - { series: etf-bil,         kind: pct }
+  - { series: etf-vgsh,        kind: pct }
+  - { series: etf-vgit,        kind: pct }
+  - { series: etf-govt,        kind: pct }
+  - { series: etf-edv,         kind: pct }
+  - { series: etf-emb,         kind: pct }
+  - { series: etf-lemb,        kind: pct }
+  - { series: etf-xlk,         kind: pct }
+  - { series: etf-xlf,         kind: pct }
+  - { series: etf-xle,         kind: pct }
+  - { series: etf-xli,         kind: pct }
+  - { series: etf-xlv,         kind: pct }
+  - { series: etf-kre,         kind: pct }
+  - { series: etf-smh,         kind: pct }
+  - { series: cu-au-ratio,     kind: pct }
+  - { series: emb-lemb-ratio,  kind: pct }
+  - { series: gld,             kind: pct }
+  - { series: hyg,             kind: pct }
+  - { series: lqd,             kind: pct }
