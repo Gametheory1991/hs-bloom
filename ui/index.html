@@ -26,6 +26,8 @@
     <a href="#/pos" data-tab-link="pos">POS</a>
     <a href="#/map" data-tab-link="map">RISK MAP</a>
     <a href="#/xcorr" data-tab-link="xcorr">X-CORR</a>
+    <a href="#/vol" data-tab-link="vol">VOL</a>
+    <a href="#/movers" data-tab-link="movers">MOVERS</a>
   </nav>
   <main class="grid" data-tab="mkt">
     <section class="col-left">
@@ -92,6 +94,20 @@
   <main class="grid hidden" data-tab="xcorr" style="grid-template-columns: 1fr;">
     <section class="panel" id="panel-xcorr">
       <div class="panel-title">X-CORR — CROSS-ASSET CORRELATION &amp; VOL</div>
+      <div class="panel-body"></div>
+      <div class="panel-foot muted"></div>
+    </section>
+  </main>
+  <main class="grid hidden" data-tab="vol" style="grid-template-columns: 1fr;">
+    <section class="panel" id="panel-vol">
+      <div class="panel-title">VOL — MACRO VOLATILITY DIGEST</div>
+      <div class="panel-body"></div>
+      <div class="panel-foot muted"></div>
+    </section>
+  </main>
+  <main class="grid hidden" data-tab="movers" style="grid-template-columns: 1fr;">
+    <section class="panel" id="panel-movers">
+      <div class="panel-title">MOVERS — SINGLE-STOCK SIGMA MOVES</div>
       <div class="panel-body"></div>
       <div class="panel-foot muted"></div>
     </section>
