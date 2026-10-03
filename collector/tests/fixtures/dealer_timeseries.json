@@ -1,0 +1,26 @@
+{
+ "pd": {
+  "timeseries": [
+   {
+    "asofdate": "2026-09-09",
+    "keyid": "PDPOSGST-TOT",
+    "value": "460449"
+   },
+   {
+    "asofdate": "2026-09-16",
+    "keyid": "PDPOSGST-TOT",
+    "value": "454557"
+   },
+   {
+    "asofdate": "2026-09-23",
+    "keyid": "PDPOSGST-TOT",
+    "value": "470836"
+   },
+   {
+    "asofdate": "2026-10-01",
+    "keyid": "PDPOSGST-TOT",
+    "value": "BAD"
+   }
+  ]
+ }
+}

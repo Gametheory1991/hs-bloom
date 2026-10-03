@@ -1,0 +1,66 @@
+{
+ "data": [
+  {
+   "record_date": "2026-08-04",
+   "auction_date": "2026-07-30",
+   "security_type": "Bill",
+   "security_term": "4-Week",
+   "bid_to_cover_ratio": "2.800000",
+   "total_tendered": "313616942600",
+   "total_accepted": "116011412600",
+   "indirect_bidder_tendered": "86678896000",
+   "indirect_bidder_accepted": "66519676000",
+   "direct_bidder_tendered": "13325000000",
+   "direct_bidder_accepted": "4126680000",
+   "primary_dealer_tendered": "199964000000",
+   "primary_dealer_accepted": "31716010000",
+   "offering_amt": "110000000000"
+  },
+  {
+   "record_date": "2026-08-17",
+   "auction_date": "2026-08-12",
+   "security_type": "Note",
+   "security_term": "10-Year",
+   "bid_to_cover_ratio": "2.530000",
+   "total_tendered": "116957209500",
+   "total_accepted": "52623557100",
+   "indirect_bidder_tendered": "37281666000",
+   "indirect_bidder_accepted": "32087936000",
+   "direct_bidder_tendered": "10697600000",
+   "direct_bidder_accepted": "6135867600",
+   "primary_dealer_tendered": "58176000000",
+   "primary_dealer_accepted": "3597810000",
+   "offering_amt": "42000000000"
+  },
+  {
+   "record_date": "2026-09-15",
+   "auction_date": "2026-09-10",
+   "security_type": "Bond",
+   "security_term": "29-Year 11-Month",
+   "bid_to_cover_ratio": "2.610000",
+   "total_tendered": "57466872500",
+   "total_accepted": "22000024000",
+   "indirect_bidder_tendered": "21120619000",
+   "indirect_bidder_accepted": "17452770500",
+   "direct_bidder_tendered": "7991900000",
+   "direct_bidder_accepted": "4019900000",
+   "primary_dealer_tendered": "28311800000",
+   "primary_dealer_accepted": "484800000",
+   "offering_amt": "22000000000"
+  },
+  {
+   "record_date": "2026-10-15",
+   "auction_date": "2026-10-06",
+   "security_type": "Note",
+   "security_term": "3-Year",
+   "bid_to_cover_ratio": "null",
+   "total_accepted": "null",
+   "indirect_bidder_accepted": "null",
+   "direct_bidder_accepted": "null",
+   "primary_dealer_accepted": "null",
+   "offering_amt": "58000000000"
+  }
+ ],
+ "meta": {},
+ "links": {}
+}
