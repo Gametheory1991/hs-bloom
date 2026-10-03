@@ -82,7 +82,7 @@ async def fetch_openfigi(store: Store, post_json: PostJson) -> str:
         for i in range(0, len(tickers), BATCH):
             if i:
                 await asyncio.sleep(REQUEST_GAP)
-            jobs = [{"idType": "ID_TICKER", "idValue": t, "exchCode": "US"}
+            jobs = [{"idType": "TICKER", "idValue": t, "exchCode": "US"}  # ID_TICKER returns nothing (verified live 2026-10-03)
                     for t in tickers[i:i + BATCH]]
             body = await post_json(URL, jobs, headers=headers)
             results = body if isinstance(body, list) else json.loads(body)
