@@ -18,7 +18,10 @@ Method per symbol:
     top-10 negative by |z|
 
 Writes doc "movers": {asof, indexes: {spx: {win5d: {up, down}, win20d: ...},
-ndx: {...}}}. Each entry: {symbol, z, ret_pct}. Also upserts the weekly run
+ndx: {...}}, all: {SYM: {idx, z5, ret5, z20, ret20}}, dispersion_5d}.
+Each top-10 entry: {symbol, z, ret_pct}. dispersion_5d (std of 5d log-returns
+across the scored universe) is also upserted to history
+"movers:dispersion-5d" for percentile ranking. Also upserts the weekly run
 date to history "movers:asof" so the UI can show staleness.
 
 A symbol needs >=65 daily closes or it is skipped (60d trailing sigma + 20d
@@ -124,6 +127,8 @@ async def fetch_movers(store: Store, get_text: GetText,
     """Weekly job: rank sigma-movers for SPX + NDX, store the top-10 lists."""
     today = today or datetime.now(timezone.utc).date()
     payload: dict = {"asof": today.isoformat(), "source": SOURCE, "indexes": {}}
+    universe: dict[str, dict] = {}
+    disp_rets: list[float] = []
     for idx_id, label, filename in INDEXES:
         tickers = _load_tickers(filename)
         scored: list[tuple[str, dict]] = []
@@ -134,6 +139,10 @@ async def fetch_movers(store: Store, get_text: GetText,
             if (i + 1) % 25 == 0:
                 log.info("movers: %s %d/%d symbols", idx_id, i + 1, len(tickers))
             await asyncio.sleep(POLITE_GAP)
+        for symbol, m in scored:
+            universe[symbol] = {"idx": idx_id, "z5": m["z5"], "ret5": m["ret5"],
+                                "z20": m["z20"], "ret20": m["ret20"]}
+            disp_rets.append(m["ret5"])
         up5 = sorted((s for s in scored if s[1]["z5"] > 0),
                      key=lambda s: -s[1]["z5"])[:TOP_N]
         dn5 = sorted((s for s in scored if s[1]["z5"] < 0),
@@ -157,6 +166,15 @@ async def fetch_movers(store: Store, get_text: GetText,
             "win5d": {"up": pack5(up5), "down": pack5(dn5)},
             "win20d": {"up": pack20(up20), "down": pack20(dn20)},
         }
+    # cross-sectional dispersion (std of 5d log-returns across the scored
+    # universe) — feeds the radar breadth cell; also stored as history so the
+    # radar can percentile-rank it. The full universe map powers single-stock
+    # lookup in chat.
+    payload["all"] = universe
+    if len(disp_rets) >= 20:
+        disp = round(pstdev(disp_rets), 2)
+        payload["dispersion_5d"] = disp
+        store.upsert_points("movers:dispersion-5d", [(today, disp)])
     store.put_doc(DOC_KEY, payload, source=SOURCE)
     store.upsert_points("movers:asof", [(today, 1.0)])
     return "movers"
