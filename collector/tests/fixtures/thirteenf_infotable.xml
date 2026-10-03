@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<informationTable xmlns="http://www.sec.gov/edgar/document/thirteenf/informationtable" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+<infoTable>
+<nameOfIssuer>AMERICAN EXPRESS CO</nameOfIssuer>
+<titleOfClass>COM</titleOfClass>
+<cusip>025816109</cusip>
+<value>50419898</value>
+<shrsOrPrnAmt><sshPrnamt>100000</sshPrnamt><sshPrnamtType>SH</sshPrnamtType></shrsOrPrnAmt>
+</infoTable>
+<infoTable>
+<nameOfIssuer>APPLE INC</nameOfIssuer>
+<titleOfClass>COM</titleOfClass>
+<cusip>037833100</cusip>
+<value>23341172</value>
+<shrsOrPrnAmt><sshPrnamt>200000</sshPrnamt><sshPrnamtType>SH</sshPrnamtType></shrsOrPrnAmt>
+</infoTable>
+<infoTable>
+<nameOfIssuer>APPLE INC</nameOfIssuer>
+<titleOfClass>COM</titleOfClass>
+<cusip>037833101</cusip>
+<value>17808079</value>
+<shrsOrPrnAmt><sshPrnamt>150000</sshPrnamt><sshPrnamtType>SH</sshPrnamtType></shrsOrPrnAmt>
+</infoTable>
+<infoTable>
+<nameOfIssuer>BROKEN ROW</nameOfIssuer>
+<titleOfClass>COM</titleOfClass>
+<cusip>000000000</cusip>
+<value>not-a-number</value>
+<shrsOrPrnAmt><sshPrnamt>1</sshPrnamt><sshPrnamtType>SH</sshPrnamtType></shrsOrPrnAmt>
+</infoTable>
+</informationTable>

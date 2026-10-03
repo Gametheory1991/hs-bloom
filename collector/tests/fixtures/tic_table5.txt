@@ -1,0 +1,15 @@
+Table 5: Major Foreign Holders of Treasury Securities
+Holdings at end of time period
+Billions of dollars
+Link: https://ticdata.treasury.gov/Publish/slt_table5.txt
+
+Country	2026-07	2026-06	2026-05
+Japan	1103.9	1116.7	1143.1
+China, Mainland	618.0	633.4	n.a.
+All Other	1842.4	1850.3	1859.6
+Grand Total	9248.1	9298.5	9368.5
+
+Of Which: Foreign Official T-Bonds & Notes	3418.8	3417.5	3449.7
+
+Notes:
+The data in this table are collected primarily from U.S.-based custodians.
