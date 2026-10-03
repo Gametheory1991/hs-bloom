@@ -4,7 +4,7 @@
 import { getSeries } from "../api.js";
 import { openChart } from "../chart.js";
 
-const FUTURES = [
+export const FUTURES = [
   ["fut-es", "ES", "S&P 500"],
   ["fut-nq", "NQ", "Nasdaq 100"],
   ["fut-ym", "YM", "Dow"],
