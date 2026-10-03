@@ -33,6 +33,7 @@
     <a href="#/flows" data-tab-link="flows">FLOWS</a>
     <a href="#/scorecard" data-tab-link="scorecard">SCORECARD</a>
     <a href="#/etf" data-tab-link="etf">ETFS</a>
+    <a href="#/central" data-tab-link="central">CENTRAL</a>
   </nav>
   <div id="health-strip" class="health-strip" title="per-feed health: green ok · amber recovered · red failing"></div>
   <main class="grid" data-tab="mkt">
@@ -61,6 +62,15 @@
     <section class="col-right">
       <div class="panel" id="panel-insights">
         <div class="panel-title">ALERTS / NEWSLETTER</div>
+        <div class="panel-body"></div>
+        <div class="panel-foot muted"></div>
+      </div>
+      <div class="panel" id="panel-alerts">
+        <div class="panel-title">ALERT TUNING</div>
+        <div class="panel-body"></div>
+      </div>
+      <div class="panel" id="panel-briefcheck">
+        <div class="panel-title">BRIEFING × TERMINAL CHECK</div>
         <div class="panel-body"></div>
         <div class="panel-foot muted"></div>
       </div>
@@ -164,6 +174,13 @@
     </section>
   </main>
   <main class="grid grid-cycle hidden" data-tab="etf" id="cycle-etf"></main>
+  <main class="grid hidden" data-tab="central" style="grid-template-columns: 1fr;">
+    <section class="panel" id="panel-central">
+      <div class="panel-title">CENTRAL — FED WATCH</div>
+      <div class="panel-body"></div>
+      <div class="panel-foot muted"></div>
+    </section>
+  </main>
   <div id="chart-overlay" class="overlay hidden">
     <div class="overlay-box">
       <div class="overlay-head"><span id="chart-title"></span><button id="chart-close">✕</button></div>
