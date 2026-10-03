@@ -11,6 +11,10 @@ import { renderHyper } from "./panels/hyper.js";
 import { renderXcorr } from "./panels/xcorr.js";
 import { renderVol } from "./panels/vol.js";
 import { renderMovers } from "./panels/movers.js";
+import { renderFutures } from "./panels/futures.js";
+import { renderFlows } from "./panels/flows.js";
+import { renderScorecard } from "./panels/scorecard.js";
+import { initHealth } from "./health.js";
 import { renderRefs } from "./panels/refs.js";
 import { renderInsights } from "./panels/insights.js";
 import { initNotifications, notifyInsights } from "./notifications.js";
@@ -83,6 +87,11 @@ async function tick() {
 initTabs();
 initNotifications();
 initChat();
+initHealth();
+renderFutures();
+renderFlows();
+renderScorecard();
+setInterval(() => { renderFutures(); renderFlows(); renderScorecard(); }, 15 * 60_000);
 initDefiViewToggle(() => {
   if (lastDash) renderDefiPanel(lastDash.panels);
 });
