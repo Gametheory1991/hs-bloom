@@ -30,4 +30,4 @@ asyncio_mode = "auto"
 testpaths = ["tests"]
 
 [tool.setuptools.package-data]
-collector = ["data/*.txt"]
+collector = ["data/*.txt", "data/*.json"]
