@@ -6,6 +6,8 @@ import { renderMacro } from "./panels/macro.js";
 import { renderNews } from "./panels/news.js";
 import { renderCycle } from "./panels/cycle.js";
 import { renderRiskMap } from "./panels/riskmap.js";
+import { renderRadar } from "./panels/radar.js";
+import { renderHyper } from "./panels/hyper.js";
 import { renderXcorr } from "./panels/xcorr.js";
 import { renderVol } from "./panels/vol.js";
 import { renderMovers } from "./panels/movers.js";
@@ -16,7 +18,7 @@ import { initChat } from "./chat.js";
 import { initTabs } from "./tabs.js";
 
 const POLL_MS = 60_000;
-const STALE_MINUTES = { equity: 20, bonds: 130, macro: 390, news: 40, defi: 35, midnight: 35, refs: 35, insights: 70, riskmap: 2880, xcorr: 2880, gse: 86400, vol: 2880, movers: 10080 };  // ~2x cadence
+const STALE_MINUTES = { equity: 20, bonds: 130, macro: 390, news: 40, defi: 35, midnight: 35, refs: 35, insights: 70, riskmap: 2880, xcorr: 2880, gse: 86400, vol: 2880, movers: 10080, radar: 2880, hyper: 10080 };  // ~2x cadence
 
 const EMPTY = { rows: [], updated_at: null, source: null };
 
@@ -55,6 +57,9 @@ async function tick() {
                 p.gse ?? { series: [] });
     renderVol(p.voldash ?? { rows: [], vix_hist: [], vvix_hist: [], beta: {}, beta_hist: {} });
     renderMovers(p.movers ?? { indexes: {}, asof: null, updated_at: null, source: null });
+    renderRadar(p.radar ?? { indicators: [], regime: "UNKNOWN", as_of: null, updated_at: null, source: null },
+                p.riskmap ?? { countries: [], asof: null, updated_at: null, source: null });
+    renderHyper(p.hyper ?? { issuances: [], equities: [], note: null, updated_at: null, source: null });
     renderInsights(p.insights ?? { alerts: [], trends: [], newsletter: { headline: "No digest yet", bullets: [] } });
     foot("equity", "equity", { ...p.equity, source: p.equity.rows[0]?.source });
     foot("bonds", "bonds", p.bonds);
@@ -64,6 +69,8 @@ async function tick() {
     foot("refs", "refs", p.refs ?? EMPTY);
     foot("insights", "insights", p.insights ?? { updated_at: null, source: null });
     foot("riskmap", "riskmap", p.riskmap ?? { updated_at: null, source: null });
+    foot("radar", "radar", p.radar ?? { updated_at: null, source: null });
+    foot("hyper", "hyper", p.hyper ?? { updated_at: null, source: null });
     await notifyInsights(p.insights);
     document.getElementById("clock").textContent = `as of ${fmtClock(dash.as_of)} UTC`;
     banner.classList.add("hidden");
