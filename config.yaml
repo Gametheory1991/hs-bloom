@@ -21,6 +21,7 @@ cadences:          # seconds between fetcher runs
   auctions: 86400   # Treasury auction surveillance; daily (each run pages ~18 months)
   dealer: 604800    # NY Fed primary dealer stats; weekly (released Wednesdays)
   risk: 86400       # risk/prediction engine; daily compute job (no external HTTP)
+  country_risk: 86400 # world risk map scoring; daily compute job (no external HTTP)
 
 indexes:           # all served by yahoo
   - { symbol: SPX,  name: "S&P 500",       yahoo: "^GSPC" }
