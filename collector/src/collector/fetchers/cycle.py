@@ -32,6 +32,8 @@ async def _fetch_one(
         return await aaii.fetch_spread(get_bytes)
     if cfg.ofr:
         return await ofr.fetch_mnemonic(cfg.ofr, get_text)
+    if cfg.yahoo:
+        return (await yahoo.fetch_chart(cfg.yahoo, get_text, range_="10y")).closes
     if cfg.yahoo_ratio:
         num, den = cfg.yahoo_ratio
         a = await yahoo.fetch_chart(num, get_text, range_="10y")
