@@ -27,8 +27,13 @@ export function renderCycle(cycle) {
   for (const tab of cycle.tabs ?? []) {
     const root = document.getElementById(`cycle-${tab.id}`);
     if (!root) continue;
+    // Batch-11 custom sections (fiscal detail, earnings, FIGI lookup) live
+    // inside the cycle tab roots; preserve them across re-renders.
+    const extras = [...root.querySelectorAll("[data-batch11]")];
+    const restore = () => { for (const el of extras) root.appendChild(el); };
     if (!tab.panels.some((p) => p.rows.length)) {
       root.innerHTML = `<section class="panel"><div class="panel-body"><div class="empty-state">NO DATA</div></div></section>`;
+      restore();
       continue;
     }
     root.innerHTML = tab.panels.map((panel, pi) => `
@@ -54,5 +59,6 @@ export function renderCycle(cycle) {
         openChart(row.id, row.name, row.overlay);
       });
     });
+    restore();
   }
 }

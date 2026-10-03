@@ -27,9 +27,9 @@ const tierStats = (rows) => {
   };
 };
 
-let defiView = "vaults"; // "vaults" | "markets" — in-memory, default VAULTS (spec §3)
+let defiView = "vaults"; // "vaults" | "markets" | "crypto" — in-memory, default VAULTS (spec §3)
 
-const VIEW_TITLES = { vaults: "CURATED VAULTS — USDC", markets: "MORPHO MARKETS — USDC" };
+const VIEW_TITLES = { vaults: "CURATED VAULTS — USDC", markets: "MORPHO MARKETS — USDC", crypto: "CRYPTO BREADTH — TOP 50" };
 
 export function initDefiViewToggle(onChange) {
   const buttons = document.querySelectorAll("#panel-defi .view-toggle button");
@@ -107,13 +107,54 @@ export function renderDefi(panel, morphoPanel) {
   document.getElementById("defi-view-title").textContent = VIEW_TITLES[defiView];
   if (defiView === "markets") {
     renderMarkets(morphoPanel);
+  } else if (defiView === "crypto") {
+    renderCrypto(panel);
   } else {
     renderVaults(panel);
   }
 }
 
 export function defiFootData(defiPanel, morphoPanel) {
-  return defiView === "markets" ? morphoPanel : defiPanel;
+  if (defiView === "markets") return morphoPanel;
+  if (defiView === "crypto") {
+    return { source: "coingecko", updated_at: defiPanel.crypto_updated_at ?? null };
+  }
+  return defiPanel;
+}
+
+// Batch 11: CoinGecko top-50 crypto breadth. Rows arrive rank-ordered.
+function renderCrypto(panel) {
+  const body = document.querySelector("#panel-defi .panel-body");
+  const coins = panel.crypto ?? [];
+  if (!coins.length) {
+    body.innerHTML = `<div class="empty-state">NO DATA</div>`;
+    return;
+  }
+  const pct = (x) => {
+    if (x == null) return "—";
+    const cls = x > 0 ? "up" : x < 0 ? "down" : "flat";
+    return `<span class="${cls}">${x > 0 ? "+" : ""}${x.toFixed(1)}%</span>`;
+  };
+  const usd = (x) => (x == null ? "—" : x >= 1
+    ? x.toLocaleString("en-US", { maximumFractionDigits: 2 })
+    : x.toPrecision(3));
+  const big = (x) => (x == null ? "—" : x >= 1e9
+    ? `$${(x / 1e9).toFixed(1)}B` : `$${(x / 1e6).toFixed(0)}M`);
+  const dom = panel.btc_dominance_pct;
+  body.innerHTML =
+    (dom != null ? `<div class="muted" style="margin-bottom:6px">BTC dominance ${dom.toFixed(1)}%</div>` : "") +
+    `<table class="crypto-table">
+    <tr><th>#</th><th>Coin</th><th>Price</th><th>24h</th><th>7d</th><th>MCap</th><th>Vol24h</th></tr>
+    ${coins.map((c) => `<tr>
+      <td class="num">${c.rank ?? "—"}</td>
+      <td class="sym">${esc(c.symbol)} <span class="muted">${esc(c.name)}</span></td>
+      <td class="num">$${usd(c.price)}</td>
+      <td class="num">${pct(c.chg24h)}</td>
+      <td class="num">${pct(c.chg7d)}</td>
+      <td class="num">${big(c.mcap)}</td>
+      <td class="num">${big(c.vol24h)}</td>
+    </tr>`).join("")}
+  </table>`;
 }
 
 let curvePlot = null;
