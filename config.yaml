@@ -22,6 +22,8 @@ cadences:          # seconds between fetcher runs
   dealer: 604800    # NY Fed primary dealer stats; weekly (released Wednesdays)
   risk: 86400       # risk/prediction engine; daily compute job (no external HTTP)
   country_risk: 86400 # world risk map scoring; daily compute job (no external HTTP)
+  gse: 2592000      # Fannie/Freddie monthly volume summaries; ~25d release lag, job probes 4 month-ends
+  xcorr: 86400      # correlation + realized-vol compute job; daily (no external HTTP)
 
 indexes:           # all served by yahoo
   - { symbol: SPX,  name: "S&P 500",       yahoo: "^GSPC" }
@@ -185,6 +187,26 @@ cycle_series:      # market-cycle series (spec 2026-08-24); exactly one source k
   - { id: hf-treasury-long, name: "HF long UST exposure $",    unit: "$", ofr: FPF-ASSETCLASS_LTREASURY_SUM }
   - { id: hf-top10-lev,     name: "Top-10 HF leverage ratio",  unit: "x", ofr: FPF-ALLQHF_GAVN10_LEVERAGERATIO_AVERAGE }
 
+  # ---- batch 3: single-symbol Yahoo prices (new `yahoo:` field in CycleSeriesCfg) ----
+  - { id: mbb-us,   name: "MBB (agency MBS ETF)",        unit: px,  yahoo: MBB }
+  - { id: hyg,      name: "HYG (HY credit)",              unit: px,  yahoo: HYG }
+  - { id: lqd,      name: "LQD (IG credit)",              unit: px,  yahoo: LQD }
+  - { id: gld,      name: "GLD (gold)",                   unit: px,  yahoo: GLD }
+  - { id: btc,      name: "BTC-USD",                      unit: px,  yahoo: "BTC-USD" }
+  - { id: vix3m,    name: "VIX3M (3M implied vol)",       unit: idx, yahoo: "^VIX3M" }
+  # ---- MBS spread proxy (price ratio — NOT a flow) ----
+  - { id: mbb-shy,  name: "MBB/SHY (MBS vs short UST)",   unit: ratio, yahoo_ratio: [MBB, SHY] }
+  # ---- CBOE put/call ratios (exact names in the daily CDN JSON; verified 2026-10-03) ----
+  - { id: pc-index, name: "Put/Call index",                 unit: ratio, cboe: "INDEX PUT/CALL RATIO" }
+  - { id: pc-etp,   name: "Put/Call ETP",                   unit: ratio, cboe: "EXCHANGE TRADED PRODUCTS PUT/CALL RATIO" }
+  - { id: pc-spx,   name: "Put/Call SPX+SPXW (0DTE incl.)",  unit: ratio, cboe: "SPX + SPXW PUT/CALL RATIO" }
+  - { id: pc-vix,   name: "Put/Call VIX options",           unit: ratio, cboe: "CBOE VOLATILITY INDEX (VIX) PUT/CALL RATIO" }
+  # ---- CFTC legacy COT breadth (codes verified live 2026-10-03; weekly Tuesdays) ----
+  - { id: cot-sofr, name: "SOFR 3M futures net non-commercial",  unit: contracts, cftc: "134741" }
+  - { id: cot-vixf, name: "VIX futures net non-commercial",      unit: contracts, cftc: "1170E1" }
+  - { id: cot-nq,   name: "Nasdaq-100 futures net non-commercial", unit: contracts, cftc: "20974+" }
+  - { id: cot-rty,  name: "Russell 2000 futures net non-commercial", unit: contracts, cftc: "239747" }
+
 cycle_tabs:        # layout only; rows reference cycle_series ids
   - id: risk
     label: RISK
@@ -195,6 +217,9 @@ cycle_tabs:        # layout only; rows reference cycle_series ids
           - { series: vxn }
           - { series: pc-total }
           - { series: pc-equity }
+          - { series: vix3m,       overlay: vix }
+          - { series: pc-index }
+          - { series: pc-spx }
       - title: "SENTIMENT & ROTATION"
         rows:
           - { series: aaii-spread }
@@ -257,6 +282,12 @@ cycle_tabs:        # layout only; rows reference cycle_series ids
           - { series: cot-crude }
           - { series: cot-usd,     overlay: usd-broad }
           - { series: cot-gbp }
+      - title: "FUTURES POSITIONING BREADTH (CFTC LEGACY)"
+        rows:
+          - { series: cot-sofr }
+          - { series: cot-vixf }
+          - { series: cot-nq }
+          - { series: cot-rty }
   - id: quant
     label: QUANT
     panels:
@@ -275,6 +306,10 @@ cycle_tabs:        # layout only; rows reference cycle_series ids
         rows:
           - { series: tlt-shy }
           - { series: ief-shy }
+          - { series: mbb-shy, overlay: tlt-shy }
+          - { series: mbb-us }
+          - { series: hyg }
+          - { series: lqd }
       - title: "HEDGE FUND LEVERAGE & UST EXPOSURE (OFR, QUARTERLY)"
         rows:
           - { series: hf-repo-borrow }
@@ -322,6 +357,11 @@ cftc_pos:            # Socrata; dataset tff|cit|disagg; groups per dataset (see 
   - { dataset: tff, code: "044601", label: "5Y T-Note",  groups: [lev_money] }
   - { dataset: tff, code: "043602", label: "10Y T-Note", groups: [lev_money] }
   - { dataset: tff, code: "020601", label: "30Y T-Bond", groups: [lev_money] }
+  # TFF leveraged-funds breadth (codes verified live 2026-10-03)
+  - { dataset: tff, code: "134741", label: "SOFR 3M",     groups: [lev_money, asset_mgr] }
+  - { dataset: tff, code: "1170E1", label: "VIX futures", groups: [lev_money] }
+  - { dataset: tff, code: "20974+", label: "Nasdaq-100",  groups: [lev_money] }
+  - { dataset: tff, code: "239747", label: "Russell 2000", groups: [lev_money] }
 
 tic:                 # TIC Table 5 (slt_table5.txt), monthly, values in $bn; Grand Total always stored
   countries: [Japan, United Kingdom, "China, Mainland", Belgium, "Cayman Islands", Luxembourg, Canada, Ireland, France, Taiwan]
@@ -334,6 +374,7 @@ thirteenf:           # SEC EDGAR 13F-HR; quarterly filings (<=45d lag); UA is ma
     - { name: "Renaissance Technologies", cik: "0001037389" }
     - { name: "Pershing Square",         cik: "0001336528" }
     - { name: "Scion Asset Management",  cik: "0001649339" }
+    - { name: "Millennium Management",  cik: "0001273087" }  # verified live 2026-10-03 via EDGAR submissions
 
 auctions:              # Treasury Fiscal Data auctions API (keyless); store keys auction:<Type>-<Tenor>:<metric>
   buckets: [Bill-4W, Bill-8W, Bill-13W, Bill-17W, Bill-26W, Bill-52W,
