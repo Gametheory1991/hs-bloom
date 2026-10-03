@@ -24,6 +24,8 @@ cadences:          # seconds between fetcher runs
   country_risk: 86400 # world risk map scoring; daily compute job (no external HTTP)
   gse: 2592000      # Fannie/Freddie monthly volume summaries; ~25d release lag, job probes 4 month-ends
   xcorr: 86400      # correlation + realized-vol compute job; daily (no external HTTP)
+  movers: 604800    # single-stock sigma movers; ~600 Yahoo requests, weekly Saturday
+  voldash: 86400    # vol dashboard compute; daily (no external HTTP)
 
 indexes:           # all served by yahoo
   - { symbol: SPX,  name: "S&P 500",       yahoo: "^GSPC" }
@@ -207,6 +209,29 @@ cycle_series:      # market-cycle series (spec 2026-08-24); exactly one source k
   - { id: cot-nq,   name: "Nasdaq-100 futures net non-commercial", unit: contracts, cftc: "20974+" }
   - { id: cot-rty,  name: "Russell 2000 futures net non-commercial", unit: contracts, cftc: "239747" }
 
+  # ---- batch 4: Yahoo vol indices (1M implied legs; verified live 2026-10-03) ----
+  - { id: vvix,   name: "VVIX (vol of VIX)",          unit: idx, yahoo: "^VVIX" }
+  - { id: gvz,    name: "GVZ (gold vol)",             unit: idx, yahoo: "^GVZ" }
+  - { id: ovx,    name: "OVX (oil vol)",              unit: idx, yahoo: "^OVX" }
+  - { id: vxslv,  name: "VXSLV (silver vol)",         unit: idx, yahoo: "^VXSLV" }
+  # ---- batch 4: Yahoo prices for vol underlyings + correlation universe ----
+  - { id: uso,     name: "USO (oil)",                 unit: px,  yahoo: USO }
+  - { id: slv,     name: "SLV (silver)",              unit: px,  yahoo: SLV }
+  - { id: tlt,     name: "TLT (20Y+ Treasury)",      unit: px,  yahoo: TLT }
+  - { id: iwm,     name: "IWM (Russell 2000)",        unit: px,  yahoo: IWM }
+  - { id: eem,     name: "EEM (emerging mkts)",       unit: px,  yahoo: EEM }
+  - { id: cu,      name: "Copper (HG=F)",             unit: px,  yahoo: "HG=F" }
+  - { id: gbp-usd, name: "GBP/USD",                   unit: fx,  yahoo: "GBPUSD=X" }
+  # ---- batch 4: FRED additions ----
+  - { id: ust30y,     name: "US 30Y yield",            unit: "%", fred: DGS30 }
+  - { id: us10y,      name: "US 10Y yield",            unit: "%", fred: DGS10 }
+  - { id: cre-delinq, name: "CRE loan delinquency %",  unit: "%", fred: DRCRELEXFACBS }
+  # ---- batch 4: CFTC legacy open interest (Treasury futures short-base visual) ----
+  - { id: oi-ust-2y,  name: "2Y T-Note futures OI",   unit: contracts, cftc_oi: "042601" }
+  - { id: oi-ust-5y,  name: "5Y T-Note futures OI",   unit: contracts, cftc_oi: "044601" }
+  - { id: oi-ust-10y, name: "10Y T-Note futures OI",  unit: contracts, cftc_oi: "043602" }
+  - { id: oi-ust-30y, name: "30Y T-Bond futures OI",  unit: contracts, cftc_oi: "020601" }
+
 cycle_tabs:        # layout only; rows reference cycle_series ids
   - id: risk
     label: RISK
@@ -273,6 +298,9 @@ cycle_tabs:        # layout only; rows reference cycle_series ids
       - title: "PROFIT CYCLE"
         rows:
           - { series: corp-profits, overlay: ism-pmi }
+      - title: "CRE STRESS (FRED, QUARTERLY)"
+        rows:
+          - { series: cre-delinq }
   - id: pos
     label: POS
     panels:
@@ -288,6 +316,12 @@ cycle_tabs:        # layout only; rows reference cycle_series ids
           - { series: cot-vixf }
           - { series: cot-nq }
           - { series: cot-rty }
+      - title: "TREASURY FUTURES OPEN INTEREST (CFTC)"
+        rows:
+          - { series: oi-ust-10y, overlay: us10y }
+          - { series: oi-ust-5y }
+          - { series: oi-ust-2y }
+          - { series: oi-ust-30y }
   - id: quant
     label: QUANT
     panels:
