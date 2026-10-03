@@ -207,6 +207,20 @@ class ThirteenFCfg:
 
 
 @dataclass(frozen=True)
+class AuctionsCfg:
+    buckets: list[str]  # e.g. ["Note-10Y", "Bill-4W"]; other auctions ignored
+    lookback_days: int  # history window pulled on each run
+
+
+@dataclass(frozen=True)
+class DealerSeriesCfg:
+    id: str       # short id, e.g. "ust-net"
+    name: str
+    keyid: str    # NY Fed PD timeseries keyid, e.g. PDPOSGST-TOT
+    unit: str
+
+
+@dataclass(frozen=True)
 class Config:
     db_path: str
     calendar_url: str
@@ -228,6 +242,8 @@ class Config:
     cftc_pos: list[CftcPosCfg]
     tic: TicCfg
     thirteenf: ThirteenFCfg
+    auctions: AuctionsCfg
+    dealer: list[DealerSeriesCfg]
 
 
 def load_config(path: str | Path) -> Config:
@@ -262,6 +278,11 @@ def load_config(path: str | Path) -> Config:
             user_agent=raw["thirteenf"]["user_agent"],
             watchlist=[ThirteenFWatchCfg(**w) for w in raw["thirteenf"]["watchlist"]],
         ),
+        auctions=AuctionsCfg(
+            buckets=list(raw["auctions"]["buckets"]),
+            lookback_days=int(raw["auctions"]["lookback_days"]),
+        ),
+        dealer=[DealerSeriesCfg(**s) for s in raw["dealer"]],
         calendar_map=[CalendarMapEntry(**m) for m in raw["calendar_map"]],
         feeds=[FeedCfg(**f) for f in raw["feeds"]],
         zyfai_base=raw["zyfai_base"],

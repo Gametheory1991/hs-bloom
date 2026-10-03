@@ -29,8 +29,11 @@ from collector.fetchers.morpho import fetch_morpho
 from collector.fetchers.news import fetch_news
 from collector.fetchers.ofr import fetch_ofr
 from collector.fetchers.refs import fetch_refs
+from collector.fetchers.risk import refresh_risk
 from collector.fetchers.thirteenf import fetch_thirteenf
 from collector.fetchers.tic import fetch_tic
+from collector.fetchers.auctions import fetch_auctions
+from collector.fetchers.dealer import fetch_dealer
 from collector.fetchers.refs_history import fetch_refs_history
 from collector.fetchers.zyfai import fetch_defi
 from collector.http import GetBytes, GetText, PostJson
@@ -71,7 +74,19 @@ def register_jobs(
         "cftc_pos": (cfg.cadences["cftc_pos"], partial(fetch_cftc_positioning, cfg.cftc_pos, store, get_text), start),
         "tic": (cfg.cadences["tic"], partial(fetch_tic, cfg.tic, store, get_text), start),
         "thirteenf": (cfg.cadences["thirteenf"], partial(fetch_thirteenf, cfg.thirteenf, store, get_text), start),
+        "auctions": (cfg.cadences["auctions"], partial(fetch_auctions, cfg.auctions, store, get_text), start),
+        "dealer": (cfg.cadences["dealer"], partial(fetch_dealer, cfg.dealer, store, get_text), start),
         "insights": (cfg.cadences["insights"], partial(refresh_digest, store, cfg), start),
+        # risk is compute-only (no HTTP): it reads whatever the data jobs have
+        # stored. APScheduler has no dependency ordering, so it starts 5 min
+        # after everything else — on a fresh deploy the data jobs get a head
+        # start, and on the daily cadence it runs 5 min after them each day.
+        # Best-effort only: the job is idempotent, recomputes daily, and every
+        # input degrades gracefully, so a premature run just yields thinner
+        # composites, never a crash. .get() keeps an old config.yaml (without
+        # the risk cadence) from breaking scheduler registration entirely.
+        "risk": (cfg.cadences.get("risk", 86400), partial(refresh_risk, store),
+                 start + timedelta(seconds=300)),
         "newsletter": (cfg.cadences["insights"], partial(deliver_newsletter, store, smtp_cfg), start + timedelta(seconds=5)),
     }
     for name, (seconds, fn, next_run_time) in fetchers.items():

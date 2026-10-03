@@ -112,6 +112,8 @@ def _coverage(store: Store, tracked_series: int, active_series: int) -> dict:
 
 def build_digest(store: Store, cfg: Config, now: datetime | None = None) -> dict:
     now = now or datetime.now(timezone.utc)
+    risk_doc = store.doc("risk_summary")
+    risk_payload = risk_doc.payload if risk_doc else None
     anomalies = []
     trends = []
     active_series = 0
@@ -189,6 +191,9 @@ def build_digest(store: Store, cfg: Config, now: datetime | None = None) -> dict
             "alerts": [{k: row[k] for k in ("series_id", "direction", "summary")} for row in anomalies[:8]],
             "trends": [{k: row[k] for k in ("series_id", "direction", "summary")} for row in trends[:8]],
             "newsletter": newsletter,
+            # the verdict is hashed so the newsletter fires when the risk
+            # engine's read of the market changes, not just on new anomalies
+            "risk_verdict": (risk_payload or {}).get("verdict"),
         },
         sort_keys=True,
     ).encode("utf-8")).hexdigest()[:16]
@@ -198,6 +203,7 @@ def build_digest(store: Store, cfg: Config, now: datetime | None = None) -> dict
         "alerts": anomalies[:8],
         "trends": trends[:8],
         "newsletter": newsletter,
+        "risk": risk_payload,
     }
 
 
