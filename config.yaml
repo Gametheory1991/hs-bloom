@@ -18,6 +18,9 @@ cadences:          # seconds between fetcher runs
   cftc_pos: 604800  # CFTC TFF/CIT/disaggregated positioning; weekly (Tuesdays)
   tic: 604800       # TIC major foreign holders; monthly release
   thirteenf: 604800 # SEC 13F-HR watchlist; quarterly filings, weekly poll
+  auctions: 86400   # Treasury auction surveillance; daily (each run pages ~18 months)
+  dealer: 604800    # NY Fed primary dealer stats; weekly (released Wednesdays)
+  risk: 86400       # risk/prediction engine; daily compute job (no external HTTP)
 
 indexes:           # all served by yahoo
   - { symbol: SPX,  name: "S&P 500",       yahoo: "^GSPC" }
@@ -313,6 +316,11 @@ cftc_pos:            # Socrata; dataset tff|cit|disagg; groups per dataset (see 
   - { dataset: tff,    code: "098662", label: "US Dollar Index", groups: [lev_money, asset_mgr, dealer] }
   - { dataset: disagg, code: "088691", label: "Gold",             groups: [m_money, swap] }
   - { dataset: disagg, code: "067651", label: "WTI Crude",        groups: [m_money, swap] }
+  # TFF leveraged-funds Treasury futures (codes verified live 2026-10-03) — the "who is short" gauge
+  - { dataset: tff, code: "042601", label: "2Y T-Note",  groups: [lev_money] }
+  - { dataset: tff, code: "044601", label: "5Y T-Note",  groups: [lev_money] }
+  - { dataset: tff, code: "043602", label: "10Y T-Note", groups: [lev_money] }
+  - { dataset: tff, code: "020601", label: "30Y T-Bond", groups: [lev_money] }
 
 tic:                 # TIC Table 5 (slt_table5.txt), monthly, values in $bn; Grand Total always stored
   countries: [Japan, United Kingdom, "China, Mainland", Belgium, "Cayman Islands", Luxembourg, Canada, Ireland, France, Taiwan]
@@ -325,6 +333,16 @@ thirteenf:           # SEC EDGAR 13F-HR; quarterly filings (<=45d lag); UA is ma
     - { name: "Renaissance Technologies", cik: "0001037389" }
     - { name: "Pershing Square",         cik: "0001336528" }
     - { name: "Scion Asset Management",  cik: "0001649339" }
+
+auctions:              # Treasury Fiscal Data auctions API (keyless); store keys auction:<Type>-<Tenor>:<metric>
+  buckets: [Bill-4W, Bill-8W, Bill-13W, Bill-17W, Bill-26W, Bill-52W,
+            Note-2Y, Note-3Y, Note-5Y, Note-7Y, Note-10Y, Bond-20Y, Bond-30Y]
+  lookback_days: 540   # ~18 months of auction history pulled on each run
+
+dealer:                # NY Fed Primary Dealer Statistics; values in $millions, weekly
+  - { id: ust-net,          name: "Dealer net outright UST position $m", keyid: PDPOSGST-TOT, unit: "$m" }
+  - { id: ust-fail-deliver, name: "UST fails to deliver $m",            keyid: PDFTD-USTET,  unit: "$m" }
+  - { id: ust-fail-receive, name: "UST fails to receive $m",             keyid: PDFTR-USTET,  unit: "$m" }
 
 feeds:             # RSS bundle; a dead feed is skipped silently
   - { name: FT,          url: "https://www.ft.com/rss/home" }
