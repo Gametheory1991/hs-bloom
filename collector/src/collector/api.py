@@ -33,21 +33,9 @@ class ChatRequest(BaseModel):
     history: list[dict[str, str]] = []
 
 
-class AlertConfigUpdate(BaseModel):
-    id: str
-    threshold_mult: float | None = None
-    muted: bool | None = None
-
-
-class BriefcheckReport(BaseModel):
-    checked_at: str
-    checked_count: int = 0
-    mismatches: list[dict] = []
-
-
 def create_app(store: Store, cfg: Config) -> FastAPI:
     app = FastAPI(title="os-bloom collector", docs_url=None, redoc_url=None)
-    app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET", "POST", "PUT"])
+    app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET", "POST"])
     series_by_id = {s.id: s for s in cfg.series}
     cycle_by_id = {s.id: s for s in cfg.cycle_series}
     index_names = {i.symbol: i.name for i in cfg.indexes}
@@ -181,37 +169,63 @@ def create_app(store: Store, cfg: Config) -> FastAPI:
             rows.append(row)
         return {"rows": rows}
 
-    @app.get("/api/alerts/config")
-    def alerts_config() -> dict:
-        """Per-alert-type tuning: [{id, label, threshold_mult, muted}]."""
-        from collector.alert_config import get_config
+    @app.get("/api/figi/lookup")
+    def figi_lookup(idtype: str = "TICKER", idvalue: str = "") -> dict:
+        """Interactive FIGI lookup: proxies OpenFIGI v3 mapping (batch 11).
 
-        return {"types": list(get_config(store).values())}
+        On-demand (no scheduler job). Needs OPENFIGI_API_KEY in env; without
+        it returns a clean JSON error (ok: false) — never a 500 — so the UI
+        can show the "set the key on Render" hint. idtype: TICKER | CUSIP |
+        ISIN | SEDOL | FIGI.
+        """
+        from collector.fetchers.openfigi import parse_mappings
 
-    @app.put("/api/alerts/config")
-    def update_alerts_config(req: AlertConfigUpdate) -> dict:
-        """Update one alert type's threshold_mult and/or muted flag."""
-        from collector.alert_config import set_config
-
+        api_key = os.environ.get("OPENFIGI_API_KEY", "").strip()
+        if not api_key:
+            return {"ok": False, "error": "no_key",
+                    "message": "Set OPENFIGI_API_KEY on Render (free key: openfigi.com)."}
+        idtype = (idtype or "").strip().upper()
+        id_map = {"TICKER": "ID_TICKER", "CUSIP": "ID_CUSIP",
+                  "ISIN": "ID_ISIN", "SEDOL": "ID_SEDOL", "FIGI": "ID_BB_GLOBAL"}
+        if idtype not in id_map:
+            return {"ok": False, "error": "bad_idtype",
+                    "message": f"idtype must be one of {', '.join(sorted(id_map))}."}
+        idvalue = (idvalue or "").strip()
+        if not idvalue or len(idvalue) > 64:
+            return {"ok": False, "error": "bad_idvalue",
+                    "message": "Enter an identifier (max 64 chars)."}
+        import httpx
         try:
-            entry = set_config(store, req.id,
-                               threshold_mult=req.threshold_mult, muted=req.muted)
-        except ValueError as exc:
-            raise HTTPException(status_code=400, detail=str(exc))
-        return {"type": entry}
-
-    @app.post("/api/briefcheck")
-    def briefcheck_store(report: BriefcheckReport) -> dict:
-        """Accept a briefcheck.py JSON report; stored as doc briefcheck_latest."""
-        store.put_doc("briefcheck_latest", report.model_dump(), "briefcheck")
-        return {"stored": True}
-
-    @app.get("/api/briefcheck")
-    def briefcheck_get() -> dict:
-        """Latest briefcheck report, or 404 when none has been posted yet."""
-        doc = store.doc("briefcheck_latest")
-        if doc is None:
-            raise HTTPException(status_code=404, detail="no briefcheck report yet")
-        return doc.payload
+            resp = httpx.post(
+                "https://api.openfigi.com/v3/mapping",
+                json=[{"idType": id_map[idtype], "idValue": idvalue}],
+                headers={"X-OPENFIGI-APIKEY": api_key,
+                         "Content-Type": "application/json"},
+                timeout=20)
+        except httpx.HTTPError as exc:
+            return {"ok": False, "error": "upstream",
+                    "message": f"OpenFIGI request failed: {str(exc)[:160]}"}
+        if resp.status_code != 200:
+            return {"ok": False, "error": "upstream",
+                    "message": f"OpenFIGI HTTP {resp.status_code}."}
+        try:
+            body = resp.json()
+            results = body if isinstance(body, list) else []
+        except ValueError:
+            return {"ok": False, "error": "upstream",
+                    "message": "OpenFIGI returned non-JSON."}
+        mapped = parse_mappings(results)
+        rows = []
+        for ticker, m in mapped.items():
+            rows.append({
+                "name": m.get("name"), "ticker": ticker,
+                "figi": m.get("figi"), "composite_figi": m.get("compositeFIGI"),
+                "security_type": m.get("securityType"),
+                "exchange_code": m.get("exchCode"),
+                "market_sector": m.get("marketSector"),
+                "share_class_figi": m.get("shareClassFIGI"),
+            })
+        return {"ok": True, "idtype": idtype, "idvalue": idvalue,
+                "count": len(rows), "results": rows}
 
     return app
