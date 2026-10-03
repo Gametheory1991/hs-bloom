@@ -29,7 +29,12 @@
     <a href="#/vol" data-tab-link="vol">VOL</a>
     <a href="#/movers" data-tab-link="movers">MOVERS</a>
     <a href="#/hyper" data-tab-link="hyper">HYPER</a>
+    <a href="#/futures" data-tab-link="futures">FUTURES</a>
+    <a href="#/flows" data-tab-link="flows">FLOWS</a>
+    <a href="#/scorecard" data-tab-link="scorecard">SCORECARD</a>
+    <a href="#/etf" data-tab-link="etf">ETFS</a>
   </nav>
+  <div id="health-strip" class="health-strip" title="per-feed health: green ok · amber recovered · red failing"></div>
   <main class="grid" data-tab="mkt">
     <section class="panel panel-hero" id="panel-radar">
       <div class="panel-title">MARKET RADAR</div>
@@ -125,6 +130,28 @@
       <div class="panel-foot muted"></div>
     </section>
   </main>
+  <main class="grid hidden" data-tab="futures" style="grid-template-columns: 1fr;">
+    <section class="panel" id="panel-futures">
+      <div class="panel-title">FUTURES — FRONT-MONTH</div>
+      <div class="panel-body"></div>
+      <div class="panel-foot muted"></div>
+    </section>
+  </main>
+  <main class="grid hidden" data-tab="flows" style="grid-template-columns: 1fr;">
+    <section class="panel" id="panel-flows">
+      <div class="panel-title">FLOWS — 13F NET FLOWS</div>
+      <div class="panel-body"></div>
+      <div class="panel-foot muted"></div>
+    </section>
+  </main>
+  <main class="grid hidden" data-tab="scorecard" style="grid-template-columns: 1fr;">
+    <section class="panel" id="panel-scorecard">
+      <div class="panel-title">SCORECARD — 1D/1M/3M/1Y + 1Y Z</div>
+      <div class="panel-body"></div>
+      <div class="panel-foot muted"></div>
+    </section>
+  </main>
+  <main class="grid grid-cycle hidden" data-tab="etf" id="cycle-etf"></main>
   <div id="chart-overlay" class="overlay hidden">
     <div class="overlay-box">
       <div class="overlay-head"><span id="chart-title"></span><button id="chart-close">✕</button></div>
