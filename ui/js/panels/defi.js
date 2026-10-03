@@ -1,4 +1,5 @@
 import { fmtUsd } from "../fmt.js";
+import { enableTouchCursor } from "../chart.js";
 
 const CHAIN_ABBR = { __proto__: null, Base: "BASE", Ethereum: "ETH", Arbitrum: "ARB" };
 const apy = (x) => (x == null ? "—" : x.toFixed(2));
@@ -117,9 +118,12 @@ export function defiFootData(defiPanel, morphoPanel) {
 }
 
 let curvePlot = null;
+let curveObserver = null;
 
 export function renderMidnight(panel) {
   const body = document.querySelector("#panel-midnight .panel-body");
+  curveObserver?.disconnect();
+  curveObserver = null;
   if (curvePlot) { curvePlot.destroy(); curvePlot = null; } // before innerHTML wipes its root
   if (!panel.rows.length) {
     body.innerHTML = `<div class="empty-state">NO LIVE MARKETS</div>`;
@@ -145,7 +149,7 @@ function drawCurve(rows) {
   if (pts.length < 2) return; // a one-point "curve" is noise — table only
   const root = document.getElementById("midnight-curve");
   curvePlot = new uPlot({
-    width: Math.max(260, root.clientWidth || 300), height: 240,
+    width: Math.max(1, root.clientWidth || 300), height: 240,
     scales: { x: { time: false } },
     series: [
       { label: "DAYS", value: (u, v) => (v == null ? "--" : Math.round(v)) },
@@ -158,4 +162,11 @@ function drawCurve(rows) {
     ],
     // default cursor + legend stay on: hovering reads out DAYS / LEND %
   }, [pts.map((r) => r.days), pts.map((r) => r.lend_apy)], root);
+  enableTouchCursor(curvePlot);
+  curveObserver = new ResizeObserver(() => {
+    if (curvePlot && root.clientWidth > 0) {
+      curvePlot.setSize({ width: root.clientWidth, height: 240 });
+    }
+  });
+  curveObserver.observe(root);
 }

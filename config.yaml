@@ -2,6 +2,23 @@ db_path: ./bloom.db
 calendar_url: https://nfs.faireconomy.media/ff_calendar_thisweek.json
 max_news: 15
 
+alerting_config:
+  defaults:
+    enabled: true
+    z_threshold: 2.2
+    window: 180
+    min_history: 20
+    min_std: 0.01
+    range_enabled: true
+    range_min: null
+    range_max: null
+    range_margin: 1.0
+    reversal_enabled: true
+    reversal_window: 5
+    reversal_z: 1.15
+    trend_z: 1.15
+  series: {}         # public series IDs; partial threshold overrides
+
 cadences:          # seconds between fetcher runs
   equity: 300
   bonds: 3600

@@ -29,7 +29,7 @@ header {
 .col-left { display: grid; grid-template-rows: 3fr 2fr; gap: 8px; min-height: 0; }
 .panel {
   background: var(--panel); border: 1px solid var(--line);
-  display: flex; flex-direction: column; min-height: 0;
+  display: flex; flex-direction: column; min-height: 0; min-width: 0;
 }
 .panel-title {
   color: var(--amber); font-size: 11px; letter-spacing: 2px;
@@ -51,7 +51,7 @@ td.sym { color: var(--amber); }
 .flat { color: var(--muted); }
 
 tr.clickable, td.clickable { cursor: pointer; }
-tr.clickable:hover, td.clickable:hover { background: var(--line); }
+tr.clickable:hover, td.clickable:hover, tr.clickable:active, td.clickable:active { background: var(--line); }
 tr.release td.actual { font-weight: 700; }
 tr.macro-divider td { color: var(--amber); letter-spacing: 2px; font-size: 10px;
                       text-align: center; padding: 6px 0 4px; }
@@ -63,11 +63,11 @@ tr.macro-divider td { color: var(--amber); letter-spacing: 2px; font-size: 10px;
 
 .overlay {
   position: fixed; inset: 0; background: rgba(0,0,0,.75);
-  display: flex; align-items: center; justify-content: center;
+  display: flex; align-items: center; justify-content: center; z-index: 10;
 }
 .overlay-box {
   background: var(--panel); border: 1px solid var(--amber);
-  padding: 12px; width: min(860px, 92vw);
+  padding: 12px; width: min(860px, 92vw); max-height: 96dvh; overflow: auto;
 }
 .overlay-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;
                 color: var(--amber); letter-spacing: 1px; }
@@ -76,6 +76,9 @@ tr.macro-divider td { color: var(--amber); letter-spacing: 2px; font-size: 10px;
   font-size: 16px; line-height: 1; padding: 6px 10px; margin: -6px -10px;
 }
 .overlay-head button:hover { color: var(--amber); }
+#chart-title { min-width: 0; overflow-wrap: anywhere; }
+#chart-root .u-over, #midnight-curve .u-over { touch-action: none; }
+.u-legend { max-width: 100%; overflow-x: auto; }
 
 /* Bloomberg PORT-style workspace tabs: beveled buttons on a dark strip,
    active tab raised (light top/left, dark bottom/right) and merged into
@@ -125,13 +128,25 @@ tr.macro-divider td { color: var(--amber); letter-spacing: 2px; font-size: 10px;
 }
 .view-toggle button:focus-visible { outline: 1px solid var(--amber); outline-offset: 1px; }
 .view-toggle button.active { color: var(--bg); background: var(--amber); }
+.header-btn:focus-visible, .tab-row a:focus-visible, #chart-close:focus-visible {
+  outline: 2px solid var(--amber); outline-offset: -2px;
+}
 
 @media (max-width: 1000px) {
-  .grid { grid-template-columns: 1fr; grid-auto-rows: minmax(240px, auto); overflow-y: auto; }
+  .grid { grid-template-columns: minmax(0, 1fr); grid-auto-rows: minmax(240px, auto); }
+  .col-left, .col-right { grid-template-rows: auto; min-width: 0; }
+  .panel-body { max-height: 65dvh; }
   body { height: auto; }
   .tab-row { overflow-x: auto; scrollbar-width: thin; }
-  .tab-row a { white-space: nowrap; }
+  .tab-row a { white-space: nowrap; flex-shrink: 0; }
   .header-btn, .banner { margin-left: 0; }
+  .tab-row a, .tab-row a.active, .header-btn, .view-toggle button, #chart-close {
+    min-width: 44px; min-height: 44px;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .tab-row a, .tab-row a.active { padding: 8px 14px; }
+  #chart-close { flex-shrink: 0; margin: 0; }
+  tr.clickable, td.clickable { height: 44px; }
 }
 
 @media (max-width: 680px) {

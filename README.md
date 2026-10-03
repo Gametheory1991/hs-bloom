@@ -1,6 +1,6 @@
 # os-bloom
 
-Customized fork of the upstream self-hosted macro and markets terminal, with
+Customized fork of [cleyfe/os-bloom](https://github.com/cleyfe/os-bloom), the upstream self-hosted macro and markets terminal, with
 mobile/PWA support and automated anomaly/trend digesting.
 
 <div align="center">
@@ -39,6 +39,11 @@ This fork also generates an automated digest from the collected data:
 - cross-series trend summaries using rolling 1M moves
 - a newsletter-style panel/API payload covering macro, news, DeFi, and rates
 - installable mobile/PWA support with browser notifications for fresh digests
+- persistent anomaly/range/reversal history with configurable per-series thresholds
+- optional event email/webhook delivery and a daily UTC newsletter
+
+See [SETUP.md](SETUP.md) for step-by-step local deployment, detection logic,
+threshold examples, and the alert APIs.
 
 ## Tabs
 
@@ -89,6 +94,16 @@ hostname -I
 Then open `http://<that-ip>:8080` on your phone. If you want the digest email
 to include a clickable mobile-safe link, set `DASHBOARD_URL` in `.env`.
 
+On phones and tablets, panels stack and wide tables scroll inside their panels.
+Tap the large tab buttons or swipe left/right **on the tab strip** to change views.
+Tap a series to open its chart; drag across the chart to read values and tap
+the close button to return. Charts resize when you rotate the device.
+
+Browser notifications require HTTPS (or localhost) and browser permission; they
+are generated while the dashboard is open, not background Web Push. Plain HTTP
+on your LAN still supports the dashboard and server-side email/webhook alerts.
+For alerts while the dashboard is closed, configure SMTP or a webhook.
+
 Exact local mobile URL formats:
 
 - dashboard home: `http://<your-lan-ip>:8080/`
@@ -107,7 +122,7 @@ newsletter delivery state.
 
 ### Gmail newsletter delivery
 
-Set these in `/home/runner/work/os-bloom/os-bloom/.env` to enable real email
+Set these in `.env` to enable real email
 delivery of the digest:
 
 ```bash
@@ -123,8 +138,9 @@ SMTP_TO=recipient@example.com
 DASHBOARD_URL=http://<your-lan-ip>:8080
 ```
 
-The collector sends the digest over SMTP after a fresh `insights` digest is
-generated and avoids duplicate sends for the same digest content.
+The collector sends one digest per UTC day after an `insights` refresh.
+The same SMTP settings enable individual event emails; successful event
+deliveries are deduplicated in SQLite across refreshes and restarts.
 
 ### Deploy on Render
 

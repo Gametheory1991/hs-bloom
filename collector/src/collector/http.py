@@ -63,3 +63,13 @@ async def post_json(url: str, json: Any, headers: dict | None = None) -> dict:
         if not isinstance(body, dict):
             raise RuntimeError(f"non-dict JSON body for {resp.url.copy_with(query=None)}")
         return body
+
+
+async def post_webhook(url: str, json: Any, headers: dict | None = None) -> dict:
+    """Webhooks commonly return empty 2xx bodies; never follow credential redirects."""
+    async with httpx.AsyncClient(timeout=20, follow_redirects=False,
+                                 headers={"User-Agent": USER_AGENT, **(headers or {})}) as client:
+        response = await client.post(url, json=json)
+        if not 200 <= response.status_code < 300:
+            raise RuntimeError("webhook delivery failed") from None
+        return {}

@@ -16,7 +16,7 @@
     <span id="banner" class="banner hidden"></span>
     <button id="alerts-toggle" class="header-btn" type="button">ENABLE ALERTS</button>
   </header>
-  <nav class="tab-row">
+  <nav class="tab-row" aria-label="Dashboard views">
     <a href="#/mkt" data-tab-link="mkt">MKT</a>
     <a href="#/defi" data-tab-link="defi">DEFI</a>
     <a href="#/risk" data-tab-link="risk">RISK</a>
@@ -80,9 +80,9 @@
   <main class="grid grid-cycle hidden" data-tab="credit" id="cycle-credit"></main>
   <main class="grid grid-cycle hidden" data-tab="profit" id="cycle-profit"></main>
   <main class="grid grid-cycle hidden" data-tab="pos" id="cycle-pos"></main>
-  <div id="chart-overlay" class="overlay hidden">
+  <div id="chart-overlay" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="chart-title">
     <div class="overlay-box">
-      <div class="overlay-head"><span id="chart-title"></span><button id="chart-close">✕</button></div>
+      <div class="overlay-head"><span id="chart-title"></span><button id="chart-close" type="button" aria-label="Close chart">✕</button></div>
       <div id="chart-root"></div>
     </div>
   </div>

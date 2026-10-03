@@ -2,10 +2,94 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+import math
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import yaml
+
+
+ALERT_DEFAULTS = {
+    "enabled": True,
+    "z_threshold": 2.2,
+    "window": 180,
+    "min_history": 20,
+    "min_std": 0.01,
+    "range_enabled": True,
+    "range_min": None,
+    "range_max": None,
+    "range_margin": 1.0,
+    "reversal_enabled": True,
+    "reversal_window": 5,
+    "reversal_z": 1.15,
+    "trend_z": 1.15,
+}
+
+
+def validate_alerting_config(raw: dict, series_ids: set[str], base: dict | None = None) -> dict:
+    """Merge a threshold-only patch; destinations are deliberately not accepted."""
+    if not isinstance(raw, dict) or set(raw) - {"defaults", "series"}:
+        raise ValueError("alerting_config accepts only defaults and series")
+    base = base or {"defaults": ALERT_DEFAULTS, "series": {}}
+    defaults = raw.get("defaults", {})
+    overrides = raw.get("series", {})
+    if not isinstance(defaults, dict) or not isinstance(overrides, dict):
+        raise ValueError("defaults and series must be objects")
+
+    def validate(values: dict) -> None:
+        if not isinstance(values, dict) or set(values) - set(ALERT_DEFAULTS):
+            raise ValueError("unknown alert threshold key")
+        for key, value in values.items():
+            if key in {"enabled", "range_enabled", "reversal_enabled"}:
+                if not isinstance(value, bool):
+                    raise ValueError(f"{key} must be boolean")
+            elif key in {"range_min", "range_max"} and value is None:
+                continue
+            elif isinstance(value, bool) or not isinstance(value, (float, int)):
+                raise ValueError(f"{key} must be numeric")
+            elif abs(value) > 1e15 or not math.isfinite(value):
+                raise ValueError(f"{key} must be finite and bounded")
+            elif key in {"window", "min_history", "reversal_window"}:
+                if not isinstance(value, int) or not 2 <= value <= 5000:
+                    raise ValueError(f"{key} must be an integer between 2 and 5000")
+            elif key == "min_std":
+                if not 1e-9 <= value <= 100:
+                    raise ValueError("min_std must be between 1e-9 and 100")
+            elif key in {"z_threshold", "reversal_z", "trend_z"}:
+                if not 0 < value <= 100:
+                    raise ValueError(f"{key} must be greater than 0 and at most 100")
+            elif key == "range_margin" and not 0 <= value <= 100:
+                raise ValueError("range_margin must be between 0 and 100")
+
+    def validate_combined(values: dict) -> None:
+        validate(values)
+        if values["min_history"] > values["window"]:
+            raise ValueError("min_history must not exceed window")
+        if values["reversal_enabled"] and 2 * values["reversal_window"] > values["window"]:
+            raise ValueError("window must contain two reversal windows")
+        lo, hi = values["range_min"], values["range_max"]
+        if lo is not None and hi is not None and lo >= hi:
+            raise ValueError("range_min must be less than range_max")
+
+    validate(defaults)
+    result = {
+        "defaults": {**ALERT_DEFAULTS, **base["defaults"], **defaults},
+        "series": {key: dict(value) for key, value in base["series"].items()},
+    }
+    validate_combined(result["defaults"])
+    for series_id, values in overrides.items():
+        if series_id not in series_ids:
+            raise ValueError("unknown alert series")
+        validate(values)
+        if values:
+            result["series"][series_id] = {**result["series"].get(series_id, {}), **values}
+        else:
+            result["series"].pop(series_id, None)
+    for series_id, values in result["series"].items():
+        if series_id not in series_ids:
+            raise ValueError("unknown alert series")
+        validate_combined({**result["defaults"], **values})
+    return result
 
 
 @dataclass(frozen=True)
@@ -190,11 +274,14 @@ class Config:
     midnight_base: str
     defi: DefiCfg
     refs: RefsCfg
+    alerting_config: dict = field(default_factory=lambda: {
+        "defaults": dict(ALERT_DEFAULTS), "series": {},
+    })
 
 
 def load_config(path: str | Path) -> Config:
     raw = yaml.safe_load(Path(path).read_text())
-    return Config(
+    cfg = Config(
         db_path=os.environ.get("DB_PATH", raw["db_path"]),
         calendar_url=raw["calendar_url"],
         max_news=raw["max_news"],
@@ -265,3 +352,22 @@ def load_config(path: str | Path) -> Config:
             ],
         ),
     )
+    from collector.anomalies import series_catalog
+
+    env_defaults = {}
+    for key, default in ALERT_DEFAULTS.items():
+        value = os.environ.get(f"ALERT_{key.upper()}")
+        if value is None or value == "":
+            continue
+        if isinstance(default, bool):
+            if value.lower() not in {"1", "0", "true", "false"}:
+                raise ValueError(f"ALERT_{key.upper()} must be boolean")
+            env_defaults[key] = value.lower() in {"1", "true"}
+        elif isinstance(default, int):
+            env_defaults[key] = int(value)
+        else:
+            env_defaults[key] = float(value)
+    ids = {s.series_id for s in series_catalog(cfg)}
+    configured = validate_alerting_config(raw.get("alerting_config", {}), ids)
+    configured = validate_alerting_config({"defaults": env_defaults}, ids, configured)
+    return Config(**{**cfg.__dict__, "alerting_config": configured})

@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -62,6 +62,38 @@ async def test_deliver_newsletter_sends_once_per_digest(tmp_path, monkeypatch):
     assert sent == [("reader@example.com", insights["digest_id"])]
     status = store.doc("newsletter_status").payload
     assert status["state"] == "idle"
+
+
+@pytest.mark.asyncio
+async def test_deliver_newsletter_waits_for_data_then_sends_same_utc_day(tmp_path, monkeypatch):
+    class Clock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return datetime(2026, 10, 3, 12, tzinfo=timezone.utc)
+
+    monkeypatch.setattr("collector.newsletter.datetime", Clock)
+    store = Store(tmp_path / "t.db")
+    cfg = load_config(REPO_ROOT / "config.yaml")
+    store.put_doc("insights", build_digest(store, cfg), source="local-analysis")
+    sent = []
+    monkeypatch.setattr("collector.newsletter._send", lambda cfg, digest: sent.append(digest))
+
+    assert await deliver_newsletter(store, smtp_cfg()) == "smtp-waiting-data"
+    status = store.doc("newsletter_status").payload
+    assert status["state"] == "waiting_for_data"
+    assert status["last_sent_at"] is None
+    assert status["last_digest_id"] is None
+    assert sent == []
+
+    store.upsert_points("idx:SPX", [(date(2026, 10, 2), 100), (date(2026, 10, 3), 110)])
+    populated = build_digest(store, cfg)
+    assert populated["newsletter"]["coverage"]["active_series"] == 1
+    store.put_doc("insights", populated, source="local-analysis")
+    assert await deliver_newsletter(store, smtp_cfg()) == "smtp"
+    assert len(sent) == 1
+    assert store.doc("newsletter_status").payload["last_sent_at"].startswith("2026-10-03")
+    assert await deliver_newsletter(store, smtp_cfg()) == "smtp-idle"
+    assert len(sent) == 1
 
 
 @pytest.mark.asyncio

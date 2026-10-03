@@ -3,8 +3,27 @@ import { getRecessions, getSeries } from "./api.js";
 let plot = null;
 let recessionsPromise = null; // fetched once per page load, shared by all charts
 let activeRequestId = 0;
+let resizeObserver = null;
+let previousFocus = null;
+
+export function enableTouchCursor(chart) {
+  const move = (e) => {
+    if (e.pointerType !== "touch") return;
+    const rect = chart.over.getBoundingClientRect();
+    chart.setCursor({ left: e.clientX - rect.left, top: e.clientY - rect.top });
+  };
+  chart.over.addEventListener("pointerdown", move);
+  chart.over.addEventListener("pointermove", move);
+}
+
+function chartSize(root) {
+  return { width: Math.max(1, Math.min(820, root.clientWidth)),
+    height: Math.max(160, Math.min(320, window.innerHeight * 0.55)) };
+}
 
 function destroyPlot() {
+  resizeObserver?.disconnect();
+  resizeObserver = null;
   if (plot) {
     plot.destroy();
     plot = null;
@@ -53,8 +72,10 @@ export async function openChart(seriesId, title, overlayId = null) {
   const requestId = ++activeRequestId;
   const overlay = document.getElementById("chart-overlay");
   const root = document.getElementById("chart-root");
+  if (overlay.classList.contains("hidden")) previousFocus = document.activeElement;
   document.getElementById("chart-title").textContent = title;
   overlay.classList.remove("hidden");
+  document.getElementById("chart-close").focus();
   try {
     const [series, second, bands] = await Promise.all([
       getSeries(seriesId, "10y"),
@@ -66,7 +87,7 @@ export async function openChart(seriesId, title, overlayId = null) {
     destroyPlot();
     const axisStyle = { stroke: "#6a746a", grid: { stroke: "#1e261e" } };
     const opts = {
-      width: Math.min(820, root.clientWidth || 820), height: 320,
+      ...chartSize(root),
       series: [{}, { label: series.name ?? series.unit, stroke: "#f5a623", width: 1.5, spanGaps: true }],
       axes: [axisStyle, { ...axisStyle }],
       hooks: { drawClear: [bandsHook(bands)] },
@@ -86,6 +107,11 @@ export async function openChart(seriesId, title, overlayId = null) {
       ];
     }
     plot = new uPlot(opts, data, root);
+    enableTouchCursor(plot);
+    resizeObserver = new ResizeObserver(() => {
+      if (plot) plot.setSize(chartSize(root));
+    });
+    resizeObserver.observe(root);
   } catch (err) {
     if (requestId !== activeRequestId) return;
     // a failed fetch must not leave the previous chart silently mislabeled
@@ -94,8 +120,22 @@ export async function openChart(seriesId, title, overlayId = null) {
   }
 }
 
-document.getElementById("chart-close").addEventListener("click", () => {
+function closeChart() {
+  if (document.getElementById("chart-overlay").classList.contains("hidden")) return;
   activeRequestId += 1;
   document.getElementById("chart-overlay").classList.add("hidden");
   destroyPlot();
+  previousFocus?.focus();
+  previousFocus = null;
+}
+
+document.getElementById("chart-close").addEventListener("click", closeChart);
+document.getElementById("chart-overlay").addEventListener("keydown", (e) => {
+  if (e.key === "Tab") {
+    e.preventDefault();
+    document.getElementById("chart-close").focus();
+  }
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") closeChart();
 });

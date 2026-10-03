@@ -4,7 +4,7 @@ from __future__ import annotations
 import asyncio
 import os
 import smtplib
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from email.message import EmailMessage
 
@@ -113,6 +113,8 @@ def _send(cfg: SmtpCfg, insights: dict) -> None:
 
 
 async def deliver_newsletter(store: Store, cfg: SmtpCfg) -> str:
+    daily_enabled = os.environ.get("NEWSLETTER_ENABLED", "1").strip().lower() in {"1", "true"}
+    cfg = replace(cfg, enabled=cfg.enabled and daily_enabled)
     previous = store.doc("newsletter_status")
     prev = previous.payload if previous else {}
     if not cfg.enabled:
@@ -158,13 +160,33 @@ async def deliver_newsletter(store: Store, cfg: SmtpCfg) -> str:
         return "smtp-waiting"
     digest = insights.payload
     digest_id = digest.get("digest_id")
-    if digest_id and prev.get("last_digest_id") == digest_id:
+    coverage = digest.get("newsletter", {}).get("coverage", {})
+    if isinstance(coverage, dict) and coverage.get("active_series") == 0:
+        store.put_doc(
+            "newsletter_status",
+            _status_payload(
+                cfg,
+                state="waiting_for_data",
+                last_digest_id=prev.get("last_digest_id"),
+                last_sent_at=prev.get("last_sent_at"),
+                last_error=None,
+            ),
+            source="smtp",
+        )
+        return "smtp-waiting-data"
+    today = datetime.now(timezone.utc).date()
+    try:
+        last_sent = datetime.fromisoformat(prev.get("last_sent_at", "").replace("Z", "+00:00"))
+        sent_today = last_sent.astimezone(timezone.utc).date() == today
+    except (ValueError, TypeError, AttributeError):
+        sent_today = False
+    if sent_today:
         store.put_doc(
             "newsletter_status",
             _status_payload(
                 cfg,
                 state="idle",
-                last_digest_id=digest_id,
+                last_digest_id=prev.get("last_digest_id"),
                 last_sent_at=prev.get("last_sent_at"),
                 last_error=None,
             ),
@@ -181,11 +203,11 @@ async def deliver_newsletter(store: Store, cfg: SmtpCfg) -> str:
                 state="error",
                 last_digest_id=prev.get("last_digest_id"),
                 last_sent_at=prev.get("last_sent_at"),
-                last_error=f"{type(exc).__name__}: {exc}",
+                last_error=type(exc).__name__,
             ),
             source="smtp",
         )
-        raise
+        raise RuntimeError("newsletter delivery failed") from None
     sent_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
     store.put_doc(
         "newsletter_status",
