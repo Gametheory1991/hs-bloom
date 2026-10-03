@@ -37,3 +37,7 @@ services:
         sync: false
       - key: SMTP_TO
         sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: CHAT_MODEL
+        value: gemini-flash-latest
