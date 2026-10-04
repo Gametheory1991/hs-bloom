@@ -83,17 +83,21 @@ def parse_workbook(data: bytes, year: int, month: int) -> dict[str, float]:
     return out
 
 
-async def _get_with_retry(url: str, get_bytes: GetBytes) -> bytes:
-    """GET with one retry on 403/429 (CDN rate limiting); 404 means the
-    report isn't published yet and is not retried."""
-    try:
-        return await _get(url, get_bytes)
-    except RuntimeError as exc:
-        if "403" not in str(exc) and "429" not in str(exc):
-            raise
-        log.info("trace_monthly rate-limited, waiting 60s before retry: %s", url)
-        await asyncio.sleep(60.0)
-        return await _get(url, get_bytes)
+async def _get_with_backoff(url: str, get_bytes: GetBytes,
+                            delays: tuple[float, ...] = (60.0, 300.0, 900.0)) -> bytes:
+    """GET with backoff on 403/429. The FINRA CDN 403s this path when it
+    rate-limits us (and also 403s instead of 404ing for unpublished months,
+    which callers handle by age). Other errors raise immediately."""
+    for delay in delays:
+        try:
+            return await _get(url, get_bytes)
+        except RuntimeError as exc:
+            if "403" not in str(exc) and "429" not in str(exc):
+                raise
+            log.info("trace_monthly blocked (%s), retrying in %.0fs: %s",
+                     exc, delay, url)
+            await asyncio.sleep(delay)
+    return await _get(url, get_bytes)  # final attempt; raises if still blocked
 
 
 async def _get(url: str, get_bytes: GetBytes) -> bytes:
@@ -107,8 +111,6 @@ async def fetch_trace_monthly(store: Store, get_bytes: GetBytes,
                               today: date | None = None) -> str:
     """Monthly job: latest published report (probe back 3 months); full
     history backfill to 2017-01 on an empty store."""
-    """Monthly job: latest published report (probe back 3 months); full
-    history backfill to 2017-01 on an empty store."""
     today = today or date.today()
     y, m = today.year, today.month
     got: tuple[int, int] | None = None
@@ -118,15 +120,20 @@ async def fetch_trace_monthly(store: Store, get_bytes: GetBytes,
         if m == 0:
             m, y = 12, y - 1
         url = URL.format(f"{y}-{m:02d}")
+        # Months <2mo old may simply be unpublished (the CDN 403s instead of
+        # 404ing) — fail fast. Older months must exist: a 403 there means we
+        # are blocked, so back off hard before concluding anything.
+        age = (today.year - y) * 12 + (today.month - m)
         try:
-            data = await _get_with_retry(url, get_bytes)
+            data = (await _get(url, get_bytes) if age < 2
+                    else await _get_with_backoff(url, get_bytes))
             vals = parse_workbook(data, y, m)
             asof = vals.pop("_asof")
             for key, val in vals.items():
                 store.upsert_points(f"cycle:{key}", [(asof, val)])
             got = (y, m)
             break
-        except Exception as exc:  # noqa: BLE001 — not yet published
+        except Exception as exc:  # noqa: BLE001 — not yet published / blocked
             errors.append(f"{y}-{m:02d}: {exc}")
             await asyncio.sleep(REQUEST_GAP)  # polite: the CDN 403s rapid bursts
     if got is None:
@@ -141,7 +148,9 @@ async def fetch_trace_monthly(store: Store, get_bytes: GetBytes,
                 bm, by = 12, by - 1
             url = URL.format(f"{by}-{bm:02d}")
             try:
-                data = await _get_with_retry(url, get_bytes)
+                # Probe already proved we are not blocked; failures here are
+                # genuine gaps — skip fast, no backoff.
+                data = await _get(url, get_bytes)
                 vals = parse_workbook(data, by, bm)
             except Exception as exc:  # noqa: BLE001 — tolerate gaps
                 log.debug("trace_monthly %s skipped: %s", url, exc)
