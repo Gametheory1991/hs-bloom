@@ -46,6 +46,9 @@ cadences:          # seconds between fetcher runs
   coingecko: 86400     # CoinGecko top-50 crypto breadth; daily (1 batched call)
   openfigi: 604800     # OpenFIGI symbology map; weekly (skips w/o OPENFIGI_API_KEY)
   finnhub: 86400       # Finnhub earnings+insider; daily when FINNHUB_API_KEY set
+  polymarket: 1800    # Polymarket Gamma top markets by 24h volume; keyless, 1 batched call
+  kalshi: 1800        # Kalshi Trade API v2 open markets; keyless, 1-5 batched calls
+  pred_edge: 3600     # prediction-market edge engine; hourly compute + bounded resolution checks
 indexes:           # all served by yahoo
   - { symbol: SPX,  name: "S&P 500",       yahoo: "^GSPC" }
   - { symbol: NDX,  name: "Nasdaq 100",    yahoo: "^NDX" }   # validate-in-smoke
