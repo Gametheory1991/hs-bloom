@@ -127,6 +127,30 @@ def test_trace_monthly_parse():
     assert vals["trace-agcy-par"] == pytest.approx(58756.0)
 
 
+def test_get_with_backoff_retries_blocked_then_succeeds():
+    calls = {"n": 0}
+
+    async def fake_bytes(url, params=None):
+        calls["n"] += 1
+        if calls["n"] < 3:
+            raise RuntimeError("HTTP 403 for https://cdn.finra.org/x")
+        return b"x" * 1200
+
+    out = asyncio.run(trace_monthly._get_with_backoff(
+        "https://cdn.finra.org/x", fake_bytes, delays=(0, 0)))
+    assert out == b"x" * 1200
+    assert calls["n"] == 3
+
+
+def test_get_with_backoff_reraises_non_block_errors():
+    async def fake_bytes(url, params=None):
+        raise RuntimeError("HTTP 404 for https://cdn.finra.org/x")
+
+    with pytest.raises(RuntimeError, match="404"):
+        asyncio.run(trace_monthly._get_with_backoff(
+            "https://cdn.finra.org/x", fake_bytes, delays=(0,)))
+
+
 def test_trace_monthly_job_skips_unpublished():
     data = (FIX / "finra_trace_monthly_report.xlsx").read_bytes()
 
