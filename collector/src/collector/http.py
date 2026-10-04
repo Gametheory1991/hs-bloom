@@ -14,6 +14,7 @@ USER_AGENT = "os-bloom/0.1 (+https://github.com/cleyfe/os-bloom)"
 GetText = Callable[..., Awaitable[str]]
 GetBytes = Callable[..., Awaitable[bytes]]
 PostJson = Callable[..., Awaitable[dict]]
+PostText = Callable[..., Awaitable[str]]
 
 
 async def get_text(url: str, params: dict | None = None, headers: dict | None = None) -> str:
@@ -63,3 +64,23 @@ async def post_json(url: str, json: Any, headers: dict | None = None) -> dict:
         if not isinstance(body, dict):
             raise RuntimeError(f"non-dict JSON body for {resp.url.copy_with(query=None)}")
         return body
+
+
+async def post_text(url: str, json: Any, headers: dict | None = None) -> str:
+    """POST a JSON body, return the raw text response.
+
+    For APIs (e.g. FINRA's Query API) that answer POSTs with CSV/pipe text
+    rather than JSON.
+    """
+    async with httpx.AsyncClient(
+        timeout=30,
+        follow_redirects=True,
+        headers=headers or {"User-Agent": USER_AGENT},
+    ) as client:
+        resp = await client.post(url, json=json)
+        if resp.status_code >= 400:
+            # strip the query string: same rationale as get_text
+            raise RuntimeError(
+                f"HTTP {resp.status_code} for {resp.url.copy_with(query=None)}"
+            ) from None
+        return resp.text

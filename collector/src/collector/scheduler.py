@@ -55,6 +55,7 @@ from collector.fetchers.finra_breadth import fetch_finra_breadth
 from collector.fetchers.finra_corp import fetch_finra_corp
 from collector.fetchers.finra_margin import fetch_finra_margin
 from collector.fetchers.finra_short import fetch_finra_short
+from collector.fetchers.finra_regsho import fetch_finra_regsho
 from collector.fetchers.ice_star import fetch_ice_star
 from collector.fetchers.refs_history import fetch_refs_history
 from collector.fetchers.trace_monthly import fetch_trace_monthly
@@ -68,7 +69,8 @@ from collector.fetchers.polymarket import fetch_polymarket
 from collector.fetchers.kalshi import fetch_kalshi
 from collector.fetchers.pred_edge import fetch_pred_edge
 from collector.fetchers.zyfai import fetch_defi
-from collector.http import GetBytes, GetText, PostJson
+from collector.http import GetBytes, GetText, PostJson, PostText
+from collector.http import post_text as _default_post_text
 from collector.newsletter import SmtpCfg, deliver_newsletter
 from collector.runner import run_fetcher
 from collector.runner import JOB_RUNS_DOC
@@ -126,8 +128,10 @@ def register_jobs(
     get_bytes: GetBytes,
     fred_api_key: str,
     smtp_cfg: SmtpCfg,
+    post_text: PostText | None = None,
 ) -> None:
     start = datetime.now(timezone.utc)
+    pt = post_text or _default_post_text
     fetchers = {
         "equity": (cfg.cadences["equity"], partial(fetch_equity, cfg.indexes, store, get_text), start),
         "bonds": (cfg.cadences["bonds"], partial(fetch_bonds, cfg.bonds, cfg.cb_rates, store, get_text,
@@ -282,6 +286,11 @@ def register_jobs(
         # history to 2023; keyless). Starts after finra_breadth.
         "finra_corp": (cfg.cadences.get("finra_corp", 86400), partial(fetch_finra_corp, store),
                  start + timedelta(seconds=7200)),
+        # FINRA Reg SHO daily short volume + OTC threshold list (both
+        # keyless; threshold via the public FINRA Query API). Daily.
+        # Starts after the other FINRA jobs.
+        "finra_regsho": (cfg.cadences.get("finra_regsho", 86400), partial(fetch_finra_regsho, store, get_text, pt),
+                 start + timedelta(seconds=7500)),
         "newsletter": (cfg.cadences["insights"], partial(deliver_newsletter, store, smtp_cfg), start + timedelta(seconds=5)),
     }
     # Boot catch-up (see _catchup_first_runs): overdue staggered jobs run
