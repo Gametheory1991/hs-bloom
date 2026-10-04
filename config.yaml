@@ -39,6 +39,7 @@ cadences:          # seconds between fetcher runs
   finra_breadth: 86400   # FINRA bond breadth + sentiment (dynarep API); daily, history to 2018
   finra_corp: 86400      # FINRA most-active corp bonds (dynarep API); daily, history to 2023
   finra_regsho: 86400    # FINRA Reg SHO daily short volume + OTC threshold list; daily, keyless
+  finra_capped: 2592000  # FINRA capped volume report (corp/agency); monthly keyless CSV, 12 rolling months
   ms_capex: 604800       # market-structure universe XBRL financials; weekly (quarterly data)
   ms_graph: 604800       # market-structure money-flow graph; weekly (zero HTTP, overlays ms_capex)
   tsv_capex: 604800      # tokenized-securities universe XBRL fundamentals; weekly
@@ -710,6 +711,15 @@ cycle_series:      # market-cycle series (spec 2026-08-24); exactly one source k
   - { id: regsho-short-GOOGL, name: "GOOGL daily short volume (Reg SHO)", unit: "sh", external: true }
   - { id: regsho-short-META,  name: "META daily short volume (Reg SHO)",  unit: "sh", external: true }
   - { id: regsho-threshold-count, name: "OTC threshold list — securities count", unit: "ct", external: true }
+  # ---- FINRA capped volume report (monthly CSV, verified live 2026-10-04) ----
+  - { id: finra-cap-ig-avgsize,  name: "Capped vol IG avg trade size",  unit: "$000s", external: true }
+  - { id: finra-cap-ig-total,    name: "Capped vol IG total par",       unit: "$", external: true }
+  - { id: finra-cap-hy-avgsize,  name: "Capped vol HY avg trade size",  unit: "$000s", external: true }
+  - { id: finra-cap-hy-total,    name: "Capped vol HY total par",       unit: "$", external: true }
+  - { id: finra-cap-agcy-avgsize, name: "Capped vol Agency avg trade size", unit: "$000s", external: true }
+  - { id: finra-cap-agcy-total,   name: "Capped vol Agency total par",      unit: "$", external: true }
+  - { id: finra-cap-144a-ig-total, name: "Capped vol 144A IG total par", unit: "$", external: true }
+  - { id: finra-cap-144a-hy-total, name: "Capped vol 144A HY total par", unit: "$", external: true }
   # ---- batch 8: market-structure universe (22 tickers, verified live 2026-10-03) ----
   - { id: ms-stt,  name: "State Street",        unit: idx, yahoo: "STT" }
   - { id: ms-blk,  name: "BlackRock",           unit: idx, yahoo: "BLK" }
@@ -1101,6 +1111,16 @@ cycle_tabs:        # layout only; rows reference cycle_series ids
           - { series: regsho-short-GOOGL }
           - { series: regsho-short-META }
           - { series: regsho-threshold-count }
+      - title: "CAPPED VOLUME — CORPORATE/AGENCY (FINRA, MONTHLY)"
+        rows:
+          - { series: finra-cap-ig-total }
+          - { series: finra-cap-ig-avgsize }
+          - { series: finra-cap-hy-total }
+          - { series: finra-cap-hy-avgsize }
+          - { series: finra-cap-agcy-total }
+          - { series: finra-cap-agcy-avgsize }
+          - { series: finra-cap-144a-ig-total }
+          - { series: finra-cap-144a-hy-total }
 
 calendar_map:      # first match wins — keep Core before CPI
   - { country: USD, match: "Core CPI",     series: us-core-cpi-yoy }
