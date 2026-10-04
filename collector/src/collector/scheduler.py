@@ -62,6 +62,9 @@ from collector.fetchers.usaspending import fetch_usaspending
 from collector.fetchers.coingecko import fetch_coingecko
 from collector.fetchers.openfigi import fetch_openfigi
 from collector.fetchers.finnhub import fetch_finnhub
+from collector.fetchers.polymarket import fetch_polymarket
+from collector.fetchers.kalshi import fetch_kalshi
+from collector.fetchers.pred_edge import fetch_pred_edge
 from collector.fetchers.zyfai import fetch_defi
 from collector.http import GetBytes, GetText, PostJson
 from collector.newsletter import SmtpCfg, deliver_newsletter
@@ -254,6 +257,19 @@ def register_jobs(
         # keyed so the earnings window rolls.
         "finnhub": (cfg.cadences.get("finnhub", 86400), partial(fetch_finnhub, store, get_text),
                  start + timedelta(seconds=5700)),
+        # batch 12: Polymarket top markets by 24h volume — keyless Gamma API,
+        # one batched call per run, 30-min cadence for fresh prices.
+        "polymarket": (cfg.cadences.get("polymarket", 1800), partial(fetch_polymarket, store, get_text),
+                 start + timedelta(seconds=6000)),
+        # batch 12: Kalshi open markets — keyless Trade API v2, universe call
+        # plus per-series calls for cross-venue matchable markets.
+        "kalshi": (cfg.cadences.get("kalshi", 1800), partial(fetch_kalshi, store, get_text),
+                 start + timedelta(seconds=6300)),
+        # batch 12: prediction-market edge engine — hourly compute job reading
+        # the venue snapshots + price histories; bounded resolution checks.
+        # Starts after both venue fetchers; same graceful-degradation contract.
+        "pred_edge": (cfg.cadences.get("pred_edge", 3600), partial(fetch_pred_edge, store, get_text),
+                 start + timedelta(seconds=6600)),
         "newsletter": (cfg.cadences["insights"], partial(deliver_newsletter, store, smtp_cfg), start + timedelta(seconds=5)),
     }
     # Boot catch-up (see _catchup_first_runs): overdue staggered jobs run

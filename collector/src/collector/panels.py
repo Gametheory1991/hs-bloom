@@ -440,6 +440,34 @@ def _finnhub_panel(store: Store) -> dict:
             "updated_at": doc.updated_at, "source": doc.source}
 
 
+def _predict_panel(store: Store) -> dict:
+    """Prediction markets (batch 12): venue snapshots, cross-venue edge
+    estimates, unusual movers, and the calibration leaderboard. Empty
+    until the polymarket/kalshi fetchers and the edge engine have run."""
+    edge = store.doc("pred_edge")
+    poly = store.doc("polymarket")
+    kal = store.doc("kalshi")
+    if edge is None:
+        return {"as_of": None, "edges": [], "movers": [], "calibration": [],
+                "polymarket": [], "kalshi": [], "disclaimer": None,
+                "updated_at": None, "source": None}
+    p = edge.payload
+    return {
+        "as_of": p.get("as_of"),
+        "edges": p.get("edges", []),
+        "movers": p.get("movers", []),
+        "calibration": p.get("calibration", []),
+        "polymarket": (poly.payload.get("markets", []) if poly else [])[:15],
+        "kalshi": (kal.payload.get("markets", []) if kal else [])[:15],
+        "tracked_count": p.get("tracked_count", 0),
+        "resolved_this_run": p.get("resolved_this_run", 0),
+        "coverage": p.get("coverage", {}),
+        "skipped": p.get("skipped", []),
+        "disclaimer": p.get("disclaimer"),
+        "updated_at": edge.updated_at, "source": edge.source,
+    }
+
+
 def build_dashboard(
     store: Store,
     indexes: list[IndexCfg],
@@ -478,5 +506,6 @@ def build_dashboard(
             "worldbank": _worldbank_panel(store),
             "usaspending": _usaspending_panel(store),
             "finnhub": _finnhub_panel(store),
+            "predict": _predict_panel(store),
         },
     }
