@@ -37,6 +37,7 @@ cadences:          # seconds between fetcher runs
   finra_short: 604800    # FINRA short interest 2x/month; weekly poll
   finra_margin: 2592000  # FINRA margin stats; single file, full history to 1997
   finra_breadth: 86400   # FINRA bond breadth + sentiment (dynarep API); daily, history to 2018
+  finra_corp: 86400      # FINRA most-active corp bonds (dynarep API); daily, history to 2023
   ms_capex: 604800       # market-structure universe XBRL financials; weekly (quarterly data)
   ms_graph: 604800       # market-structure money-flow graph; weekly (zero HTTP, overlays ms_capex)
   tsv_capex: 604800      # tokenized-securities universe XBRL fundamentals; weekly
@@ -672,6 +673,25 @@ cycle_series:      # market-cycle series (spec 2026-08-24); exactly one source k
   - { id: finra-sent-144a-eln-total-vol, name: "144A ELN total volume $M par", unit: "$M", external: true }
   - { id: finra-sent-144a-eln-total-trades, name: "144A ELN total trades", unit: "ct", external: true }
   - { id: finra-sent-144a-eln-netflow, name: "144A ELN net customer flow ($M par)", unit: "$M", external: true }
+  # ---- FINRA most-active corporate bonds (dynarep API, daily, history to 2023) ----
+  - { id: finra-corp-ig-avgyield, name: "Most-active IG avg yield", unit: "%", external: true }
+  - { id: finra-corp-ig-avgprice, name: "Most-active IG avg price", unit: "px", external: true }
+  - { id: finra-corp-ig-avgchg, name: "Most-active IG avg price change", unit: "px", external: true }
+  - { id: finra-corp-hy-avgyield, name: "Most-active HY avg yield", unit: "%", external: true }
+  - { id: finra-corp-hy-avgprice, name: "Most-active HY avg price", unit: "px", external: true }
+  - { id: finra-corp-hy-avgchg, name: "Most-active HY avg price change", unit: "px", external: true }
+  - { id: finra-corp-conv-avgyield, name: "Most-active converts avg yield", unit: "%", external: true }
+  - { id: finra-corp-conv-avgprice, name: "Most-active converts avg price", unit: "px", external: true }
+  - { id: finra-corp-conv-avgchg, name: "Most-active converts avg price change", unit: "px", external: true }
+  - { id: finra-corp144a-ig-avgyield, name: "144A most-active IG avg yield", unit: "%", external: true }
+  - { id: finra-corp144a-ig-avgprice, name: "144A most-active IG avg price", unit: "px", external: true }
+  - { id: finra-corp144a-ig-avgchg, name: "144A most-active IG avg price change", unit: "px", external: true }
+  - { id: finra-corp144a-hy-avgyield, name: "144A most-active HY avg yield", unit: "%", external: true }
+  - { id: finra-corp144a-hy-avgprice, name: "144A most-active HY avg price", unit: "px", external: true }
+  - { id: finra-corp144a-hy-avgchg, name: "144A most-active HY avg price change", unit: "px", external: true }
+  - { id: finra-corp144a-conv-avgyield, name: "144A most-active converts avg yield", unit: "%", external: true }
+  - { id: finra-corp144a-conv-avgprice, name: "144A most-active converts avg price", unit: "px", external: true }
+  - { id: finra-corp144a-conv-avgchg, name: "144A most-active converts avg price change", unit: "px", external: true }
   # ---- batch 8: market-structure universe (22 tickers, verified live 2026-10-03) ----
   - { id: ms-stt,  name: "State Street",        unit: idx, yahoo: "STT" }
   - { id: ms-blk,  name: "BlackRock",           unit: idx, yahoo: "BLK" }
@@ -1037,6 +1057,17 @@ cycle_tabs:        # layout only; rows reference cycle_series ids
           - { series: finra-sent-corp-all-dsell-vol }
           - { series: finra-sent-corp-all-dbuy-vol }
           - { series: finra-sent-corp-all-inter-vol }
+      - title: "MOST-ACTIVE CORP BONDS (FINRA, DAILY)"
+        rows:
+          - { series: finra-corp-ig-avgyield }
+          - { series: finra-corp-hy-avgyield }
+          - { series: finra-corp-conv-avgyield }
+          - { series: finra-corp-ig-avgprice }
+          - { series: finra-corp-hy-avgprice }
+          - { series: finra-corp-ig-avgchg }
+          - { series: finra-corp-hy-avgchg }
+          - { series: finra-corp144a-ig-avgyield }
+          - { series: finra-corp144a-hy-avgyield }
 
 calendar_map:      # first match wins — keep Core before CPI
   - { country: USD, match: "Core CPI",     series: us-core-cpi-yoy }
