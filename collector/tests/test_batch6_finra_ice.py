@@ -168,6 +168,55 @@ def test_trace_monthly_job_skips_unpublished():
     assert store.points("cycle:trace-corp-cust-share")
 
 
+def test_trace_monthly_blocked_flag_fail_fast_and_recovers(monkeypatch):
+    # While the FINRA CDN is blocking us, the daily probe must fail fast
+    # (no long backoffs) and flag the block; on recovery it backfills and
+    # clears the flag.
+    async def _instant_sleep(delay):
+        return None
+    monkeypatch.setattr(asyncio, "sleep", _instant_sleep)
+
+    async def fake_blocked(url, params=None):
+        raise RuntimeError("HTTP 403 for https://cdn.finra.org/x")
+
+    store = FakeStore()
+    # Fresh run, everything 403s -> blocked flag set
+    with pytest.raises(RuntimeError, match="no TRACE monthly report"):
+        asyncio.run(trace_monthly.fetch_trace_monthly(
+            store, fake_blocked, today=date(2026, 10, 3)))
+    assert store.docs["trace_monthly"]["payload"]["blocked"] is True
+
+    # Next daily run while still blocked: 4 probes, 1 attempt each (fail-fast,
+    # no backoff retries)
+    calls = {"n": 0}
+
+    async def fake_still_blocked(url, params=None):
+        calls["n"] += 1
+        raise RuntimeError("HTTP 403 for https://cdn.finra.org/x")
+
+    with pytest.raises(RuntimeError, match="no TRACE monthly report"):
+        asyncio.run(trace_monthly.fetch_trace_monthly(
+            store, fake_still_blocked, today=date(2026, 10, 4)))
+    assert calls["n"] == 4
+    assert store.docs["trace_monthly"]["payload"]["blocked"] is True
+
+    # CDN recovers: full success, blocked flag cleared, data backfilled
+    data = (FIX / "finra_trace_monthly_report.xlsx").read_bytes()
+
+    async def fake_recovered(url, params=None):
+        if "2026-09" in url:
+            raise RuntimeError("404")  # not yet published
+        return data
+
+    out = asyncio.run(trace_monthly.fetch_trace_monthly(
+        store, fake_recovered, today=date(2026, 10, 5)))
+    assert out == trace_monthly.SOURCE
+    payload = store.docs["trace_monthly"]["payload"]
+    assert payload.get("blocked") is not True
+    assert payload["as_of"] == "2026-08"
+    assert store.points("cycle:trace-corp-par")
+
+
 # ---------- ICE STAR ----------
 
 def test_ice_star_parse():
