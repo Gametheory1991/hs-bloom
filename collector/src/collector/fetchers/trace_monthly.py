@@ -109,9 +109,15 @@ async def _get(url: str, get_bytes: GetBytes) -> bytes:
 
 async def fetch_trace_monthly(store: Store, get_bytes: GetBytes,
                               today: date | None = None) -> str:
-    """Monthly job: latest published report (probe back 3 months); full
-    history backfill to 2017-01 on an empty store."""
+    """Daily job: latest published report (probe back 3 months); full
+    history backfill to 2017-01 on an empty store. No-op when up to date.
+    While the FINRA CDN is blocking us (flagged by the previous run), probe
+    with fail-fast only — no long backoffs — so recovery is picked up
+    within a day."""
     today = today or date.today()
+    prev = store.doc("trace_monthly")
+    blocked = bool(prev and isinstance(prev.payload, dict)
+                   and prev.payload.get("blocked"))
     y, m = today.year, today.month
     got: tuple[int, int] | None = None
     errors: list[str] = []
@@ -122,10 +128,12 @@ async def fetch_trace_monthly(store: Store, get_bytes: GetBytes,
         url = URL.format(f"{y}-{m:02d}")
         # Months <2mo old may simply be unpublished (the CDN 403s instead of
         # 404ing) — fail fast. Older months must exist: a 403 there means we
-        # are blocked, so back off hard before concluding anything.
+        # are blocked, so back off hard before concluding anything — unless
+        # we already know we're blocked, in which case fail fast and just
+        # poll for recovery.
         age = (today.year - y) * 12 + (today.month - m)
         try:
-            data = (await _get(url, get_bytes) if age < 2
+            data = (await _get(url, get_bytes) if age < 2 or blocked
                     else await _get_with_backoff(url, get_bytes))
             vals = parse_workbook(data, y, m)
             asof = vals.pop("_asof")
@@ -137,6 +145,15 @@ async def fetch_trace_monthly(store: Store, get_bytes: GetBytes,
             errors.append(f"{y}-{m:02d}: {exc}")
             await asyncio.sleep(REQUEST_GAP)  # polite: the CDN 403s rapid bursts
     if got is None:
+        # Flag the block so the next daily run polls cheaply (fail-fast)
+        # instead of burning long backoffs. Cleared automatically on success.
+        payload: dict = {}
+        if prev and isinstance(prev.payload, dict):
+            payload = {k: v for k, v in prev.payload.items()
+                       if k in ("as_of", "series")}
+        payload["blocked"] = True
+        payload["block_error"] = "; ".join(errors[:2])
+        store.put_doc("trace_monthly", payload, source=SOURCE)
         raise RuntimeError("no TRACE monthly report in last 4 months: "
                            + "; ".join(errors[:2]))
     if len(store.points("cycle:trace-corp-par")) < 12:
