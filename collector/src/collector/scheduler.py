@@ -52,6 +52,7 @@ from collector.fetchers.voldash import refresh_voldash
 from collector.fetchers.auctions import fetch_auctions
 from collector.fetchers.dealer import fetch_dealer
 from collector.fetchers.finra_breadth import fetch_finra_breadth
+from collector.fetchers.finra_corp import fetch_finra_corp
 from collector.fetchers.finra_margin import fetch_finra_margin
 from collector.fetchers.finra_short import fetch_finra_short
 from collector.fetchers.ice_star import fetch_ice_star
@@ -276,6 +277,11 @@ def register_jobs(
         # history to 2018; keyless). Starts after the other FINRA jobs.
         "finra_breadth": (cfg.cadences.get("finra_breadth", 86400), partial(fetch_finra_breadth, store),
                  start + timedelta(seconds=6900)),
+        # FINRA most-active corporate bonds (daily top-10 IG/HY/convertible
+        # lists from the public dynarep API behind finra.org market-corp;
+        # history to 2023; keyless). Starts after finra_breadth.
+        "finra_corp": (cfg.cadences.get("finra_corp", 86400), partial(fetch_finra_corp, store),
+                 start + timedelta(seconds=7200)),
         "newsletter": (cfg.cadences["insights"], partial(deliver_newsletter, store, smtp_cfg), start + timedelta(seconds=5)),
     }
     # Boot catch-up (see _catchup_first_runs): overdue staggered jobs run
