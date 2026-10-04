@@ -32,7 +32,7 @@ cadences:          # seconds between fetcher runs
   ai_capex: 604800   # AI buildout universe XBRL capex/financials; weekly (quarterly data)
   ai_graph: 604800   # AI money-flow knowledge graph; weekly (zero HTTP, overlays ai_capex)
   trace_treasury: 86400  # FINRA Treasury TRACE aggregates; daily file ~8pm ET
-  trace_monthly: 2592000 # FINRA TRACE monthly volume; 3rd biz day after month-end
+  trace_monthly: 86400 # FINRA TRACE monthly volume; daily probe (no-op when current), fast-fail while CDN blocked
   ice_star: 86400        # ICE Vantage daily STAR zip (agency/non-agency securitized)
   finra_short: 604800    # FINRA short interest 2x/month; weekly poll
   finra_margin: 2592000  # FINRA margin stats; single file, full history to 1997
