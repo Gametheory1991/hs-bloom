@@ -40,6 +40,7 @@ def test_register_jobs_creates_all_jobs_with_config_cadences(tmp_path):
         "finra_short", "finra_margin", "tsv_capex", "tsv_graph", "tsv_watch", "newsletter",
         "worldbank", "usaspending", "coingecko", "openfigi", "finnhub",
         "polymarket", "kalshi", "pred_edge", "finra_breadth", "finra_corp", "finra_regsho",
+        "finra_capped",
     }
     assert jobs["equity"].trigger.interval.total_seconds() == 300
     assert jobs["news"].trigger.interval.total_seconds() == 600
@@ -62,6 +63,7 @@ def test_register_jobs_creates_all_jobs_with_config_cadences(tmp_path):
     assert jobs["polymarket"].trigger.interval.total_seconds() == 1800
     assert jobs["kalshi"].trigger.interval.total_seconds() == 1800
     assert jobs["pred_edge"].trigger.interval.total_seconds() == 3600
+    assert jobs["finra_capped"].trigger.interval.total_seconds() == 2592000
     assert all(j.misfire_grace_time == 30 for j in jobs.values())
 
 
@@ -72,4 +74,4 @@ def test_main_builds_app(tmp_path, monkeypatch):
 
     app, scheduler = build()
     assert app.title == "os-bloom collector"
-    assert len(scheduler.get_jobs()) == 50  # +1 finra_breadth, +1 finra_corp, +1 finra_regsho
+    assert len(scheduler.get_jobs()) == 51  # +1 finra_breadth, +1 finra_corp, +1 finra_regsho, +1 finra_capped
