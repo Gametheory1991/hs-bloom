@@ -38,6 +38,7 @@ cadences:          # seconds between fetcher runs
   finra_margin: 2592000  # FINRA margin stats; single file, full history to 1997
   finra_breadth: 86400   # FINRA bond breadth + sentiment (dynarep API); daily, history to 2018
   finra_corp: 86400      # FINRA most-active corp bonds (dynarep API); daily, history to 2023
+  finra_regsho: 86400    # FINRA Reg SHO daily short volume + OTC threshold list; daily, keyless
   ms_capex: 604800       # market-structure universe XBRL financials; weekly (quarterly data)
   ms_graph: 604800       # market-structure money-flow graph; weekly (zero HTTP, overlays ms_capex)
   tsv_capex: 604800      # tokenized-securities universe XBRL fundamentals; weekly
@@ -692,6 +693,23 @@ cycle_series:      # market-cycle series (spec 2026-08-24); exactly one source k
   - { id: finra-corp144a-conv-avgyield, name: "144A most-active converts avg yield", unit: "%", external: true }
   - { id: finra-corp144a-conv-avgprice, name: "144A most-active converts avg price", unit: "px", external: true }
   - { id: finra-corp144a-conv-avgchg, name: "144A most-active converts avg price change", unit: "px", external: true }
+  # ---- FINRA Reg SHO daily short volume (daily; external) ----
+  - { id: regsho-cnms-shortvol,    name: "Reg SHO short volume — consolidated", unit: "sh", external: true }
+  - { id: regsho-cnms-shortexempt, name: "Reg SHO short-exempt volume — consolidated", unit: "sh", external: true }
+  - { id: regsho-cnms-shortratio,  name: "Reg SHO short ratio — consolidated", unit: "ratio", external: true }
+  - { id: regsho-fnyx-shortvol,    name: "Reg SHO short volume — NYSE", unit: "sh", external: true }
+  - { id: regsho-fnyx-shortexempt, name: "Reg SHO short-exempt volume — NYSE", unit: "sh", external: true }
+  - { id: regsho-fnyx-shortratio,  name: "Reg SHO short ratio — NYSE", unit: "ratio", external: true }
+  - { id: regsho-fnsq-shortvol,    name: "Reg SHO short volume — FINRA TRF", unit: "sh", external: true }
+  - { id: regsho-fnsq-shortexempt, name: "Reg SHO short-exempt volume — FINRA TRF", unit: "sh", external: true }
+  - { id: regsho-fnsq-shortratio,  name: "Reg SHO short ratio — FINRA TRF", unit: "ratio", external: true }
+  - { id: regsho-short-MSFT,  name: "MSFT daily short volume (Reg SHO)",  unit: "sh", external: true }
+  - { id: regsho-short-NVDA,  name: "NVDA daily short volume (Reg SHO)",  unit: "sh", external: true }
+  - { id: regsho-short-AAPL,  name: "AAPL daily short volume (Reg SHO)",  unit: "sh", external: true }
+  - { id: regsho-short-AMZN,  name: "AMZN daily short volume (Reg SHO)",  unit: "sh", external: true }
+  - { id: regsho-short-GOOGL, name: "GOOGL daily short volume (Reg SHO)", unit: "sh", external: true }
+  - { id: regsho-short-META,  name: "META daily short volume (Reg SHO)",  unit: "sh", external: true }
+  - { id: regsho-threshold-count, name: "OTC threshold list — securities count", unit: "ct", external: true }
   # ---- batch 8: market-structure universe (22 tickers, verified live 2026-10-03) ----
   - { id: ms-stt,  name: "State Street",        unit: idx, yahoo: "STT" }
   - { id: ms-blk,  name: "BlackRock",           unit: idx, yahoo: "BLK" }
@@ -1068,6 +1086,21 @@ cycle_tabs:        # layout only; rows reference cycle_series ids
           - { series: finra-corp-hy-avgchg }
           - { series: finra-corp144a-ig-avgyield }
           - { series: finra-corp144a-hy-avgyield }
+      - title: "SHORT VOLUME — REG SHO DAILY (FINRA)"
+        rows:
+          - { series: regsho-cnms-shortvol }
+          - { series: regsho-cnms-shortratio }
+          - { series: regsho-fnyx-shortvol }
+          - { series: regsho-fnyx-shortratio }
+          - { series: regsho-fnsq-shortvol }
+          - { series: regsho-fnsq-shortratio }
+          - { series: regsho-short-MSFT }
+          - { series: regsho-short-NVDA }
+          - { series: regsho-short-AAPL }
+          - { series: regsho-short-AMZN }
+          - { series: regsho-short-GOOGL }
+          - { series: regsho-short-META }
+          - { series: regsho-threshold-count }
 
 calendar_map:      # first match wins — keep Core before CPI
   - { country: USD, match: "Core CPI",     series: us-core-cpi-yoy }
