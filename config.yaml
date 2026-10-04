@@ -36,6 +36,7 @@ cadences:          # seconds between fetcher runs
   ice_star: 86400        # ICE Vantage daily STAR zip (agency/non-agency securitized)
   finra_short: 604800    # FINRA short interest 2x/month; weekly poll
   finra_margin: 2592000  # FINRA margin stats; single file, full history to 1997
+  finra_breadth: 86400   # FINRA bond breadth + sentiment (dynarep API); daily, history to 2018
   ms_capex: 604800       # market-structure universe XBRL financials; weekly (quarterly data)
   ms_graph: 604800       # market-structure money-flow graph; weekly (zero HTTP, overlays ms_capex)
   tsv_capex: 604800      # tokenized-securities universe XBRL fundamentals; weekly
@@ -430,6 +431,247 @@ cycle_series:      # market-cycle series (spec 2026-08-24); exactly one source k
   - { id: finra-margin-debit,         name: "Margin debt $M",        unit: "$M", external: true }
   - { id: finra-margin-credit-cash,   name: "Free credit cash $M",   unit: "$M", external: true }
   - { id: finra-margin-credit-margin, name: "Free credit margin $M",  unit: "$M", external: true }
+  # ---- FINRA bond market breadth + sentiment (daily; external; history to 2018) ----
+  - { id: finra-breadth-corp-all-adv, name: "Corp breadth All — advances", unit: "ct", external: true }
+  - { id: finra-breadth-corp-all-dec, name: "Corp breadth All — declines", unit: "ct", external: true }
+  - { id: finra-breadth-corp-all-unch, name: "Corp breadth All — unchanged", unit: "ct", external: true }
+  - { id: finra-breadth-corp-all-hi52, name: "Corp breadth All — 52 week high", unit: "ct", external: true }
+  - { id: finra-breadth-corp-all-lo52, name: "Corp breadth All — 52 week low", unit: "ct", external: true }
+  - { id: finra-breadth-corp-all-dvol, name: "Corp breadth All — dollar volume", unit: "$M", external: true }
+  - { id: finra-breadth-corp-all-issues, name: "Corp breadth All — total issues traded", unit: "ct", external: true }
+  - { id: finra-breadth-corp-all-adspread, name: "Corp breadth All — adv-dec spread", unit: "ct", external: true }
+  - { id: finra-breadth-corp-conv-adv, name: "Corp breadth Convertibles — advances", unit: "ct", external: true }
+  - { id: finra-breadth-corp-conv-dec, name: "Corp breadth Convertibles — declines", unit: "ct", external: true }
+  - { id: finra-breadth-corp-conv-unch, name: "Corp breadth Convertibles — unchanged", unit: "ct", external: true }
+  - { id: finra-breadth-corp-conv-hi52, name: "Corp breadth Convertibles — 52 week high", unit: "ct", external: true }
+  - { id: finra-breadth-corp-conv-lo52, name: "Corp breadth Convertibles — 52 week low", unit: "ct", external: true }
+  - { id: finra-breadth-corp-conv-dvol, name: "Corp breadth Convertibles — dollar volume", unit: "$M", external: true }
+  - { id: finra-breadth-corp-conv-issues, name: "Corp breadth Convertibles — total issues traded", unit: "ct", external: true }
+  - { id: finra-breadth-corp-conv-adspread, name: "Corp breadth Convertibles — adv-dec spread", unit: "ct", external: true }
+  - { id: finra-breadth-corp-hy-adv, name: "Corp breadth High Yield — advances", unit: "ct", external: true }
+  - { id: finra-breadth-corp-hy-dec, name: "Corp breadth High Yield — declines", unit: "ct", external: true }
+  - { id: finra-breadth-corp-hy-unch, name: "Corp breadth High Yield — unchanged", unit: "ct", external: true }
+  - { id: finra-breadth-corp-hy-hi52, name: "Corp breadth High Yield — 52 week high", unit: "ct", external: true }
+  - { id: finra-breadth-corp-hy-lo52, name: "Corp breadth High Yield — 52 week low", unit: "ct", external: true }
+  - { id: finra-breadth-corp-hy-dvol, name: "Corp breadth High Yield — dollar volume", unit: "$M", external: true }
+  - { id: finra-breadth-corp-hy-issues, name: "Corp breadth High Yield — total issues traded", unit: "ct", external: true }
+  - { id: finra-breadth-corp-hy-adspread, name: "Corp breadth High Yield — adv-dec spread", unit: "ct", external: true }
+  - { id: finra-breadth-corp-ig-adv, name: "Corp breadth Inv Grade — advances", unit: "ct", external: true }
+  - { id: finra-breadth-corp-ig-dec, name: "Corp breadth Inv Grade — declines", unit: "ct", external: true }
+  - { id: finra-breadth-corp-ig-unch, name: "Corp breadth Inv Grade — unchanged", unit: "ct", external: true }
+  - { id: finra-breadth-corp-ig-hi52, name: "Corp breadth Inv Grade — 52 week high", unit: "ct", external: true }
+  - { id: finra-breadth-corp-ig-lo52, name: "Corp breadth Inv Grade — 52 week low", unit: "ct", external: true }
+  - { id: finra-breadth-corp-ig-dvol, name: "Corp breadth Inv Grade — dollar volume", unit: "$M", external: true }
+  - { id: finra-breadth-corp-ig-issues, name: "Corp breadth Inv Grade — total issues traded", unit: "ct", external: true }
+  - { id: finra-breadth-corp-ig-adspread, name: "Corp breadth Inv Grade — adv-dec spread", unit: "ct", external: true }
+  - { id: finra-breadth-agency-all-adv, name: "Agency breadth All — advances", unit: "ct", external: true }
+  - { id: finra-breadth-agency-all-dec, name: "Agency breadth All — declines", unit: "ct", external: true }
+  - { id: finra-breadth-agency-all-unch, name: "Agency breadth All — unchanged", unit: "ct", external: true }
+  - { id: finra-breadth-agency-all-hi52, name: "Agency breadth All — 52 week high", unit: "ct", external: true }
+  - { id: finra-breadth-agency-all-lo52, name: "Agency breadth All — 52 week low", unit: "ct", external: true }
+  - { id: finra-breadth-agency-all-dvol, name: "Agency breadth All — dollar volume", unit: "$M", external: true }
+  - { id: finra-breadth-agency-all-issues, name: "Agency breadth All — total issues traded", unit: "ct", external: true }
+  - { id: finra-breadth-agency-all-adspread, name: "Agency breadth All — adv-dec spread", unit: "ct", external: true }
+  - { id: finra-breadth-agency-fannie-adv, name: "Agency breadth Fannie Mae — advances", unit: "ct", external: true }
+  - { id: finra-breadth-agency-fannie-dec, name: "Agency breadth Fannie Mae — declines", unit: "ct", external: true }
+  - { id: finra-breadth-agency-fannie-unch, name: "Agency breadth Fannie Mae — unchanged", unit: "ct", external: true }
+  - { id: finra-breadth-agency-fannie-hi52, name: "Agency breadth Fannie Mae — 52 week high", unit: "ct", external: true }
+  - { id: finra-breadth-agency-fannie-lo52, name: "Agency breadth Fannie Mae — 52 week low", unit: "ct", external: true }
+  - { id: finra-breadth-agency-fannie-dvol, name: "Agency breadth Fannie Mae — dollar volume", unit: "$M", external: true }
+  - { id: finra-breadth-agency-fannie-issues, name: "Agency breadth Fannie Mae — total issues traded", unit: "ct", external: true }
+  - { id: finra-breadth-agency-fannie-adspread, name: "Agency breadth Fannie Mae — adv-dec spread", unit: "ct", external: true }
+  - { id: finra-breadth-agency-fhlb-adv, name: "Agency breadth FHLB — advances", unit: "ct", external: true }
+  - { id: finra-breadth-agency-fhlb-dec, name: "Agency breadth FHLB — declines", unit: "ct", external: true }
+  - { id: finra-breadth-agency-fhlb-unch, name: "Agency breadth FHLB — unchanged", unit: "ct", external: true }
+  - { id: finra-breadth-agency-fhlb-hi52, name: "Agency breadth FHLB — 52 week high", unit: "ct", external: true }
+  - { id: finra-breadth-agency-fhlb-lo52, name: "Agency breadth FHLB — 52 week low", unit: "ct", external: true }
+  - { id: finra-breadth-agency-fhlb-dvol, name: "Agency breadth FHLB — dollar volume", unit: "$M", external: true }
+  - { id: finra-breadth-agency-fhlb-issues, name: "Agency breadth FHLB — total issues traded", unit: "ct", external: true }
+  - { id: finra-breadth-agency-fhlb-adspread, name: "Agency breadth FHLB — adv-dec spread", unit: "ct", external: true }
+  - { id: finra-breadth-agency-freddie-adv, name: "Agency breadth Freddie Mac — advances", unit: "ct", external: true }
+  - { id: finra-breadth-agency-freddie-dec, name: "Agency breadth Freddie Mac — declines", unit: "ct", external: true }
+  - { id: finra-breadth-agency-freddie-unch, name: "Agency breadth Freddie Mac — unchanged", unit: "ct", external: true }
+  - { id: finra-breadth-agency-freddie-hi52, name: "Agency breadth Freddie Mac — 52 week high", unit: "ct", external: true }
+  - { id: finra-breadth-agency-freddie-lo52, name: "Agency breadth Freddie Mac — 52 week low", unit: "ct", external: true }
+  - { id: finra-breadth-agency-freddie-dvol, name: "Agency breadth Freddie Mac — dollar volume", unit: "$M", external: true }
+  - { id: finra-breadth-agency-freddie-issues, name: "Agency breadth Freddie Mac — total issues traded", unit: "ct", external: true }
+  - { id: finra-breadth-agency-freddie-adspread, name: "Agency breadth Freddie Mac — adv-dec spread", unit: "ct", external: true }
+  - { id: finra-breadth-144a-all-adv, name: "144A breadth All — advances", unit: "ct", external: true }
+  - { id: finra-breadth-144a-all-dec, name: "144A breadth All — declines", unit: "ct", external: true }
+  - { id: finra-breadth-144a-all-unch, name: "144A breadth All — unchanged", unit: "ct", external: true }
+  - { id: finra-breadth-144a-all-hi52, name: "144A breadth All — 52 week high", unit: "ct", external: true }
+  - { id: finra-breadth-144a-all-lo52, name: "144A breadth All — 52 week low", unit: "ct", external: true }
+  - { id: finra-breadth-144a-all-dvol, name: "144A breadth All — dollar volume", unit: "$M", external: true }
+  - { id: finra-breadth-144a-all-issues, name: "144A breadth All — total issues traded", unit: "ct", external: true }
+  - { id: finra-breadth-144a-all-adspread, name: "144A breadth All — adv-dec spread", unit: "ct", external: true }
+  - { id: finra-breadth-144a-conv-adv, name: "144A breadth Convertibles — advances", unit: "ct", external: true }
+  - { id: finra-breadth-144a-conv-dec, name: "144A breadth Convertibles — declines", unit: "ct", external: true }
+  - { id: finra-breadth-144a-conv-unch, name: "144A breadth Convertibles — unchanged", unit: "ct", external: true }
+  - { id: finra-breadth-144a-conv-hi52, name: "144A breadth Convertibles — 52 week high", unit: "ct", external: true }
+  - { id: finra-breadth-144a-conv-lo52, name: "144A breadth Convertibles — 52 week low", unit: "ct", external: true }
+  - { id: finra-breadth-144a-conv-dvol, name: "144A breadth Convertibles — dollar volume", unit: "$M", external: true }
+  - { id: finra-breadth-144a-conv-issues, name: "144A breadth Convertibles — total issues traded", unit: "ct", external: true }
+  - { id: finra-breadth-144a-conv-adspread, name: "144A breadth Convertibles — adv-dec spread", unit: "ct", external: true }
+  - { id: finra-breadth-144a-hy-adv, name: "144A breadth High Yield — advances", unit: "ct", external: true }
+  - { id: finra-breadth-144a-hy-dec, name: "144A breadth High Yield — declines", unit: "ct", external: true }
+  - { id: finra-breadth-144a-hy-unch, name: "144A breadth High Yield — unchanged", unit: "ct", external: true }
+  - { id: finra-breadth-144a-hy-hi52, name: "144A breadth High Yield — 52 week high", unit: "ct", external: true }
+  - { id: finra-breadth-144a-hy-lo52, name: "144A breadth High Yield — 52 week low", unit: "ct", external: true }
+  - { id: finra-breadth-144a-hy-dvol, name: "144A breadth High Yield — dollar volume", unit: "$M", external: true }
+  - { id: finra-breadth-144a-hy-issues, name: "144A breadth High Yield — total issues traded", unit: "ct", external: true }
+  - { id: finra-breadth-144a-hy-adspread, name: "144A breadth High Yield — adv-dec spread", unit: "ct", external: true }
+  - { id: finra-breadth-144a-ig-adv, name: "144A breadth Inv Grade — advances", unit: "ct", external: true }
+  - { id: finra-breadth-144a-ig-dec, name: "144A breadth Inv Grade — declines", unit: "ct", external: true }
+  - { id: finra-breadth-144a-ig-unch, name: "144A breadth Inv Grade — unchanged", unit: "ct", external: true }
+  - { id: finra-breadth-144a-ig-hi52, name: "144A breadth Inv Grade — 52 week high", unit: "ct", external: true }
+  - { id: finra-breadth-144a-ig-lo52, name: "144A breadth Inv Grade — 52 week low", unit: "ct", external: true }
+  - { id: finra-breadth-144a-ig-dvol, name: "144A breadth Inv Grade — dollar volume", unit: "$M", external: true }
+  - { id: finra-breadth-144a-ig-issues, name: "144A breadth Inv Grade — total issues traded", unit: "ct", external: true }
+  - { id: finra-breadth-144a-ig-adspread, name: "144A breadth Inv Grade — adv-dec spread", unit: "ct", external: true }
+  - { id: finra-sent-corp-all-dbuy-vol, name: "Corp All dealer buys volume $M par", unit: "$M", external: true }
+  - { id: finra-sent-corp-all-dbuy-trades, name: "Corp All dealer buys trades", unit: "ct", external: true }
+  - { id: finra-sent-corp-all-dsell-vol, name: "Corp All dealer sells volume $M par", unit: "$M", external: true }
+  - { id: finra-sent-corp-all-dsell-trades, name: "Corp All dealer sells trades", unit: "ct", external: true }
+  - { id: finra-sent-corp-all-inter-vol, name: "Corp All inter-dealer volume $M par", unit: "$M", external: true }
+  - { id: finra-sent-corp-all-inter-trades, name: "Corp All inter-dealer trades", unit: "ct", external: true }
+  - { id: finra-sent-corp-all-total-vol, name: "Corp All total volume $M par", unit: "$M", external: true }
+  - { id: finra-sent-corp-all-total-trades, name: "Corp All total trades", unit: "ct", external: true }
+  - { id: finra-sent-corp-all-netflow, name: "Corp All net customer flow ($M par)", unit: "$M", external: true }
+  - { id: finra-sent-corp-ig-dbuy-vol, name: "Corp Inv Grade dealer buys volume $M par", unit: "$M", external: true }
+  - { id: finra-sent-corp-ig-dbuy-trades, name: "Corp Inv Grade dealer buys trades", unit: "ct", external: true }
+  - { id: finra-sent-corp-ig-dsell-vol, name: "Corp Inv Grade dealer sells volume $M par", unit: "$M", external: true }
+  - { id: finra-sent-corp-ig-dsell-trades, name: "Corp Inv Grade dealer sells trades", unit: "ct", external: true }
+  - { id: finra-sent-corp-ig-inter-vol, name: "Corp Inv Grade inter-dealer volume $M par", unit: "$M", external: true }
+  - { id: finra-sent-corp-ig-inter-trades, name: "Corp Inv Grade inter-dealer trades", unit: "ct", external: true }
+  - { id: finra-sent-corp-ig-total-vol, name: "Corp Inv Grade total volume $M par", unit: "$M", external: true }
+  - { id: finra-sent-corp-ig-total-trades, name: "Corp Inv Grade total trades", unit: "ct", external: true }
+  - { id: finra-sent-corp-ig-netflow, name: "Corp Inv Grade net customer flow ($M par)", unit: "$M", external: true }
+  - { id: finra-sent-corp-hy-dbuy-vol, name: "Corp High Yield dealer buys volume $M par", unit: "$M", external: true }
+  - { id: finra-sent-corp-hy-dbuy-trades, name: "Corp High Yield dealer buys trades", unit: "ct", external: true }
+  - { id: finra-sent-corp-hy-dsell-vol, name: "Corp High Yield dealer sells volume $M par", unit: "$M", external: true }
+  - { id: finra-sent-corp-hy-dsell-trades, name: "Corp High Yield dealer sells trades", unit: "ct", external: true }
+  - { id: finra-sent-corp-hy-inter-vol, name: "Corp High Yield inter-dealer volume $M par", unit: "$M", external: true }
+  - { id: finra-sent-corp-hy-inter-trades, name: "Corp High Yield inter-dealer trades", unit: "ct", external: true }
+  - { id: finra-sent-corp-hy-total-vol, name: "Corp High Yield total volume $M par", unit: "$M", external: true }
+  - { id: finra-sent-corp-hy-total-trades, name: "Corp High Yield total trades", unit: "ct", external: true }
+  - { id: finra-sent-corp-hy-netflow, name: "Corp High Yield net customer flow ($M par)", unit: "$M", external: true }
+  - { id: finra-sent-corp-conv-dbuy-vol, name: "Corp Convertibles dealer buys volume $M par", unit: "$M", external: true }
+  - { id: finra-sent-corp-conv-dbuy-trades, name: "Corp Convertibles dealer buys trades", unit: "ct", external: true }
+  - { id: finra-sent-corp-conv-dsell-vol, name: "Corp Convertibles dealer sells volume $M par", unit: "$M", external: true }
+  - { id: finra-sent-corp-conv-dsell-trades, name: "Corp Convertibles dealer sells trades", unit: "ct", external: true }
+  - { id: finra-sent-corp-conv-inter-vol, name: "Corp Convertibles inter-dealer volume $M par", unit: "$M", external: true }
+  - { id: finra-sent-corp-conv-inter-trades, name: "Corp Convertibles inter-dealer trades", unit: "ct", external: true }
+  - { id: finra-sent-corp-conv-total-vol, name: "Corp Convertibles total volume $M par", unit: "$M", external: true }
+  - { id: finra-sent-corp-conv-total-trades, name: "Corp Convertibles total trades", unit: "ct", external: true }
+  - { id: finra-sent-corp-conv-netflow, name: "Corp Convertibles net customer flow ($M par)", unit: "$M", external: true }
+  - { id: finra-sent-corp-church-dbuy-vol, name: "Corp Church dealer buys volume $M par", unit: "$M", external: true }
+  - { id: finra-sent-corp-church-dbuy-trades, name: "Corp Church dealer buys trades", unit: "ct", external: true }
+  - { id: finra-sent-corp-church-dsell-vol, name: "Corp Church dealer sells volume $M par", unit: "$M", external: true }
+  - { id: finra-sent-corp-church-dsell-trades, name: "Corp Church dealer sells trades", unit: "ct", external: true }
+  - { id: finra-sent-corp-church-inter-vol, name: "Corp Church inter-dealer volume $M par", unit: "$M", external: true }
+  - { id: finra-sent-corp-church-inter-trades, name: "Corp Church inter-dealer trades", unit: "ct", external: true }
+  - { id: finra-sent-corp-church-total-vol, name: "Corp Church total volume $M par", unit: "$M", external: true }
+  - { id: finra-sent-corp-church-total-trades, name: "Corp Church total trades", unit: "ct", external: true }
+  - { id: finra-sent-corp-church-netflow, name: "Corp Church net customer flow ($M par)", unit: "$M", external: true }
+  - { id: finra-sent-corp-eln-dbuy-vol, name: "Corp ELN dealer buys volume $M par", unit: "$M", external: true }
+  - { id: finra-sent-corp-eln-dbuy-trades, name: "Corp ELN dealer buys trades", unit: "ct", external: true }
+  - { id: finra-sent-corp-eln-dsell-vol, name: "Corp ELN dealer sells volume $M par", unit: "$M", external: true }
+  - { id: finra-sent-corp-eln-dsell-trades, name: "Corp ELN dealer sells trades", unit: "ct", external: true }
+  - { id: finra-sent-corp-eln-inter-vol, name: "Corp ELN inter-dealer volume $M par", unit: "$M", external: true }
+  - { id: finra-sent-corp-eln-inter-trades, name: "Corp ELN inter-dealer trades", unit: "ct", external: true }
+  - { id: finra-sent-corp-eln-total-vol, name: "Corp ELN total volume $M par", unit: "$M", external: true }
+  - { id: finra-sent-corp-eln-total-trades, name: "Corp ELN total trades", unit: "ct", external: true }
+  - { id: finra-sent-corp-eln-netflow, name: "Corp ELN net customer flow ($M par)", unit: "$M", external: true }
+  - { id: finra-sent-agency-all-dbuy-vol, name: "Agency All dealer buys volume $M par", unit: "$M", external: true }
+  - { id: finra-sent-agency-all-dbuy-trades, name: "Agency All dealer buys trades", unit: "ct", external: true }
+  - { id: finra-sent-agency-all-dsell-vol, name: "Agency All dealer sells volume $M par", unit: "$M", external: true }
+  - { id: finra-sent-agency-all-dsell-trades, name: "Agency All dealer sells trades", unit: "ct", external: true }
+  - { id: finra-sent-agency-all-inter-vol, name: "Agency All inter-dealer volume $M par", unit: "$M", external: true }
+  - { id: finra-sent-agency-all-inter-trades, name: "Agency All inter-dealer trades", unit: "ct", external: true }
+  - { id: finra-sent-agency-all-total-vol, name: "Agency All total volume $M par", unit: "$M", external: true }
+  - { id: finra-sent-agency-all-total-trades, name: "Agency All total trades", unit: "ct", external: true }
+  - { id: finra-sent-agency-all-netflow, name: "Agency All net customer flow ($M par)", unit: "$M", external: true }
+  - { id: finra-sent-agency-fhlb-dbuy-vol, name: "Agency FHLB dealer buys volume $M par", unit: "$M", external: true }
+  - { id: finra-sent-agency-fhlb-dbuy-trades, name: "Agency FHLB dealer buys trades", unit: "ct", external: true }
+  - { id: finra-sent-agency-fhlb-dsell-vol, name: "Agency FHLB dealer sells volume $M par", unit: "$M", external: true }
+  - { id: finra-sent-agency-fhlb-dsell-trades, name: "Agency FHLB dealer sells trades", unit: "ct", external: true }
+  - { id: finra-sent-agency-fhlb-inter-vol, name: "Agency FHLB inter-dealer volume $M par", unit: "$M", external: true }
+  - { id: finra-sent-agency-fhlb-inter-trades, name: "Agency FHLB inter-dealer trades", unit: "ct", external: true }
+  - { id: finra-sent-agency-fhlb-total-vol, name: "Agency FHLB total volume $M par", unit: "$M", external: true }
+  - { id: finra-sent-agency-fhlb-total-trades, name: "Agency FHLB total trades", unit: "ct", external: true }
+  - { id: finra-sent-agency-fhlb-netflow, name: "Agency FHLB net customer flow ($M par)", unit: "$M", external: true }
+  - { id: finra-sent-agency-fannie-dbuy-vol, name: "Agency Fannie Mae dealer buys volume $M par", unit: "$M", external: true }
+  - { id: finra-sent-agency-fannie-dbuy-trades, name: "Agency Fannie Mae dealer buys trades", unit: "ct", external: true }
+  - { id: finra-sent-agency-fannie-dsell-vol, name: "Agency Fannie Mae dealer sells volume $M par", unit: "$M", external: true }
+  - { id: finra-sent-agency-fannie-dsell-trades, name: "Agency Fannie Mae dealer sells trades", unit: "ct", external: true }
+  - { id: finra-sent-agency-fannie-inter-vol, name: "Agency Fannie Mae inter-dealer volume $M par", unit: "$M", external: true }
+  - { id: finra-sent-agency-fannie-inter-trades, name: "Agency Fannie Mae inter-dealer trades", unit: "ct", external: true }
+  - { id: finra-sent-agency-fannie-total-vol, name: "Agency Fannie Mae total volume $M par", unit: "$M", external: true }
+  - { id: finra-sent-agency-fannie-total-trades, name: "Agency Fannie Mae total trades", unit: "ct", external: true }
+  - { id: finra-sent-agency-fannie-netflow, name: "Agency Fannie Mae net customer flow ($M par)", unit: "$M", external: true }
+  - { id: finra-sent-agency-freddie-dbuy-vol, name: "Agency Freddie Mac dealer buys volume $M par", unit: "$M", external: true }
+  - { id: finra-sent-agency-freddie-dbuy-trades, name: "Agency Freddie Mac dealer buys trades", unit: "ct", external: true }
+  - { id: finra-sent-agency-freddie-dsell-vol, name: "Agency Freddie Mac dealer sells volume $M par", unit: "$M", external: true }
+  - { id: finra-sent-agency-freddie-dsell-trades, name: "Agency Freddie Mac dealer sells trades", unit: "ct", external: true }
+  - { id: finra-sent-agency-freddie-inter-vol, name: "Agency Freddie Mac inter-dealer volume $M par", unit: "$M", external: true }
+  - { id: finra-sent-agency-freddie-inter-trades, name: "Agency Freddie Mac inter-dealer trades", unit: "ct", external: true }
+  - { id: finra-sent-agency-freddie-total-vol, name: "Agency Freddie Mac total volume $M par", unit: "$M", external: true }
+  - { id: finra-sent-agency-freddie-total-trades, name: "Agency Freddie Mac total trades", unit: "ct", external: true }
+  - { id: finra-sent-agency-freddie-netflow, name: "Agency Freddie Mac net customer flow ($M par)", unit: "$M", external: true }
+  - { id: finra-sent-144a-all-dbuy-vol, name: "144A All dealer buys volume $M par", unit: "$M", external: true }
+  - { id: finra-sent-144a-all-dbuy-trades, name: "144A All dealer buys trades", unit: "ct", external: true }
+  - { id: finra-sent-144a-all-dsell-vol, name: "144A All dealer sells volume $M par", unit: "$M", external: true }
+  - { id: finra-sent-144a-all-dsell-trades, name: "144A All dealer sells trades", unit: "ct", external: true }
+  - { id: finra-sent-144a-all-inter-vol, name: "144A All inter-dealer volume $M par", unit: "$M", external: true }
+  - { id: finra-sent-144a-all-inter-trades, name: "144A All inter-dealer trades", unit: "ct", external: true }
+  - { id: finra-sent-144a-all-total-vol, name: "144A All total volume $M par", unit: "$M", external: true }
+  - { id: finra-sent-144a-all-total-trades, name: "144A All total trades", unit: "ct", external: true }
+  - { id: finra-sent-144a-all-netflow, name: "144A All net customer flow ($M par)", unit: "$M", external: true }
+  - { id: finra-sent-144a-ig-dbuy-vol, name: "144A Inv Grade dealer buys volume $M par", unit: "$M", external: true }
+  - { id: finra-sent-144a-ig-dbuy-trades, name: "144A Inv Grade dealer buys trades", unit: "ct", external: true }
+  - { id: finra-sent-144a-ig-dsell-vol, name: "144A Inv Grade dealer sells volume $M par", unit: "$M", external: true }
+  - { id: finra-sent-144a-ig-dsell-trades, name: "144A Inv Grade dealer sells trades", unit: "ct", external: true }
+  - { id: finra-sent-144a-ig-inter-vol, name: "144A Inv Grade inter-dealer volume $M par", unit: "$M", external: true }
+  - { id: finra-sent-144a-ig-inter-trades, name: "144A Inv Grade inter-dealer trades", unit: "ct", external: true }
+  - { id: finra-sent-144a-ig-total-vol, name: "144A Inv Grade total volume $M par", unit: "$M", external: true }
+  - { id: finra-sent-144a-ig-total-trades, name: "144A Inv Grade total trades", unit: "ct", external: true }
+  - { id: finra-sent-144a-ig-netflow, name: "144A Inv Grade net customer flow ($M par)", unit: "$M", external: true }
+  - { id: finra-sent-144a-hy-dbuy-vol, name: "144A High Yield dealer buys volume $M par", unit: "$M", external: true }
+  - { id: finra-sent-144a-hy-dbuy-trades, name: "144A High Yield dealer buys trades", unit: "ct", external: true }
+  - { id: finra-sent-144a-hy-dsell-vol, name: "144A High Yield dealer sells volume $M par", unit: "$M", external: true }
+  - { id: finra-sent-144a-hy-dsell-trades, name: "144A High Yield dealer sells trades", unit: "ct", external: true }
+  - { id: finra-sent-144a-hy-inter-vol, name: "144A High Yield inter-dealer volume $M par", unit: "$M", external: true }
+  - { id: finra-sent-144a-hy-inter-trades, name: "144A High Yield inter-dealer trades", unit: "ct", external: true }
+  - { id: finra-sent-144a-hy-total-vol, name: "144A High Yield total volume $M par", unit: "$M", external: true }
+  - { id: finra-sent-144a-hy-total-trades, name: "144A High Yield total trades", unit: "ct", external: true }
+  - { id: finra-sent-144a-hy-netflow, name: "144A High Yield net customer flow ($M par)", unit: "$M", external: true }
+  - { id: finra-sent-144a-conv-dbuy-vol, name: "144A Convertibles dealer buys volume $M par", unit: "$M", external: true }
+  - { id: finra-sent-144a-conv-dbuy-trades, name: "144A Convertibles dealer buys trades", unit: "ct", external: true }
+  - { id: finra-sent-144a-conv-dsell-vol, name: "144A Convertibles dealer sells volume $M par", unit: "$M", external: true }
+  - { id: finra-sent-144a-conv-dsell-trades, name: "144A Convertibles dealer sells trades", unit: "ct", external: true }
+  - { id: finra-sent-144a-conv-inter-vol, name: "144A Convertibles inter-dealer volume $M par", unit: "$M", external: true }
+  - { id: finra-sent-144a-conv-inter-trades, name: "144A Convertibles inter-dealer trades", unit: "ct", external: true }
+  - { id: finra-sent-144a-conv-total-vol, name: "144A Convertibles total volume $M par", unit: "$M", external: true }
+  - { id: finra-sent-144a-conv-total-trades, name: "144A Convertibles total trades", unit: "ct", external: true }
+  - { id: finra-sent-144a-conv-netflow, name: "144A Convertibles net customer flow ($M par)", unit: "$M", external: true }
+  - { id: finra-sent-144a-church-dbuy-vol, name: "144A Church dealer buys volume $M par", unit: "$M", external: true }
+  - { id: finra-sent-144a-church-dbuy-trades, name: "144A Church dealer buys trades", unit: "ct", external: true }
+  - { id: finra-sent-144a-church-dsell-vol, name: "144A Church dealer sells volume $M par", unit: "$M", external: true }
+  - { id: finra-sent-144a-church-dsell-trades, name: "144A Church dealer sells trades", unit: "ct", external: true }
+  - { id: finra-sent-144a-church-inter-vol, name: "144A Church inter-dealer volume $M par", unit: "$M", external: true }
+  - { id: finra-sent-144a-church-inter-trades, name: "144A Church inter-dealer trades", unit: "ct", external: true }
+  - { id: finra-sent-144a-church-total-vol, name: "144A Church total volume $M par", unit: "$M", external: true }
+  - { id: finra-sent-144a-church-total-trades, name: "144A Church total trades", unit: "ct", external: true }
+  - { id: finra-sent-144a-church-netflow, name: "144A Church net customer flow ($M par)", unit: "$M", external: true }
+  - { id: finra-sent-144a-eln-dbuy-vol, name: "144A ELN dealer buys volume $M par", unit: "$M", external: true }
+  - { id: finra-sent-144a-eln-dbuy-trades, name: "144A ELN dealer buys trades", unit: "ct", external: true }
+  - { id: finra-sent-144a-eln-dsell-vol, name: "144A ELN dealer sells volume $M par", unit: "$M", external: true }
+  - { id: finra-sent-144a-eln-dsell-trades, name: "144A ELN dealer sells trades", unit: "ct", external: true }
+  - { id: finra-sent-144a-eln-inter-vol, name: "144A ELN inter-dealer volume $M par", unit: "$M", external: true }
+  - { id: finra-sent-144a-eln-inter-trades, name: "144A ELN inter-dealer trades", unit: "ct", external: true }
+  - { id: finra-sent-144a-eln-total-vol, name: "144A ELN total volume $M par", unit: "$M", external: true }
+  - { id: finra-sent-144a-eln-total-trades, name: "144A ELN total trades", unit: "ct", external: true }
+  - { id: finra-sent-144a-eln-netflow, name: "144A ELN net customer flow ($M par)", unit: "$M", external: true }
   # ---- batch 8: market-structure universe (22 tickers, verified live 2026-10-03) ----
   - { id: ms-stt,  name: "State Street",        unit: idx, yahoo: "STT" }
   - { id: ms-blk,  name: "BlackRock",           unit: idx, yahoo: "BLK" }
@@ -772,6 +1014,29 @@ cycle_tabs:        # layout only; rows reference cycle_series ids
           - { series: finra-margin-debit }
           - { series: finra-margin-credit-cash }
           - { series: finra-margin-credit-margin }
+      - title: "BOND BREADTH — ADVANCE/DECLINE (FINRA, DAILY)"
+        rows:
+          - { series: finra-breadth-corp-all-adv }
+          - { series: finra-breadth-corp-all-dec }
+          - { series: finra-breadth-corp-all-adspread }
+          - { series: finra-breadth-corp-hy-adspread }
+          - { series: finra-breadth-corp-ig-adspread }
+          - { series: finra-breadth-corp-all-hi52 }
+          - { series: finra-breadth-corp-all-lo52 }
+          - { series: finra-breadth-corp-all-dvol }
+          - { series: finra-breadth-agency-all-adspread }
+          - { series: finra-breadth-144a-all-adspread }
+      - title: "BOND SENTIMENT — DEALER FLOWS (FINRA, DAILY)"
+        rows:
+          - { series: finra-sent-corp-all-netflow }
+          - { series: finra-sent-corp-ig-netflow }
+          - { series: finra-sent-corp-hy-netflow }
+          - { series: finra-sent-corp-conv-netflow }
+          - { series: finra-sent-agency-all-netflow }
+          - { series: finra-sent-144a-all-netflow }
+          - { series: finra-sent-corp-all-dsell-vol }
+          - { series: finra-sent-corp-all-dbuy-vol }
+          - { series: finra-sent-corp-all-inter-vol }
 
 calendar_map:      # first match wins — keep Core before CPI
   - { country: USD, match: "Core CPI",     series: us-core-cpi-yoy }
