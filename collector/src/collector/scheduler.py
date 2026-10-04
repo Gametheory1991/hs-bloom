@@ -53,6 +53,7 @@ from collector.fetchers.auctions import fetch_auctions
 from collector.fetchers.dealer import fetch_dealer
 from collector.fetchers.finra_breadth import fetch_finra_breadth
 from collector.fetchers.finra_corp import fetch_finra_corp
+from collector.fetchers.finra_capped import fetch_finra_capped
 from collector.fetchers.finra_margin import fetch_finra_margin
 from collector.fetchers.finra_short import fetch_finra_short
 from collector.fetchers.finra_regsho import fetch_finra_regsho
@@ -291,6 +292,11 @@ def register_jobs(
         # Starts after the other FINRA jobs.
         "finra_regsho": (cfg.cadences.get("finra_regsho", 86400), partial(fetch_finra_regsho, store, get_text, pt),
                  start + timedelta(seconds=7500)),
+        # FINRA capped volume report — monthly corporate/agency capped trade
+        # volume (keyless CSV, 12 rolling months, published 1st business day).
+        # Starts after the other FINRA jobs.
+        "finra_capped": (cfg.cadences.get("finra_capped", 30 * 86400), partial(fetch_finra_capped, store, get_text),
+                 start + timedelta(seconds=7800)),
         "newsletter": (cfg.cadences["insights"], partial(deliver_newsletter, store, smtp_cfg), start + timedelta(seconds=5)),
     }
     # Boot catch-up (see _catchup_first_runs): overdue staggered jobs run
