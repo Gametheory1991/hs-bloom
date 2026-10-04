@@ -22,7 +22,7 @@ def test_dashboard_shape_on_empty_store(tmp_path):
     assert set(body["panels"].keys()) == {
         "macro", "equity", "bonds", "news", "defi", "midnight", "morpho", "refs", "cycle",
         "insights", "ai_flow", "ms_flow", "gse", "hyper", "movers", "radar", "riskmap", "voldash", "xcorr", "tsv",
-        "worldbank", "usaspending", "finnhub",
+        "worldbank", "usaspending", "finnhub", "predict",
     }
     assert [t["id"] for t in body["panels"]["cycle"]["tabs"]] == [
         "risk", "econ", "credit", "profit", "pos", "quant", "etf", "struct",
