@@ -169,7 +169,7 @@ function companyCard(n) {
     ? `<div class="ai-card-fin"><span class="${fcfCls}">FCF ${fmtUsd(f.fcf)}</span><span class="muted">capex ${fmtUsd(f.capex)}</span></div>`
     : `<div class="ai-card-fin muted">private — deals only</div>`;
   return `<div class="ai-card" data-id="${esc(n.id)}" role="button" tabindex="0">
-    <div class="ai-card-head"><strong>${esc(n.name)}</strong>
+    <div class="ai-card-head">${n.logo ? `<img class="ai-logo" src="${esc(n.logo)}" alt="" loading="lazy" onerror="this.remove()" style="width:22px;height:22px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:6px">` : ""}<strong>${esc(n.name)}</strong>
       ${n.ticker ? `<span class="muted">${esc(n.ticker)}</span>` : ""}
       ${f.fcf != null && f.fcf < 0 ? `<span class="ai-dot-red" title="negative FCF"></span>` : ""}</div>
     ${sub}
@@ -203,6 +203,7 @@ const fmtDealAmt = (e) => e.amount_bn != null ? `<strong>$${e.amount_bn}B</stron
 
 function graphSvg(nodes, edges, centerId) {
   const W = 1000, H = 520, top = 44;
+  const clipSeq = (graphSvg._seq = (graphSvg._seq || 0) + 1);
   const groups = [...new Set(nodes.map((n) => n._group || "Other"))];
   const pos = {};
   groups.forEach((g, gi) => {
@@ -244,8 +245,17 @@ function graphSvg(nodes, edges, centerId) {
     const r = n.id === centerId ? 34 : 15 + 21 * Math.sqrt((nodeMax[n.id] || 0) / maxAmt);
     const neg = (n.flags || []).includes("cashflow_negative");
     const isC = n.id === centerId;
+    const rr = r.toFixed(1);
+    // Logo clipped to the node circle. The colored circle is drawn first, so a
+    // failed/blank logo image simply leaves the circle visible (no JS needed).
+    let logoEl = "";
+    if (n.logo) {
+      const clipId = `lgc${clipSeq}_${String(n.id).replace(/[^a-zA-Z0-9_-]/g, "_")}`;
+      logoEl = `<clipPath id="${clipId}"><circle cx="${p.x}" cy="${p.y}" r="${rr}"/></clipPath>` +
+        `<image href="${esc(n.logo)}" x="${(p.x - r).toFixed(1)}" y="${(p.y - r).toFixed(1)}" width="${(2 * r).toFixed(1)}" height="${(2 * r).toFixed(1)}" preserveAspectRatio="xMidYMid slice" clip-path="url(#${clipId})"/>`;
+    }
     svg += `<g class="ai-node" data-node="${esc(n.id)}" style="cursor:pointer">
-      <circle cx="${p.x}" cy="${p.y}" r="${r.toFixed(1)}" fill="${groupColor(n._group || "Other")}" fill-opacity="${neg ? 0.35 : 0.85}" stroke="${isC ? "#fff" : neg ? "#e05252" : "#111"}" stroke-width="${isC ? 2.5 : neg ? 2 : 1}"/>
+      <circle cx="${p.x}" cy="${p.y}" r="${rr}" fill="${groupColor(n._group || "Other")}" fill-opacity="${neg ? 0.35 : 0.85}" stroke="${isC ? "#fff" : neg ? "#e05252" : "#111"}" stroke-width="${isC ? 2.5 : neg ? 2 : 1}"/>${logoEl}
       <text x="${p.x}" y="${(p.y + r + 14).toFixed(1)}" text-anchor="middle" font-size="11" fill="#e8e8e8">${esc(n.name)}</text></g>`;
   });
   return `<div class="ai-graph-scroll"><svg viewBox="0 0 ${W} ${H}" class="ai-graph-svg" role="img" aria-label="money-flow ego graph">${svg}</svg></div>`;
@@ -265,7 +275,7 @@ function nodeDetail(doc, n) {
     </div><div class="muted" style="font-size:10px">Quarter ${esc(String(f.latest_quarter || "").slice(0, 7))} · SEC XBRL${f.currency && f.currency !== "USD" ? ` · figures in ${esc(f.currency)}` : ""}</div>`
     : `<div class="muted">No XBRL financials — deals only.</div>`;
   return `<div class="ai-node-card">
-    <div class="ai-node-card-head"><strong>${esc(n.name)}</strong>
+    <div class="ai-node-card-head">${n.logo ? `<img class="ai-logo" src="${esc(n.logo)}" alt="" loading="lazy" onerror="this.remove()" style="width:26px;height:26px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:8px">` : ""}<strong>${esc(n.name)}</strong>
       ${n.ticker ? `<span class="muted">${esc(n.ticker)}</span>` : ""}
       <span class="muted">${esc(n._vlabel || "")}</span></div>
     ${fin}
