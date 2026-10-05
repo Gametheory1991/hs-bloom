@@ -64,10 +64,10 @@ export async function openChart(seriesId, title, overlayId = null) {
     if (requestId !== activeRequestId) return;
     root.innerHTML = "";
     destroyPlot();
-    const axisStyle = { stroke: "#6a746a", grid: { stroke: "#1e261e" } };
+    const axisStyle = { stroke: "#6b7280", grid: { stroke: "#e5e7eb" } };
     const opts = {
       width: Math.min(820, root.clientWidth || 820), height: 320,
-      series: [{}, { label: series.name ?? series.unit, stroke: "#f5a623", width: 1.5, spanGaps: true }],
+      series: [{}, { label: series.name ?? series.unit, stroke: "#2563eb", width: 1.5, spanGaps: true }],
       axes: [axisStyle, { ...axisStyle }],
       hooks: { drawClear: [bandsHook(bands)] },
     };
