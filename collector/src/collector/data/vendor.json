@@ -1,0 +1,307 @@
+{
+ "universe_id": "vendor",
+ "title": "Vendor",
+ "as_of": "2026-10-04",
+ "_schema_note": "Generic coverage-map schema (same as ai_buildout/market_structure): verticals -> companies [{id, name, ticker?, cik?, kind}], edges (press-reported, per-edge source + confidence), aggregates, risk_notes. Covers market-data vendors, index providers, rating agencies, alt-data and research \u2014 the companies selling data/indexes/ratings to the industry.",
+ "verticals": [
+  {
+   "id": "market_data",
+   "label": "Market-data vendors",
+   "group": "Data",
+   "companies": [
+    {
+     "id": "bloomberg",
+     "name": "Bloomberg L.P.",
+     "kind": "private"
+    },
+    {
+     "id": "lseg",
+     "name": "LSEG",
+     "kind": "public",
+     "ticker": "LSEG.L",
+     "cik": ""
+    },
+    {
+     "id": "spgi",
+     "name": "S&P Global",
+     "kind": "public",
+     "ticker": "SPGI",
+     "cik": "0000064040"
+    },
+    {
+     "id": "factset",
+     "name": "FactSet",
+     "kind": "public",
+     "ticker": "FDS",
+     "cik": "0001013237"
+    },
+    {
+     "id": "morningstar",
+     "name": "Morningstar",
+     "kind": "public",
+     "ticker": "MORN",
+     "cik": "0001289419"
+    },
+    {
+     "id": "refinitiv",
+     "name": "Refinitiv / LSEG",
+     "kind": "private"
+    },
+    {
+     "id": "ihs-markit",
+     "name": "IHS Markit / S&P Global",
+     "kind": "private"
+    },
+    {
+     "id": "pitchbook",
+     "name": "PitchBook / Morningstar",
+     "kind": "private"
+    },
+    {
+     "id": "kensho",
+     "name": "Kensho / S&P Global",
+     "kind": "private"
+    }
+   ]
+  },
+  {
+   "id": "index_providers",
+   "label": "Index providers",
+   "group": "Indexes",
+   "companies": [
+    {
+     "id": "spdji",
+     "name": "S&P Dow Jones Indices",
+     "kind": "private"
+    },
+    {
+     "id": "msci",
+     "name": "MSCI",
+     "kind": "public",
+     "ticker": "MSCI",
+     "cik": "0001408198"
+    },
+    {
+     "id": "ftse-russell",
+     "name": "FTSE Russell / LSEG",
+     "kind": "private"
+    },
+    {
+     "id": "crsp",
+     "name": "CRSP",
+     "kind": "private"
+    },
+    {
+     "id": "ice-indices",
+     "name": "ICE Data Indices",
+     "kind": "private"
+    }
+   ]
+  },
+  {
+   "id": "rating_agencies",
+   "label": "Rating agencies",
+   "group": "Ratings",
+   "companies": [
+    {
+     "id": "sp-ratings",
+     "name": "S&P Global Ratings",
+     "kind": "private"
+    },
+    {
+     "id": "moodys",
+     "name": "Moody's",
+     "kind": "public",
+     "ticker": "MCO",
+     "cik": "0001059556"
+    },
+    {
+     "id": "fitch",
+     "name": "Fitch Ratings / Hearst",
+     "kind": "private"
+    },
+    {
+     "id": "kbra",
+     "name": "KBRA",
+     "kind": "private"
+    }
+   ]
+  },
+  {
+   "id": "alt_data",
+   "label": "Alternative data",
+   "group": "Alt data",
+   "companies": [
+    {
+     "id": "thinknum",
+     "name": "Thinknum",
+     "kind": "private"
+    },
+    {
+     "id": "yipitdata",
+     "name": "YipitData",
+     "kind": "private"
+    },
+    {
+     "id": "earnest",
+     "name": "Earnest Analytics",
+     "kind": "private"
+    },
+    {
+     "id": "second-measure",
+     "name": "Second Measure",
+     "kind": "private"
+    },
+    {
+     "id": "rms",
+     "name": "RMS / Moody's",
+     "kind": "private"
+    }
+   ]
+  },
+  {
+   "id": "research",
+   "label": "Independent research",
+   "group": "Research",
+   "companies": [
+    {
+     "id": "cfra",
+     "name": "CFRA",
+     "kind": "private"
+    },
+    {
+     "id": "argus",
+     "name": "Argus Research",
+     "kind": "private"
+    },
+    {
+     "id": "bernstein",
+     "name": "Bernstein / Societe Generale",
+     "kind": "private"
+    }
+   ]
+  }
+ ],
+ "edges": [
+  {
+   "from": "lseg",
+   "to": "refinitiv",
+   "kind": "acquire",
+   "amount_bn": 27.0,
+   "date": "2021-01",
+   "label": "LSEG acquires Refinitiv for $27B",
+   "source": "LSEG press release",
+   "confidence": "confirmed"
+  },
+  {
+   "from": "spgi",
+   "to": "ihs-markit",
+   "kind": "acquire",
+   "amount_bn": 44.0,
+   "date": "2022-02",
+   "label": "S&P Global acquires IHS Markit for $44B",
+   "source": "S&P Global press release",
+   "confidence": "confirmed"
+  },
+  {
+   "from": "morningstar",
+   "to": "pitchbook",
+   "kind": "acquire",
+   "amount_bn": 0.225,
+   "date": "2016-12",
+   "label": "Morningstar acquires PitchBook for $225M",
+   "source": "Morningstar press release",
+   "confidence": "confirmed"
+  },
+  {
+   "from": "moodys",
+   "to": "rms",
+   "kind": "acquire",
+   "amount_bn": 2.0,
+   "date": "2021-09",
+   "label": "Moody's acquires RMS for ~$2B",
+   "source": "Moody's press release",
+   "confidence": "confirmed"
+  },
+  {
+   "from": "spgi",
+   "to": "kensho",
+   "kind": "acquire",
+   "amount_bn": 0.55,
+   "date": "2018-04",
+   "label": "S&P Global acquires Kensho for $550M",
+   "source": "S&P Global press release",
+   "confidence": "confirmed"
+  },
+  {
+   "from": "spgi",
+   "to": "spdji",
+   "kind": "owns",
+   "amount_bn": null,
+   "date": null,
+   "label": "S&P Global majority-owns S&P Dow Jones Indices JV",
+   "source": "S&P Global 10-K",
+   "confidence": "confirmed"
+  },
+  {
+   "from": "spgi",
+   "to": "sp-ratings",
+   "kind": "owns",
+   "amount_bn": null,
+   "date": null,
+   "label": "S&P Global Ratings is a division of S&P Global",
+   "source": "S&P Global 10-K",
+   "confidence": "confirmed"
+  },
+  {
+   "from": "lseg",
+   "to": "ftse-russell",
+   "kind": "owns",
+   "amount_bn": null,
+   "date": null,
+   "label": "FTSE Russell is LSEG's index arm",
+   "source": "LSEG annual report",
+   "confidence": "confirmed"
+  }
+ ],
+ "aggregates": [
+  {
+   "id": "DATA",
+   "label": "Data & analytics",
+   "members": [
+    "spgi",
+    "moodys",
+    "msci",
+    "factset",
+    "morningstar"
+   ],
+   "metric": "revenue"
+  },
+  {
+   "id": "IDX",
+   "label": "Index providers",
+   "members": [
+    "msci",
+    "spgi"
+   ],
+   "metric": "revenue"
+  }
+ ],
+ "risk_notes": [
+  {
+   "id": "spgi-structure",
+   "text": "S&P Global monetizes the same credit franchise three ways: Ratings (issuer-paid), S&P Dow Jones Indices (AUM-linked licensing, e.g. SPY), and Market Intelligence (IHS Markit) \u2014 all three appear as separate nodes.",
+   "source": "S&P Global 10-K segment reporting"
+  },
+  {
+   "id": "lseg-refinitiv",
+   "text": "LSEG's $27B Refinitiv deal (2021) made data/analytics >70% of group revenue \u2014 LSEG is now primarily a data company that happens to own exchanges.",
+   "source": "LSEG annual report"
+  },
+  {
+   "id": "index-licensing",
+   "text": "Index licensing is the highest-margin slice: MSCI and SPDJI collect basis points on trillions of indexed AUM (SPY tracks the S&P 500; iShares licenses MSCI indexes).",
+   "source": "MSCI / S&P Global filings"
+  }
+ ]
+}
