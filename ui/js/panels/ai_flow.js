@@ -77,6 +77,30 @@ const UNIVERSE_OPTS = {
     chartNote: "MSB6 = JPM+BAC+C+MS+GS+UBS · EXCH4 = CME+ICE+NDAQ+CBOE, summed by as-reported quarter-end (fiscal quarters not re-aligned). Revenue — capex tags are not meaningful for banks/brokers. USD.",
     legend: `<span style="color:#e05252">—</span> acquire &nbsp;<span style="color:#7fd4a8">—</span> invest &nbsp;<span style="color:#e8c96a">- -</span> pfof &nbsp;<span style="color:#8fa8d8">—</span> owns &nbsp;<span style="color:#b48ae0">- -</span> spinoff`,
   },
+  bank_fixed_income: {
+    tabLabel: "BANKS & FI",
+    hubs: ["jpmorgan", "bank-of-america", "fannie-mae", "jpm-securities", "goldman-sachs"],
+    ego: "jpmorgan",
+    chartTitle: "REVENUE — BIG-4 + REGIONALS (QUARTERLY)",
+    chartNote: "BIG4 = JPM+BAC+C+WFC · REG8 = USB+PNC+TFC+FITB+KEY+RF+HBAN+COF, summed by as-reported quarter-end (fiscal quarters not re-aligned). Revenue — capex tags are not meaningful for banks. USD.",
+    legend: `<span style="color:#e05252">—</span> acquire &nbsp;<span style="color:#7fd4a8">—</span> purchase &nbsp;<span style="color:#8fa8d8">—</span> affiliate`,
+  },
+  technology: {
+    tabLabel: "TECHNOLOGY",
+    hubs: ["fis", "stripe", "ion-group", "exegy", "coinbase"],
+    ego: "fis",
+    chartTitle: "REVENUE — FINTECH + PAY NETWORKS (QUARTERLY)",
+    chartNote: "FINT = FIS+FISV+JKHY+QTWO+MQ+PYPL+GPN · PAYNET = V+MA, summed by as-reported quarter-end (fiscal quarters not re-aligned). USD.",
+    legend: `<span style="color:#e05252">—</span> acquire &nbsp;<span style="color:#999">- -</span> terminated`,
+  },
+  vendor: {
+    tabLabel: "VENDOR",
+    hubs: ["spgi", "lseg", "moodys", "msci", "factset"],
+    ego: "spgi",
+    chartTitle: "REVENUE — DATA & ANALYTICS (QUARTERLY)",
+    chartNote: "DATA = SPGI+MCO+MSCI+FDS+MORN · IDX = MSCI+SPGI, summed by as-reported quarter-end (fiscal quarters not re-aligned). USD.",
+    legend: `<span style="color:#e05252">—</span> acquire &nbsp;<span style="color:#8fa8d8">—</span> owns`,
+  },
 };
 const optsFor = (doc) => UNIVERSE_OPTS[doc.universe_id] || {
   tabLabel: (doc.universe_id || "UNIVERSE").toUpperCase().replace(/_/g, " "),
@@ -324,25 +348,25 @@ export function renderMsFlow(doc) {
 const EMPTY = { universe_id: "", verticals: [], edges: [], rollups: {}, capex_stack: {}, risk_notes: [], updated_at: null, source: null };
 
 // Universe selector: renders the toggle + the selected universe into
-// #panel-ai-flow. Called by main.js with both dashboard panels.
-export function renderUniverseSelector(aiDoc, msDoc) {
+// #panel-ai-flow. Called by main.js with the dashboard panels (one doc per
+// universe, in display order). Generic across N universes.
+export function renderUniverseSelector(...docs) {
   const body = document.querySelector("#panel-ai-flow .panel-body");
   const footEl = document.querySelector("#panel-ai-flow .panel-foot");
   if (!body) return;
-  aiDoc = aiDoc && aiDoc.universe_id ? aiDoc : { ...EMPTY, universe_id: "ai_buildout" };
-  msDoc = msDoc && msDoc.universe_id ? msDoc : { ...EMPTY, universe_id: "market_structure" };
-  const hasAi = (aiDoc.verticals || []).length > 0;
-  const hasMs = (msDoc.verticals || []).length > 0;
-  if (!hasAi && !hasMs) {
+  const FALLBACK_IDS = ["ai_buildout", "market_structure", "bank_fixed_income", "technology", "vendor"];
+  docs = docs.map((d, i) => (d && d.universe_id ? d : { ...EMPTY, universe_id: FALLBACK_IDS[i] || `universe_${i}` }));
+  const has = docs.map((d) => (d.verticals || []).length > 0);
+  if (!has.some(Boolean)) {
     body.innerHTML = `<div class="empty-state">NO DATA — universe graph jobs have not run yet</div>`;
     if (footEl) footEl.textContent = "DATA: —";
     return;
   }
-  let sel = (hasMs && !hasAi) ? "ms" : "ai";
-  const doc = () => sel === "ai" ? aiDoc : msDoc;
+  let sel = has.findIndex(Boolean);
+  const doc = () => docs[sel];
   const renderSel = () => {
     const chips = body.querySelectorAll("[data-uni]");
-    chips.forEach((c) => c.classList.toggle("on", c.dataset.uni === sel));
+    chips.forEach((c) => c.classList.toggle("on", Number(c.dataset.uni) === sel));
     renderUniverse(doc(), optsFor(doc()), body.querySelector(".uni-slot"));
     const d = doc();
     if (footEl) {
@@ -353,10 +377,9 @@ export function renderUniverseSelector(aiDoc, msDoc) {
   };
   body.innerHTML = `
     <div class="ai-chips uni-toggle" style="margin-bottom:8px">
-      <button class="ai-chip" data-uni="ai"${hasAi ? "" : " disabled"}>AI BUILDOUT</button>
-      <button class="ai-chip" data-uni="ms"${hasMs ? "" : " disabled"}>MARKET STRUCTURE</button>
+      ${docs.map((d, i) => `<button class="ai-chip" data-uni="${i}"${has[i] ? "" : " disabled"}>${esc(optsFor(d).tabLabel)}</button>`).join("")}
     </div>
     <div class="uni-slot"></div>`;
-  body.querySelectorAll("[data-uni]").forEach((b) => b.addEventListener("click", () => { sel = b.dataset.uni; renderSel(); }));
+  body.querySelectorAll("[data-uni]").forEach((b) => b.addEventListener("click", () => { sel = Number(b.dataset.uni); renderSel(); }));
   renderSel();
 }
