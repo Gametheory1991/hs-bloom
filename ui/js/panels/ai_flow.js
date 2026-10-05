@@ -101,6 +101,22 @@ const UNIVERSE_OPTS = {
     chartNote: "DATA = SPGI+MCO+MSCI+FDS+MORN · IDX = MSCI+SPGI, summed by as-reported quarter-end (fiscal quarters not re-aligned). USD.",
     legend: `<span style="color:#e05252">—</span> acquire &nbsp;<span style="color:#8fa8d8">—</span> owns`,
   },
+  etf: {
+    tabLabel: "ETF ECOSYSTEM",
+    hubs: ["blackrock", "state-street", "citadel-securities", "jpmorgan", "sp-dow-jones"],
+    ego: "blackrock",
+    chartTitle: "REVENUE — ISSUERS + APs (QUARTERLY)",
+    chartNote: "ISSUER4 = BLK+STT+IVZ+SCHW · AP5 = JPM+GS+MS+BAC+C, summed by as-reported quarter-end (fiscal quarters not re-aligned). Revenue — capex tags are not meaningful for issuers/banks. USD.",
+    legend: `<span style="color:#8fa8d8">—</span> license &nbsp;<span style="color:#7fd4a8">—</span> liquidity &nbsp;<span style="color:#e8c96a">- -</span> ap_flow`,
+  },
+  crypto: {
+    tabLabel: "CRYPTO",
+    hubs: ["coinbase", "strategy", "circle", "mara", "blackrock-ibit"],
+    ego: "coinbase",
+    chartTitle: "REVENUE — MINERS + EXCHANGES (QUARTERLY)",
+    chartNote: "MINERS = MARA+RIOT+CLSK+HUT+BITF+CORZ · CEX = COIN+BLSH+HOOD+CRCL, summed by as-reported quarter-end (fiscal quarters not re-aligned). Revenue — capex tags are not meaningful for exchanges/miners. USD.",
+    legend: `<span style="color:#e05252">—</span> acquire &nbsp;<span style="color:#7fd4a8">—</span> invest`,
+  },
 };
 const optsFor = (doc) => UNIVERSE_OPTS[doc.universe_id] || {
   tabLabel: (doc.universe_id || "UNIVERSE").toUpperCase().replace(/_/g, " "),
@@ -354,7 +370,7 @@ export function renderUniverseSelector(...docs) {
   const body = document.querySelector("#panel-ai-flow .panel-body");
   const footEl = document.querySelector("#panel-ai-flow .panel-foot");
   if (!body) return;
-  const FALLBACK_IDS = ["ai_buildout", "market_structure", "bank_fixed_income", "technology", "vendor"];
+  const FALLBACK_IDS = ["ai_buildout", "market_structure", "bank_fixed_income", "technology", "vendor", "etf", "crypto"];
   docs = docs.map((d, i) => (d && d.universe_id ? d : { ...EMPTY, universe_id: FALLBACK_IDS[i] || `universe_${i}` }));
   const has = docs.map((d) => (d.verticals || []).length > 0);
   if (!has.some(Boolean)) {
