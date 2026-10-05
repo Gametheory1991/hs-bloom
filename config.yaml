@@ -40,6 +40,7 @@ cadences:          # seconds between fetcher runs
   finra_corp: 86400      # FINRA most-active corp bonds (dynarep API); daily, history to 2023
   finra_regsho: 86400    # FINRA Reg SHO daily short volume + OTC threshold list; daily, keyless
   finra_capped: 2592000  # FINRA capped volume report (corp/agency); monthly keyless CSV, 12 rolling months
+  finra_ids_star: 86400  # FINRA IDS STAR Structured Product Activity Reports; daily ZIPs, keyless, 36-mo backfill
   ms_capex: 604800       # market-structure universe XBRL financials; weekly (quarterly data)
   ms_graph: 604800       # market-structure money-flow graph; weekly (zero HTTP, overlays ms_capex)
   tsv_capex: 604800      # tokenized-securities universe XBRL fundamentals; weekly
@@ -434,6 +435,35 @@ cycle_series:      # market-cycle series (spec 2026-08-24); exactly one source k
   - { id: ice-star-agency-trades,     name: "ICE STAR agency trades",        unit: "k",   external: true }
   - { id: ice-star-nonagency-par,     name: "ICE STAR non-agency par $bn",   unit: "$bn", external: true }
   - { id: ice-star-nonagency-trades,  name: "ICE STAR non-agency trades",    unit: "k",   external: true }
+  # ---- FINRA-IDS STAR structured-product activity (daily; external: dedicated job writes cycle:<id>) ----
+  - { id: star-tba-par,            name: "STAR TBA par $",            unit: "$",  external: true }
+  - { id: star-tba-trades,         name: "STAR TBA trades",           unit: "k",  external: true }
+  - { id: star-tba-umbs-par,       name: "STAR TBA UMBS par $",       unit: "$",  external: true }
+  - { id: star-tba-fnma-par,       name: "STAR TBA FNMA par $",       unit: "$",  external: true }
+  - { id: star-tba-fhlmc-par,      name: "STAR TBA FHLMC par $",      unit: "$",  external: true }
+  - { id: star-tba-gnma-par,       name: "STAR TBA GNMA par $",       unit: "$",  external: true }
+  - { id: star-spec-par,           name: "STAR specified pools par $", unit: "$", external: true }
+  - { id: star-spec-trades,        name: "STAR specified pools trades", unit: "k", external: true }
+  - { id: star-agcmo-par,          name: "STAR agency CMO par $",     unit: "$",  external: true }
+  - { id: star-agcmo-trades,       name: "STAR agency CMO trades",    unit: "k",  external: true }
+  - { id: star-nagcmo-ig-par,      name: "STAR non-agency CMO IG par $", unit: "$", external: true }
+  - { id: star-nagcmo-nonig-par,   name: "STAR non-agency CMO HY par $", unit: "$", external: true }
+  - { id: star-nagcmo-par,         name: "STAR non-agency CMO par $", unit: "$",  external: true }
+  - { id: star-nagcmo-trades,      name: "STAR non-agency CMO trades", unit: "k", external: true }
+  - { id: star-nagcmbs-ig-par,     name: "STAR non-agency CMBS IG par $", unit: "$", external: true }
+  - { id: star-nagcmbs-nonig-par,  name: "STAR non-agency CMBS HY par $", unit: "$", external: true }
+  - { id: star-nagcmbs-par,        name: "STAR non-agency CMBS par $", unit: "$", external: true }
+  - { id: star-nagcmbs-trades,     name: "STAR non-agency CMBS trades", unit: "k", external: true }
+  - { id: star-agcmbs-par,         name: "STAR agency CMBS par $",   unit: "$",  external: true }
+  - { id: star-agcmbs-trades,      name: "STAR agency CMBS trades",  unit: "k",  external: true }
+  - { id: star-abs-ig-par,         name: "STAR ABS IG par $",        unit: "$",  external: true }
+  - { id: star-abs-nonig-par,      name: "STAR ABS HY par $",        unit: "$",  external: true }
+  - { id: star-abs-par,            name: "STAR ABS par $",           unit: "$",  external: true }
+  - { id: star-abs-trades,         name: "STAR ABS trades",          unit: "k",  external: true }
+  - { id: star-clo-ig-par,         name: "STAR CLO IG par $",        unit: "$",  external: true }
+  - { id: star-clo-nonig-par,      name: "STAR CLO HY par $",        unit: "$",  external: true }
+  - { id: star-clo-par,            name: "STAR CLO par $",           unit: "$",  external: true }
+  - { id: star-clo-trades,         name: "STAR CLO trades",          unit: "k",  external: true }
   # ---- batch 6: FINRA short interest (2x/month; external) ----
   - { id: finra-short-total, name: "Total short interest (shares)", unit: "sh", external: true }
   - { id: short-MSFT,  name: "MSFT short interest",  unit: "sh", external: true }

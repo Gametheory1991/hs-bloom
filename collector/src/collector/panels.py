@@ -518,6 +518,7 @@ def _finra_panel(store: Store) -> dict:
     margin, margin_upd, margin_src = _d("finra_margin")
     treas, treas_upd, treas_src = _d("trace_treasury")
     monthly, monthly_upd, monthly_src = _d("trace_monthly")
+    star, star_upd, star_src = _d("finra_ids_star")
 
     # Margin debit sparkline (last ~2y of monthly points)
     margin_hist = []
@@ -585,6 +586,10 @@ def _finra_panel(store: Store) -> dict:
                            "updated_at": monthly_upd, "source": monthly_src}
                           if monthly else {"as_of": None, "blocked": True,
                                            "updated_at": None, "source": None}),
+        "star": ({"as_of": star.get("as_of"), "status": star.get("status"),
+                  "days": star.get("days", 0),
+                  "updated_at": star_upd, "source": star_src}
+                 if star else None),
     }
 
 

@@ -57,6 +57,7 @@ from collector.fetchers.finra_capped import fetch_finra_capped
 from collector.fetchers.finra_margin import fetch_finra_margin
 from collector.fetchers.finra_short import fetch_finra_short
 from collector.fetchers.finra_regsho import fetch_finra_regsho
+from collector.fetchers.finra_ids_star import fetch_finra_ids_star
 from collector.fetchers.ice_star import fetch_ice_star
 from collector.fetchers.refs_history import fetch_refs_history
 from collector.fetchers.trace_monthly import fetch_trace_monthly
@@ -343,6 +344,11 @@ def register_jobs(
         # Starts after the other FINRA jobs.
         "finra_capped": (cfg.cadences.get("finra_capped", 30 * 86400), partial(fetch_finra_capped, store, get_text),
                  start + timedelta(seconds=7800)),
+        # FINRA IDS STAR — Structured Product Activity Reports (daily ZIPs,
+        # keyless, 36-month backfill). Public equivalent of ICE Vantage.
+        # Starts after the other FINRA jobs.
+        "finra_ids_star": (cfg.cadences.get("finra_ids_star", 86400), partial(fetch_finra_ids_star, store, get_bytes),
+                 start + timedelta(seconds=8100)),
         "newsletter": (cfg.cadences["insights"], partial(deliver_newsletter, store, smtp_cfg), start + timedelta(seconds=5)),
     }
     # Boot catch-up (see _catchup_first_runs): overdue staggered jobs run
