@@ -243,6 +243,40 @@ def register_jobs(
         # registry exists, so this is the machine-trackable part).
         "tsv_watch": (cfg.cadences.get("tsv_watch", 604800), partial(fetch_tsv_watch, store, get_text),
                  start + timedelta(seconds=4200)),
+        # bank/fixed-income universe — same generic universe fetchers,
+        # new universe_id. XBRL fundamentals for the 19 public names
+        # (money-center, IBs, regionals, custody, GSEs, Jefferies), then
+        # the money-flow graph.
+        "bank_capex": (cfg.cadences.get("bank_capex", 604800), partial(fetch_universe_capex, cfg, store, get_text, "bank_fixed_income"),
+                 start + timedelta(seconds=4500)),
+        "bank_graph": (cfg.cadences.get("bank_graph", 604800), partial(fetch_universe_graph, store, "bank_fixed_income"),
+                 start + timedelta(seconds=4800)),
+        # technology universe (trading tech, fintech infra, regtech,
+        # crypto infra, post-trade) — same generic universe engine.
+        # ~11 public companies x 5 tags, SEC fair access.
+        "tech_capex": (cfg.cadences.get("tech_capex", 604800), partial(fetch_universe_capex, cfg, store, get_text, "technology"),
+                 start + timedelta(seconds=4500)),
+        # technology money-flow graph: zero HTTP, overlays tech_capex
+        # financials onto the vendored deal graph. Starts after tech_capex.
+        "tech_graph": (cfg.cadences.get("tech_graph", 604800), partial(fetch_universe_graph, store, "technology"),
+                 start + timedelta(seconds=4800)),
+        # vendor universe (market-data vendors, index providers, rating
+        # agencies, alt-data, research) — same generic universe engine.
+        # ~6 public companies x 5 tags, SEC fair access.
+        "vendor_capex": (cfg.cadences.get("vendor_capex", 604800), partial(fetch_universe_capex, cfg, store, get_text, "vendor"),
+                 start + timedelta(seconds=5100)),
+        # vendor money-flow graph: zero HTTP, overlays vendor_capex
+        # financials onto the vendored deal graph. Starts after vendor_capex.
+        "vendor_graph": (cfg.cadences.get("vendor_graph", 604800), partial(fetch_universe_graph, store, "vendor"),
+                 start + timedelta(seconds=5400)),
+        # bank/fixed-income universe — same generic universe fetchers,
+        # new universe_id. XBRL fundamentals for the 19 public names
+        # (money-center, IBs, regionals, custody, GSEs, Jefferies), then
+        # the money-flow graph.
+        "bank_capex": (cfg.cadences.get("bank_capex", 604800), partial(fetch_universe_capex, cfg, store, get_text, "bank_fixed_income"),
+                 start + timedelta(seconds=4500)),
+        "bank_graph": (cfg.cadences.get("bank_graph", 604800), partial(fetch_universe_graph, store, "bank_fixed_income"),
+                 start + timedelta(seconds=4800)),
         # batch 11: World Bank macro fundamentals (GDP/CPI/unemployment)
         # for the 13 bond-matrix countries — keyless, 3 batched calls.
         "worldbank": (cfg.cadences.get("worldbank", 604800), partial(fetch_worldbank, store, get_text),
