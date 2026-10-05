@@ -108,10 +108,14 @@ def _refs_panel(store: Store) -> dict:
     return {"rows": _refs_rows(store, doc), "updated_at": doc.updated_at, "source": doc.source}
 
 
-def _macro_panel(store: Store, now: datetime) -> dict:
-    """Timeline split: 'past' = last 7 days from macro_history (FF only serves
+def econ_calendar_payload(store: Store, now: datetime) -> dict:
+    """Econ calendar: upcoming releases + past 7 days with actuals.
+
+    Timeline split: 'past' = last 7 days from macro_history (FF only serves
     the current week, so history is our own accumulation); 'releases' = the
-    calendar's upcoming entries. Unparseable times ("TBD") stay upcoming."""
+    calendar's upcoming entries. Unparseable times ("TBD") stay upcoming.
+    Shared by the dashboard macro panel and GET /api/econ-calendar.
+    """
     panel = _doc_panel(store, "macro_calendar", "releases")
     upcoming = []
     for r in panel["releases"]:
@@ -135,6 +139,56 @@ def _macro_panel(store: Store, now: datetime) -> dict:
     past.sort(key=lambda p: p[0])
     panel["past"] = [r for _, r in past]
     return panel
+
+
+def _macro_panel(store: Store, now: datetime) -> dict:
+    return econ_calendar_payload(store, now)
+
+
+def _auctions_panel(store: Store) -> dict:
+    """Treasury auction surveillance: upcoming schedule + recent results.
+
+    Reads the ``upcoming_auctions`` / ``auction_results`` docs written by the
+    auctions fetcher (Fiscal Data Treasury API). One malformed record degrades
+    that row, never the panel.
+    """
+    upcoming, recent = [], []
+    upc = store.doc("upcoming_auctions")
+    if upc is not None:
+        for a in upc.payload.get("auctions", [])[:8]:
+            try:
+                upcoming.append({
+                    "auction_date": a["auction_date"],
+                    "bucket": a.get("bucket"),
+                    "security_term": a.get("security_term"),
+                    "security_type": a.get("security_type"),
+                    "offering_amt": a.get("offering_amt"),
+                })
+            except (KeyError, TypeError):
+                continue
+    res = store.doc("auction_results")
+    if res is not None:
+        for a in res.payload.get("results", [])[:8]:
+            try:
+                recent.append({
+                    "auction_date": a["auction_date"],
+                    "bucket": a.get("bucket"),
+                    "high_yield": a.get("high_yield"),
+                    "bid_to_cover": a.get("bid_to_cover"),
+                    "indirect_pct": a.get("indirect_pct"),
+                    "direct_pct": a.get("direct_pct"),
+                    "dealer_pct": a.get("dealer_pct"),
+                    "offering_amt": a.get("offering_amt"),
+                })
+            except (KeyError, TypeError):
+                continue
+    docs = [d for d in (upc, res) if d is not None]
+    return {
+        "upcoming": upcoming,
+        "recent": recent,
+        "updated_at": max((d.updated_at for d in docs), default=None),
+        "source": "fiscaldata.treasury.gov",
+    }
 
 
 def _cycle_row(store: Store, cfg: CycleSeriesCfg, overlay: str | None) -> dict:
@@ -575,6 +629,7 @@ def build_dashboard(
         "as_of": now.isoformat().replace("+00:00", "Z"),
         "panels": {
             "macro": _macro_panel(store, now),
+            "auctions": _auctions_panel(store),
             "equity": {"rows": _equity_rows(store, indexes),
                        "updated_at": equity_doc.updated_at if equity_doc else None},
             "bonds": {"rows": _bond_rows(store),

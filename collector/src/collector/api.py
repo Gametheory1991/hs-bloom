@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from collector.changes import apply_transform, to_bands
 from collector.chat import SYSTEM_PROMPT, ask_gemini, build_context
 from collector.config import Config
-from collector.panels import build_dashboard
+from collector.panels import build_dashboard, econ_calendar_payload
 from collector.store import Store
 
 RANGE_DAYS = {"1y": 365, "5y": 5 * 365, "10y": 10 * 365}
@@ -160,6 +160,51 @@ def create_app(store: Store, cfg: Config) -> FastAPI:
             if doc is not None:
                 filers.append(doc.payload)
         return {"filers": filers}
+
+    @app.get("/api/auctions")
+    def auctions() -> dict:
+        """Treasury auction results + upcoming schedule.
+
+        ``recent``: latest 40 completed auctions (high yield, bid-to-cover,
+        takedown splits). ``buckets``: latest completed result per benchmark
+        bucket. ``upcoming``: announced but not yet held, by auction date.
+        Source: Fiscal Data Treasury API (keyless), refreshed daily.
+        """
+        upc = store.doc("upcoming_auctions")
+        res = store.doc("auction_results")
+        recent = (res.payload.get("results", []) if res is not None else [])[:40]
+        buckets: dict[str, dict] = {}
+        for r in sorted((res.payload.get("results", []) if res is not None else []),
+                        key=lambda x: x.get("auction_date", ""), reverse=True):
+            b = r.get("bucket")
+            if b and b not in buckets and r.get("completed"):
+                buckets[b] = {
+                    "auction_date": r.get("auction_date"),
+                    "high_yield": r.get("high_yield"),
+                    "bid_to_cover": r.get("bid_to_cover"),
+                    "indirect_pct": r.get("indirect_pct"),
+                    "direct_pct": r.get("direct_pct"),
+                    "dealer_pct": r.get("dealer_pct"),
+                    "offering_amt": r.get("offering_amt"),
+                }
+        docs = [d for d in (upc, res) if d is not None]
+        return {
+            "upcoming": (upc.payload.get("auctions", []) if upc is not None else []),
+            "recent": recent,
+            "buckets": buckets,
+            "updated_at": max((d.updated_at for d in docs), default=None),
+            "source": "fiscaldata.treasury.gov",
+        }
+
+    @app.get("/api/econ-calendar")
+    def econ_calendar() -> dict:
+        """Econ calendar: upcoming releases + past 7 days with actuals.
+
+        Same payload as the dashboard macro panel. Source: ForexFactory
+        weekly calendar feed (USD/EUR, high impact), refreshed on a polite
+        cadence (6h baseline, hourly on release days).
+        """
+        return econ_calendar_payload(store, datetime.now(timezone.utc))
 
     @app.get("/api/scorecard")
     def scorecard() -> dict:
