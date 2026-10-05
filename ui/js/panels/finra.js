@@ -8,6 +8,7 @@
 // also renders on this tab via #cycle-struct; ICE Vantage moved to its own
 // cycle tab on POS.
 import { renderTraceCharts } from "./trace_charts.js";
+import { renderTraceGrid } from "./trace_grid.js";
 const big = (x) =>
   x == null ? "—" : x.toLocaleString("en-US", { maximumFractionDigits: 0 });
 const pct1 = (x) => (x == null ? "—" : `${(x * 100).toFixed(1)}%`);
@@ -130,7 +131,12 @@ export function renderFinra(p) {
   if (!body) return;
   const f = p ?? {};
   body.innerHTML =
-    `<div id="trace-charts-root"></div>` +
+    `<h3>TRACE VOLUMES <span class="muted">monthly · click-and-drag to zoom · click a grid row for its chart</span></h3>
+    <div class="trace-view-toggle seg" role="tablist">
+      <button id="trace-view-chart" class="on">Chart</button><button id="trace-view-grid">Grid</button>
+    </div>
+    <div id="trace-chart-wrap"></div>
+    <div id="trace-grid-wrap" hidden></div>` +
     regshoSection(f.regsho) +
     thresholdSection(f.threshold) +
     shortInterestSection(f.short_interest) +
@@ -140,4 +146,18 @@ export function renderFinra(p) {
     marginSection(f.margin) +
     traceSection(f.trace_treasury, f.trace_monthly);
   renderTraceCharts();
+  renderTraceGrid();
+  const chartBtn = document.getElementById("trace-view-chart");
+  const gridBtn = document.getElementById("trace-view-grid");
+  const chartWrap = document.getElementById("trace-chart-wrap");
+  const gridWrap = document.getElementById("trace-grid-wrap");
+  const setView = (which) => {
+    const showChart = which === "chart";
+    chartWrap.hidden = !showChart;
+    gridWrap.hidden = showChart;
+    chartBtn.classList.toggle("on", showChart);
+    gridBtn.classList.toggle("on", !showChart);
+  };
+  chartBtn.addEventListener("click", () => setView("chart"));
+  gridBtn.addEventListener("click", () => setView("grid"));
 }
