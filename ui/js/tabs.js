@@ -1,4 +1,4 @@
-const TABS = ["mkt", "defi", "risk", "econ", "credit", "profit", "pos", "map", "xcorr", "vol", "movers", "hyper", "futures", "flows", "scorecard", "etf", "central", "predict"];
+const TABS = ["mkt", "defi", "risk", "econ", "credit", "profit", "pos", "map", "xcorr", "vol", "movers", "hyper", "futures", "flows", "scorecard", "etf", "central", "predict", "finra"];
 
 const currentTab = () => {
   const t = location.hash.replace("#/", "");

@@ -20,6 +20,7 @@ import { renderFlows } from "./panels/flows.js";
 import { renderScorecard } from "./panels/scorecard.js";
 import { renderCentral } from "./panels/central.js";
 import { renderPredict } from "./panels/predict.js";
+import { renderFinra } from "./panels/finra.js";
 import { renderAlerts } from "./panels/alerts.js";
 import { renderBriefcheck } from "./panels/briefcheck.js";
 import { initPalette, updateIndex } from "./palette.js";
@@ -31,7 +32,7 @@ import { initChat } from "./chat.js";
 import { initTabs } from "./tabs.js";
 
 const POLL_MS = 60_000;
-const STALE_MINUTES = { equity: 20, bonds: 130, macro: 390, news: 40, defi: 35, midnight: 35, refs: 35, insights: 70, riskmap: 2880, xcorr: 2880, gse: 86400, vol: 2880, movers: 10080, radar: 2880, hyper: 10080, tsv: 10080, usaspending: 20160, finnhub: 2880, worldbank: 20160, coingecko: 2880, predict: 120 };  // ~2x cadence
+const STALE_MINUTES = { equity: 20, bonds: 130, macro: 390, news: 40, defi: 35, midnight: 35, refs: 35, insights: 70, riskmap: 2880, xcorr: 2880, gse: 86400, vol: 2880, movers: 10080, radar: 2880, hyper: 10080, tsv: 10080, usaspending: 20160, finnhub: 2880, worldbank: 20160, coingecko: 2880, predict: 120, finra: 2880 };  // ~2x cadence
 
 const EMPTY = { rows: [], updated_at: null, source: null };
 
@@ -44,7 +45,7 @@ const PANEL_ENTRIES = [
   ["BRIEFING × TERMINAL CHECK", "mkt"], ["TOP NEWS", "mkt"],
   ["FUTURES — FRONT-MONTH", "futures"], ["FLOWS — 13F NET FLOWS", "flows"],
   ["SCORECARD — 1D/1M/3M/1Y + 1Y Z", "scorecard"], ["CENTRAL — FED WATCH", "central"],
-  ["PREDICT — MARKETS & EDGE", "predict"],
+  ["PREDICT — MARKETS & EDGE", "predict"], ["FINRA — SHORTS · BREADTH · TRACE", "finra"],
 ];
 
 function buildIndex(dash) {
@@ -121,6 +122,7 @@ async function tick() {
     renderTsv(p.tsv ?? { verticals: [], edges: [], risk_notes: [], order: {}, watch: null, updated_at: null, source: null });
     renderInsights(p.insights ?? { alerts: [], trends: [], newsletter: { headline: "No digest yet", bullets: [] } });
     renderPredict(p.predict ?? { edges: [], movers: [], calibration: [], polymarket: [], kalshi: [], tracked_count: 0, resolved_this_run: 0, skipped: [], disclaimer: null, updated_at: null, source: null });
+    renderFinra(p.finra ?? {});
     foot("equity", "equity", { ...p.equity, source: p.equity.rows[0]?.source });
     foot("bonds", "bonds", p.bonds);
     foot("macro", "macro", p.macro);
@@ -129,6 +131,7 @@ async function tick() {
     foot("refs", "refs", p.refs ?? EMPTY);
     foot("insights", "insights", p.insights ?? { updated_at: null, source: null });
     foot("predict", "predict", p.predict ?? { updated_at: null, source: null });
+    foot("finra", "finra", { updated_at: p.finra?.regsho?.updated_at ?? null, source: "finra" });
     foot("riskmap", "riskmap", p.riskmap ?? { updated_at: null, source: null });
     foot("radar", "radar", p.radar ?? { updated_at: null, source: null });
     foot("hyper", "hyper", p.hyper ?? { updated_at: null, source: null });
