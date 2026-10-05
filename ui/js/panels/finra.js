@@ -7,7 +7,7 @@
 // sentiment, corp bonds, Reg SHO, capped volume — all Now/Δ1M/Δ1Y tables)
 // also renders on this tab via #cycle-struct; ICE Vantage moved to its own
 // cycle tab on POS.
-import { renderTraceCharts } from "./trace_charts.js";
+import { renderTraceCharts, setTraceChartProduct } from "./trace_charts.js";
 import { renderTraceGrid } from "./trace_grid.js";
 const big = (x) =>
   x == null ? "—" : x.toLocaleString("en-US", { maximumFractionDigits: 0 });
@@ -126,6 +126,35 @@ function traceSection(t, mo) {
     <table><tr><th>Feed</th><th>As of</th><th>Series</th><th>Status</th></tr>${tHtml}${mHtml}</table>`;
 }
 
+const STAR_ROWS = [
+  ["star-tba-par", "star-tba-trades", "TBA (all issuers)", "star-tba"],
+  ["star-tba-umbs-par", null, "TBA — UMBS", "star-umbs"],
+  ["star-tba-gnma-par", null, "TBA — GNMA", "star-gnma"],
+  ["star-spec-par", "star-spec-trades", "Specified pools", "star-spec"],
+  ["star-agcmo-par", "star-agcmo-trades", "Agency CMO", "star-agcmo"],
+  ["star-nagcmo-par", "star-nagcmo-trades", "Non-agency CMO", "star-nagcmo"],
+  ["star-nagcmbs-par", "star-nagcmbs-trades", "Non-agency CMBS", "star-nagcmbs"],
+  ["star-agcmbs-par", "star-agcmbs-trades", "Agency CMBS", "star-agcmbs"],
+  ["star-abs-par", "star-abs-trades", "ABS", "star-abs"],
+  ["star-clo-par", "star-clo-trades", "CLO", "star-clo"],
+];
+function starSection(s) {
+  if (!s || !s.latest) return `<h3>STRUCTURED PRODUCT ACTIVITY — STAR</h3><p class="muted">No STAR data yet — first pull pending.</p>`;
+  const L = s.latest;
+  const rows = STAR_ROWS.map(([parId, trId, label, chartId]) => {
+    const par = L[parId], tr = trId ? L[trId] : null;
+    return `<tr data-star-chart="${chartId}" title="Click to view ${label} chart">` +
+      `<td><b>${label}</b></td>` +
+      `<td class="num">${par == null ? "—" : "$" + (par / 1e9).toFixed(2) + "B"}</td>` +
+      `<td class="num">${tr == null ? "—" : Math.round(tr).toLocaleString("en-US")}</td></tr>`;
+  }).join("");
+  return `<h3>STRUCTURED PRODUCT ACTIVITY — STAR <span class="muted">daily · as of ${s.as_of ?? "—"} · click a row for its trend chart</span></h3>
+    <table class="star-table"><tr><th>Product</th><th>$ Volume</th><th>Trades</th></tr>${rows}</table>
+    <p class="muted">FINRA-ICE Data Services Structured Trading Activity Reports — the public equivalent of the ` +
+    `login-walled ICE Vantage structured aggregates. Daily TBA/specified/CMO/CMBS/ABS/CLO activity by issuer and ` +
+    `investment grade. Full trend lines in the TRACE chart above and the grid below.</p>`;
+}
+
 export function renderFinra(p) {
   const body = document.querySelector("#panel-finra .panel-body");
   if (!body) return;
@@ -137,6 +166,7 @@ export function renderFinra(p) {
     </div>
     <div id="trace-chart-wrap"></div>
     <div id="trace-grid-wrap" hidden></div>` +
+    starSection(f.star) +
     regshoSection(f.regsho) +
     thresholdSection(f.threshold) +
     shortInterestSection(f.short_interest) +
@@ -160,4 +190,13 @@ export function renderFinra(p) {
   };
   chartBtn.addEventListener("click", () => setView("chart"));
   gridBtn.addEventListener("click", () => setView("grid"));
+  // STAR row click-to-chart
+  body.querySelectorAll("tr[data-star-chart]").forEach((tr) => {
+    tr.style.cursor = "pointer";
+    tr.addEventListener("click", () => {
+      setView("chart");
+      setTraceChartProduct(tr.dataset.starChart);
+      chartWrap.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  });
 }
