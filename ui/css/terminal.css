@@ -448,3 +448,28 @@ path.map-country:hover { stroke: var(--amber); stroke-width: 1.6; }
 }
 .trace-chart { min-height: 340px; }
 #trace-chart-status { margin: 4px 0 12px; font-size: 11px; }
+.trace-view-toggle { margin: 8px 0; }
+#trace-grid-wrap { overflow-x: auto; margin: 8px 0 16px; }
+table.trace-grid { font-size: 12px; white-space: nowrap; }
+table.trace-grid th { cursor: pointer; user-select: none; }
+table.trace-grid th:hover { color: var(--fg); }
+table.trace-grid td.num, table.trace-grid th.num { text-align: right; font-variant-numeric: tabular-nums; }
+table.trace-grid td:first-child, table.trace-grid th:first-child {
+  position: sticky; left: 0; background: var(--panel); z-index: 1;
+  box-shadow: 1px 0 0 var(--line);
+}
+table.trace-grid tbody tr[data-pid] { cursor: pointer; }
+table.trace-grid tbody tr[data-pid]:hover td:first-child { text-decoration: underline; }
+table.trace-grid svg.trng, table.trace-grid svg.tspark { display: block; }
+
+/* KOI scorecard (MKT tab): compact FINRA/TRACE Y/Y cards */
+.koi-sub { font-size: 10px; letter-spacing: 1px; margin: 2px 0 6px; }
+.koi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
+.koi-card { background: var(--bg); border: 1px solid var(--line); padding: 8px 10px; cursor: pointer; }
+.koi-card:hover { border-color: var(--amber); }
+.koi-name { font-size: 10px; letter-spacing: 1px; color: var(--muted); }
+.koi-yoy { display: flex; gap: 14px; margin: 4px 0 2px; }
+.koi-metric { display: flex; flex-direction: column; }
+.koi-k { font-size: 9px; color: var(--muted); letter-spacing: 1px; }
+.koi-v { font-size: 17px; font-weight: 700; }
+.koi-mom { font-size: 10px; }
