@@ -1,3 +1,38 @@
+## 2026-10-05 — Treasury auctions + econ calendar: real data on the terminal and in the briefing
+
+**Auction surveillance, end to end.** `collector/fetchers/auctions.py` now keeps
+per-auction detail records (not just per-bucket series): two docs,
+`auction_results` (completed auctions — high yield, bid-to-cover,
+indirect/direct/dealer takedown %, offering, CUSIP; upserted by
+(auction_date, cusip) so announced auctions gain their results in place,
+pruned to 180 days) and `upcoming_auctions` (announced but not yet held,
+sorted by auction date). The per-bucket series gained a `high_yield` metric
+(high investment rate for bills). Source: Treasury Fiscal Data auctions API
+(keyless), daily job, unchanged cadence.
+
+**New API endpoints.** `GET /api/auctions` → {upcoming, recent (24), buckets
+(latest completed result per benchmark tenor), updated_at, source};
+`GET /api/econ-calendar` → upcoming releases + past 7 days with actuals
+(same payload as the dashboard macro panel, refactored into
+`econ_calendar_payload`).
+
+**Dashboard.** New `auctions` panel in `/api/dashboard` (MKT tab, next to the
+macro calendar): UPCOMING schedule table (date / tenor / offering) + RECENT
+RESULTS table (date / tenor / high yield / bid-to-cover / indirect %).
+New `ui/js/panels/auctions.js` renderer. The econ calendar already had the
+MACRO panel; it is now also queryable via the API.
+
+**Briefing wiring.** `send_briefing.py` tables 7 and 8 are live: Table 7 shows
+the latest completed auction per benchmark tenor with high yield and the
+auction-over-auction move (bps vs prior auction date, bid-to-cover then vs
+now), plus the announced upcoming schedule; Table 8 shows past releases with
+actuals and the coming week's releases with consensus/previous, times in ET.
+The honest-omission note is retired.
+
+**Tests.** 6 new fetcher/doc tests (`test_auctions_docs.py`); 4 new endpoint +
+panel tests (`test_api.py`); existing auction FakeStore extended for docs.
+Full suite: 559 passed, 16 pre-existing fixture failures unchanged
+(missing vendored fixtures in this env — also fail on pristine main).
 ## 2026-10-03 — UI+data batch: central-bank watch, command palette, alert-tuning UI, briefcheck view (subagent)
 
 **Central-bank watch tab (`central`).** New `ui/js/panels/central.js` + TABS/nav/mount
