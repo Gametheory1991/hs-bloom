@@ -53,6 +53,10 @@ cadences:          # seconds between fetcher runs
   tech_graph: 604800     # technology money-flow graph; weekly (zero HTTP, overlays tech_capex)
   vendor_capex: 604800   # vendor universe XBRL fundamentals; weekly (quarterly data)
   vendor_graph: 604800   # vendor money-flow graph; weekly (zero HTTP, overlays vendor_capex)
+  etf_capex: 604800      # ETF ecosystem universe XBRL fundamentals; weekly (quarterly data)
+  etf_graph: 604800      # ETF money-flow graph; weekly (zero HTTP, overlays etf_capex)
+  crypto_capex: 604800   # crypto universe XBRL fundamentals; weekly (quarterly data)
+  crypto_graph: 604800   # crypto money-flow graph; weekly (zero HTTP, overlays crypto_capex)
   worldbank: 604800    # World Bank macro fundamentals; weekly (annual data)
   usaspending: 604800  # USAspending.gov fiscal pulse; weekly (3 keyless POSTs)
   coingecko: 86400     # CoinGecko top-50 crypto breadth; daily (1 batched call)
@@ -817,6 +821,27 @@ cycle_series:      # market-cycle series (spec 2026-08-24); exactly one source k
   - { id: vnd-fds,  name: "FactSet",            unit: idx, yahoo: "FDS" }
   - { id: vnd-morn, name: "Morningstar",        unit: idx, yahoo: "MORN" }
   - { id: vnd-lseg, name: "LSEG",               unit: idx, yahoo: "LSEG.L" }
+  # ---- crypto universe (exchanges, miners, stablecoins, BTC ETFs, treasury cos, DeFi) ----
+  - { id: crypto-coin, name: "Coinbase",            unit: idx, yahoo: "COIN" }
+  - { id: crypto-blsh, name: "Bullish",             unit: idx, yahoo: "BLSH" }
+  - { id: crypto-hood, name: "Robinhood",           unit: idx, yahoo: "HOOD" }
+  - { id: crypto-mara, name: "MARA Holdings",       unit: idx, yahoo: "MARA" }
+  - { id: crypto-riot, name: "Riot Platforms",      unit: idx, yahoo: "RIOT" }
+  - { id: crypto-clsk, name: "CleanSpark",          unit: idx, yahoo: "CLSK" }
+  - { id: crypto-hut,  name: "Hut 8",               unit: idx, yahoo: "HUT" }
+  - { id: crypto-bitf, name: "Bitfarms",            unit: idx, yahoo: "BITF" }
+  - { id: crypto-corz, name: "Core Scientific",     unit: idx, yahoo: "CORZ" }
+  - { id: crypto-crcl, name: "Circle",              unit: idx, yahoo: "CRCL" }
+  - { id: crypto-ibit, name: "iShares Bitcoin Trust", unit: idx, yahoo: "IBIT" }
+  - { id: crypto-fbtc, name: "Fidelity Bitcoin Fund", unit: idx, yahoo: "FBTC" }
+  - { id: crypto-gbtc, name: "Grayscale Bitcoin Trust", unit: idx, yahoo: "GBTC" }
+  - { id: crypto-mstr, name: "Strategy",            unit: idx, yahoo: "MSTR" }
+  - { id: crypto-btcs, name: "BTCS Inc.",           unit: idx, yahoo: "BTCS" }
+  - { id: crypto-smlr, name: "Semler Scientific",   unit: idx, yahoo: "SMLR" }
+  # ---- ETF ecosystem universe (issuers, market makers, APs, index providers) ----
+  - { id: etf-ivz,  name: "Invesco",            unit: idx, yahoo: "IVZ" }
+  - { id: etf-wt,   name: "WisdomTree",         unit: idx, yahoo: "WT" }
+  - { id: etf-flow, name: "Flow Traders",       unit: idx, yahoo: "FLOW.AS" }
   # ---- batch 10: TRACE extensions (verified live 2026-10-03) ----
   - { id: trace-ust-frns-par,  name: "Treasury TRACE FRN par $bn",         unit: "$bn",  external: true }
   - { id: trace-ust-onrun-par, name: "Treasury TRACE on-the-run par $bn",  unit: "$bn",  external: true }
