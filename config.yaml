@@ -1134,12 +1134,6 @@ cycle_tabs:        # layout only; rows reference cycle_series ids
           - { series: trace-eln-par }
           - { series: trace-eln-trades }
           - { series: trace-corp-cust-share }
-      - title: "ICE VANTAGE SECURITIZED (DAILY)"
-        rows:
-          - { series: ice-star-agency-par }
-          - { series: ice-star-agency-trades }
-          - { series: ice-star-nonagency-par }
-          - { series: ice-star-nonagency-trades }
       - title: "SHORT INTEREST (FINRA, 2×/MONTH)"
         rows:
           - { series: finra-short-total }
@@ -1213,6 +1207,15 @@ cycle_tabs:        # layout only; rows reference cycle_series ids
           - { series: finra-cap-agcy-avgsize }
           - { series: finra-cap-144a-ig-total }
           - { series: finra-cap-144a-hy-total }
+  - id: ice
+    label: ICE
+    panels:
+      - title: "ICE VANTAGE SECURITIZED (DAILY)"
+        rows:
+          - { series: ice-star-agency-par }
+          - { series: ice-star-agency-trades }
+          - { series: ice-star-nonagency-par }
+          - { series: ice-star-nonagency-trades }
 
 calendar_map:      # first match wins — keep Core before CPI
   - { country: USD, match: "Core CPI",     series: us-core-cpi-yoy }
@@ -1276,8 +1279,7 @@ thirteenf:           # SEC EDGAR 13F-HR; quarterly filings (<=45d lag); UA is ma
 
 auctions:              # Treasury Fiscal Data auctions API (keyless); store keys auction:<Type>-<Tenor>:<metric>
   buckets: [Bill-4W, Bill-8W, Bill-13W, Bill-17W, Bill-26W, Bill-52W,
-            Note-2Y, Note-3Y, Note-5Y, Note-7Y, Note-10Y, Bond-20Y, Bond-30Y,
-            TIPS-5Y, TIPS-10Y, TIPS-30Y, FRN-2Y]
+            Note-2Y, Note-3Y, Note-5Y, Note-7Y, Note-10Y, Bond-20Y, Bond-30Y]
   lookback_days: 540   # ~18 months of auction history pulled on each run
 
 dealer:                # NY Fed Primary Dealer Statistics; values in $millions, weekly
