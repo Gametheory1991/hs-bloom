@@ -41,6 +41,11 @@ def test_normalize_bucket_reopenings_land_in_benchmark_bucket():
     assert normalize_bucket("Note", "1-Year 11-Month") == "Note-2Y"
     assert normalize_bucket("Note", "bogus") is None
     assert normalize_bucket("", "10-Year") is None
+    # TIPS and FRNs get their own buckets, never nominal note/bond buckets
+    assert normalize_bucket("Note", "9-Year 10-Month", "Yes", "No") == "TIPS-10Y"
+    assert normalize_bucket("Note", "4-Year 10-Month", "Yes", "No") == "TIPS-5Y"
+    assert normalize_bucket("Note", "29-Year 10-Month", "yes", "no") == "TIPS-30Y"
+    assert normalize_bucket("Note", "1-Year 11-Month", "No", "Yes") == "FRN-2Y"
 
 
 def test_parse_auctions_metrics_and_future_skip():
