@@ -269,14 +269,26 @@ def register_jobs(
         # financials onto the vendored deal graph. Starts after vendor_capex.
         "vendor_graph": (cfg.cadences.get("vendor_graph", 604800), partial(fetch_universe_graph, store, "vendor"),
                  start + timedelta(seconds=5400)),
-        # bank/fixed-income universe — same generic universe fetchers,
-        # new universe_id. XBRL fundamentals for the 19 public names
-        # (money-center, IBs, regionals, custody, GSEs, Jefferies), then
-        # the money-flow graph.
-        "bank_capex": (cfg.cadences.get("bank_capex", 604800), partial(fetch_universe_capex, cfg, store, get_text, "bank_fixed_income"),
-                 start + timedelta(seconds=4500)),
-        "bank_graph": (cfg.cadences.get("bank_graph", 604800), partial(fetch_universe_graph, store, "bank_fixed_income"),
-                 start + timedelta(seconds=4800)),
+        # crypto universe (exchanges, miners, stablecoin issuers, spot BTC
+        # ETF issuers, BTC treasury companies, DeFi protocols) — same generic
+        # universe engine. ~14 public names x 5 tags, SEC fair access.
+        # Complements technology.json's crypto_infra (custody/tech) and the
+        # CoinGecko top-50 token breadth feed.
+        "crypto_capex": (cfg.cadences.get("crypto_capex", 604800), partial(fetch_universe_capex, cfg, store, get_text, "crypto"),
+                 start + timedelta(seconds=6150)),
+        # crypto money-flow graph: zero HTTP, overlays crypto_capex
+        # financials onto the vendored deal graph. Starts after crypto_capex.
+        "crypto_graph": (cfg.cadences.get("crypto_graph", 604800), partial(fetch_universe_graph, store, "crypto"),
+                 start + timedelta(seconds=6450)),
+        # ETF ecosystem universe (issuers, market makers, APs, liquidity
+        # providers, index providers) — same generic universe engine.
+        # ~15 public companies x 5 tags, SEC fair access.
+        "etf_capex": (cfg.cadences.get("etf_capex", 604800), partial(fetch_universe_capex, cfg, store, get_text, "etf"),
+                 start + timedelta(seconds=5700)),
+        # ETF money-flow graph: zero HTTP, overlays etf_capex financials
+        # onto the vendored deal graph. Starts after etf_capex.
+        "etf_graph": (cfg.cadences.get("etf_graph", 604800), partial(fetch_universe_graph, store, "etf"),
+                 start + timedelta(seconds=6000)),
         # batch 11: World Bank macro fundamentals (GDP/CPI/unemployment)
         # for the 13 bond-matrix countries — keyless, 3 batched calls.
         "worldbank": (cfg.cadences.get("worldbank", 604800), partial(fetch_worldbank, store, get_text),
