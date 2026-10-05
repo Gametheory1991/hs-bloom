@@ -2,7 +2,8 @@
 // Reads dash.panels.finra (backend _finra_panel).
 // Sections: Reg SHO short volume, threshold list, short interest,
 // market breadth, most-active corporate bonds, capped volume,
-// margin statistics, TRACE treasury/monthly.
+// margin statistics, TRACE treasury/monthly, TRACE volume charts.
+import { renderTraceCharts } from "./trace_charts.js";
 const big = (x) =>
   x == null ? "—" : x.toLocaleString("en-US", { maximumFractionDigits: 0 });
 const pct1 = (x) => (x == null ? "—" : `${(x * 100).toFixed(1)}%`);
@@ -125,6 +126,7 @@ export function renderFinra(p) {
   if (!body) return;
   const f = p ?? {};
   body.innerHTML =
+    `<div id="trace-charts-root"></div>` +
     regshoSection(f.regsho) +
     thresholdSection(f.threshold) +
     shortInterestSection(f.short_interest) +
@@ -133,4 +135,5 @@ export function renderFinra(p) {
     cappedSection(f.capped) +
     marginSection(f.margin) +
     traceSection(f.trace_treasury, f.trace_monthly);
+  renderTraceCharts();
 }
