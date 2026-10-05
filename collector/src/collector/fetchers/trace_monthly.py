@@ -28,7 +28,7 @@ from collector.store import Store
 log = logging.getLogger(__name__)
 
 URL = ("https://cdn.finra.org/trace/volume/monthly/"
-       "TRACE_Public_Monthly_Report-{}.xlsx")
+       "TRACE_Public_Monthly_Report_{}.xlsx")
 SOURCE = "finra-trace-monthly"
 
 # seconds between HTTP requests; this CDN path 403s rapid bursts — 5s gaps
