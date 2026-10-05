@@ -190,12 +190,12 @@ function drawCurve(rows) {
     scales: { x: { time: false } },
     series: [
       { label: "DAYS", value: (u, v) => (v == null ? "--" : Math.round(v)) },
-      { label: "LEND %", stroke: "#f5a623", width: 1.5, points: { show: true, size: 5 },
+      { label: "LEND %", stroke: "#2563eb", width: 1.5, points: { show: true, size: 5 },
         value: (u, v) => (v == null ? "--" : v.toFixed(2)) },
     ],
     axes: [
-      { stroke: "#6a746a", grid: { stroke: "#1e261e" } },
-      { stroke: "#6a746a", grid: { stroke: "#1e261e" } },
+      { stroke: "#6b7280", grid: { stroke: "#e5e7eb" } },
+      { stroke: "#6b7280", grid: { stroke: "#e5e7eb" } },
     ],
     // default cursor + legend stay on: hovering reads out DAYS / LEND %
   }, [pts.map((r) => r.days), pts.map((r) => r.lend_apy)], root);

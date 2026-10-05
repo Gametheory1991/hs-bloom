@@ -8,7 +8,7 @@ import { WORLD } from "../world110m.js";
 import { COLORS, featurePath } from "./riskmap.js";
 import { fmtAge, isStale } from "../fmt.js";
 
-const STROKE = "#0a0e0a";
+const STROKE = "#ffffff";
 const STALE_MINUTES = 2880;
 
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) =>

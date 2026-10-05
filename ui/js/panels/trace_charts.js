@@ -4,34 +4,35 @@
 import { getSeries, getRecessions } from "../api.js";
 
 // TRACE monthly products. `trades` is null where FINRA only publishes par.
+// NOTE: /api/series takes bare ids (no cycle: prefix) — the backend prepends it.
 const PRODUCTS = [
-  { id: "ust", label: "Treasury Total", par: "cycle:trace-ust-par", trades: "cycle:trace-ust-trades" },
-  { id: "tba", label: "TBA", par: "cycle:trace-tba-par", trades: null },
-  { id: "corp", label: "Corporate", par: "cycle:trace-corp-par", trades: "cycle:trace-corp-trades" },
-  { id: "mbs", label: "MBS (Spec Pools)", par: "cycle:trace-mbs-par", trades: null },
-  { id: "cmo", label: "CMO", par: "cycle:trace-cmo-par", trades: null },
-  { id: "absx", label: "ABSX (CLO/CMBS)", par: "cycle:trace-absx-par", trades: null },
-  { id: "agcy", label: "Agency", par: "cycle:trace-agcy-par", trades: null },
-  { id: "conv", label: "Convertibles", par: "cycle:trace-conv-par", trades: "cycle:trace-conv-trades" },
-  { id: "abs", label: "ABS", par: "cycle:trace-abs-par", trades: null },
-  { id: "eln", label: "ELN", par: "cycle:trace-eln-par", trades: "cycle:trace-eln-trades" },
-  { id: "chrc", label: "Church Plans", par: "cycle:trace-chrc-par", trades: "cycle:trace-chrc-trades" },
-  { id: "onrun", label: "Treasury On-the-Run", par: "cycle:trace-ust-onrun-par", trades: null },
-  { id: "offrun", label: "Treasury Off-the-Run", par: "cycle:trace-ust-offrun-par", trades: null },
+  { id: "ust", label: "Treasury Total", par: "trace-ust-par", trades: "trace-ust-trades" },
+  { id: "tba", label: "TBA", par: "trace-tba-par", trades: null },
+  { id: "corp", label: "Corporate", par: "trace-corp-par", trades: "trace-corp-trades" },
+  { id: "mbs", label: "MBS (Spec Pools)", par: "trace-mbs-par", trades: null },
+  { id: "cmo", label: "CMO", par: "trace-cmo-par", trades: null },
+  { id: "absx", label: "ABSX (CLO/CMBS)", par: "trace-absx-par", trades: null },
+  { id: "agcy", label: "Agency", par: "trace-agcy-par", trades: null },
+  { id: "conv", label: "Convertibles", par: "trace-conv-par", trades: "trace-conv-trades" },
+  { id: "abs", label: "ABS", par: "trace-abs-par", trades: null },
+  { id: "eln", label: "ELN", par: "trace-eln-par", trades: "trace-eln-trades" },
+  { id: "chrc", label: "Church Plans", par: "trace-chrc-par", trades: "trace-chrc-trades" },
+  { id: "onrun", label: "Treasury On-the-Run", par: "trace-ust-onrun-par", trades: null },
+  { id: "offrun", label: "Treasury Off-the-Run", par: "trace-ust-offrun-par", trades: null },
 ];
 
 const OVERLAYS = [
   { id: "", label: "No overlay" },
   { id: "us10y", label: "US 10Y Yield (FRED)" },
   { id: "us-mortgage-30y", label: "30Y Mortgage Rate (FRED)" },
-  { id: "cycle:ig-oas", label: "IG OAS" },
-  { id: "cycle:hy-oas", label: "HY OAS" },
-  { id: "cycle:tlt", label: "TLT (20Y+ Treasury ETF)" },
-  { id: "cycle:lqd", label: "LQD (IG ETF)" },
-  { id: "cycle:hyg", label: "HYG (HY ETF)" },
-  { id: "cycle:mbb-us", label: "MBB (MBS ETF)" },
-  { id: "cycle:vix", label: "VIX" },
-  { id: "cycle:vvix", label: "VVIX" },
+  { id: "ig-oas", label: "IG OAS" },
+  { id: "hy-oas", label: "HY OAS" },
+  { id: "tlt", label: "TLT (20Y+ Treasury ETF)" },
+  { id: "lqd", label: "LQD (IG ETF)" },
+  { id: "hyg", label: "HYG (HY ETF)" },
+  { id: "mbb-us", label: "MBB (MBS ETF)" },
+  { id: "vix", label: "VIX" },
+  { id: "vvix", label: "VVIX" },
 ];
 
 const RANGES = [
@@ -116,17 +117,17 @@ async function drawChart() {
     if (reqId !== state.reqId) return; // superseded
     destroyPlot();
     chartDiv.innerHTML = "";
-    const axisStyle = { stroke: "#6a746a", grid: { stroke: "#1e261e" } };
+    const axisStyle = { stroke: "#6b7280", grid: { stroke: "#e5e7eb" } };
     const opts = {
       width: Math.max(300, chartDiv.clientWidth || 760),
       height: 340,
-      series: [{}, { label: series.name ?? currentTitle(), stroke: "#f5a623", width: 1.5, spanGaps: true }],
+      series: [{}, { label: series.name ?? currentTitle(), stroke: "#2563eb", width: 1.5, spanGaps: true }],
       axes: [axisStyle, { ...axisStyle }],
       hooks: { drawClear: [bandsHook(bands)] },
     };
     let data;
     if (second) {
-      opts.series.push({ label: second.name, stroke: "#5f9ea0", width: 1.2, scale: "y2", spanGaps: true });
+      opts.series.push({ label: second.name, stroke: "#0891b2", width: 1.2, scale: "y2", spanGaps: true });
       opts.axes.push({ ...axisStyle, scale: "y2", side: 1, grid: { show: false } });
       data = mergeSeries(series, second);
       statusDiv.textContent = `${series.points.length} pts · overlay: ${second.name} (${second.points.length} pts)`;
@@ -166,8 +167,16 @@ function syncControls() {
     b.classList.toggle("on", b.dataset.range === state.range));
 }
 
+// Programmatic product selection (used by the grid's row click).
+export function setTraceChartProduct(id) {
+  if (!PRODUCTS.some((p) => p.id === id)) return;
+  state.product = id;
+  syncControls();
+  drawChart();
+}
+
 export function renderTraceCharts() {
-  const root = document.getElementById("trace-charts-root");
+  const root = document.getElementById("trace-chart-wrap");
   if (!root || root.dataset.init) return;
   root.dataset.init = "1";
 
@@ -176,7 +185,6 @@ export function renderTraceCharts() {
   const rangeBtns = RANGES.map((r) => `<button data-range="${r.id}">${r.label}</button>`).join("");
 
   root.innerHTML = `
-    <h3>TRACE VOLUME CHARTS <span class="muted">monthly · click-and-drag to zoom</span></h3>
     <div class="trace-controls">
       <label>Product
         <select id="trace-prod">${prodOpts}</select>

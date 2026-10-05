@@ -14,7 +14,7 @@ const COLORS = {
   land: "#161c22",
 };
 export { COLORS };
-const STROKE = "#0a0e0a";
+const STROKE = "#ffffff";
 const STALE_MINUTES = 2880; // 2x the daily country_risk cadence
 
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) =>
