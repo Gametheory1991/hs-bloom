@@ -1,371 +1,407 @@
 {
- "universe_id": "technology",
- "title": "Technology",
- "as_of": "2026-10-04",
- "_schema_note": "Generic coverage-map schema (same as ai_buildout/market_structure): verticals -> companies [{id, name, ticker?, cik?, kind}], edges (press-reported, per-edge source + confidence), aggregates, risk_notes. Complements market_structure's OMS/ATS/venues verticals: this file covers execution tech (EMS), market-data tech, fintech infrastructure, regtech, crypto infra and post-trade \u2014 no ATS/venue operators duplicated.",
- "verticals": [
-  {
-   "id": "ems",
-   "label": "EMS / execution tech",
-   "group": "Trading tech",
-   "companies": [
+  "universe_id": "technology",
+  "title": "Technology",
+  "as_of": "2026-10-04",
+  "_schema_note": "Generic coverage-map schema (same as ai_buildout/market_structure): verticals -> companies [{id, name, ticker?, cik?, kind}], edges (press-reported, per-edge source + confidence), aggregates, risk_notes. Complements market_structure's OMS/ATS/venues verticals: this file covers execution tech (EMS), market-data tech, fintech infrastructure, regtech, crypto infra and post-trade — no ATS/venue operators duplicated.",
+  "verticals": [
     {
-     "id": "flextrade",
-     "name": "FlexTrade Systems",
-     "kind": "private"
+      "id": "ems",
+      "label": "EMS / execution tech",
+      "group": "Trading tech",
+      "companies": [
+        {
+          "id": "flextrade",
+          "name": "FlexTrade Systems",
+          "kind": "private",
+          "logo": "https://www.google.com/s2/favicons?domain=flextrade.com&sz=128"
+        },
+        {
+          "id": "fidessa",
+          "name": "Fidessa / ION",
+          "kind": "private",
+          "logo": "https://www.google.com/s2/favicons?domain=iongroup.com&sz=128"
+        },
+        {
+          "id": "ion-group",
+          "name": "ION Group",
+          "kind": "private",
+          "logo": "https://www.google.com/s2/favicons?domain=iongroup.com&sz=128"
+        },
+        {
+          "id": "tora",
+          "name": "TORA / LSEG",
+          "kind": "private",
+          "logo": "https://www.google.com/s2/favicons?domain=tora.com&sz=128"
+        },
+        {
+          "id": "ts-imagine",
+          "name": "TS Imagine / ION",
+          "kind": "private"
+        },
+        {
+          "id": "portware",
+          "name": "Portware / FactSet",
+          "kind": "private",
+          "logo": "https://www.google.com/s2/favicons?domain=factset.com&sz=128"
+        }
+      ]
     },
     {
-     "id": "fidessa",
-     "name": "Fidessa / ION",
-     "kind": "private"
+      "id": "market_data_tech",
+      "label": "Market-data tech",
+      "group": "Trading tech",
+      "companies": [
+        {
+          "id": "exegy",
+          "name": "Exegy",
+          "kind": "private",
+          "logo": "https://www.google.com/s2/favicons?domain=exegy.com&sz=128"
+        },
+        {
+          "id": "vela",
+          "name": "Vela Trading Systems",
+          "kind": "private"
+        },
+        {
+          "id": "activ-financial",
+          "name": "Activ Financial",
+          "kind": "private",
+          "logo": "https://www.google.com/s2/favicons?domain=activfinancial.com&sz=128"
+        },
+        {
+          "id": "quodd",
+          "name": "Quodd",
+          "kind": "private",
+          "logo": "https://www.google.com/s2/favicons?domain=quodd.com&sz=128"
+        },
+        {
+          "id": "maystreet",
+          "name": "MayStreet / LSEG",
+          "kind": "private",
+          "logo": "https://www.google.com/s2/favicons?domain=maystreet.com&sz=128"
+        }
+      ]
     },
     {
-     "id": "ion-group",
-     "name": "ION Group",
-     "kind": "private"
+      "id": "fintech_infra",
+      "label": "Fintech infrastructure",
+      "group": "Fintech",
+      "companies": [
+        {
+          "id": "fis",
+          "name": "FIS",
+          "kind": "public",
+          "ticker": "FIS",
+          "cik": "0001136893",
+          "logo": "https://www.google.com/s2/favicons?domain=fisglobal.com&sz=128"
+        },
+        {
+          "id": "fisv",
+          "name": "Fiserv",
+          "kind": "public",
+          "ticker": "FISV",
+          "cik": "0000798354",
+          "logo": "https://www.google.com/s2/favicons?domain=fiserv.com&sz=128"
+        },
+        {
+          "id": "jkhy",
+          "name": "Jack Henry",
+          "kind": "public",
+          "ticker": "JKHY",
+          "cik": "0000779152",
+          "logo": "https://www.google.com/s2/favicons?domain=jackhenry.com&sz=128"
+        },
+        {
+          "id": "qtwo",
+          "name": "Q2 Holdings",
+          "kind": "public",
+          "ticker": "QTWO",
+          "cik": "0001410384",
+          "logo": "https://www.google.com/s2/favicons?domain=q2.com&sz=128"
+        },
+        {
+          "id": "mq",
+          "name": "Marqeta",
+          "kind": "public",
+          "ticker": "MQ",
+          "cik": "0001522540",
+          "logo": "https://www.google.com/s2/favicons?domain=marqeta.com&sz=128"
+        },
+        {
+          "id": "pypl",
+          "name": "PayPal",
+          "kind": "public",
+          "ticker": "PYPL",
+          "cik": "0001633917",
+          "logo": "https://www.google.com/s2/favicons?domain=paypal.com&sz=128"
+        },
+        {
+          "id": "gpn",
+          "name": "Global Payments",
+          "kind": "public",
+          "ticker": "GPN",
+          "cik": "0001123360",
+          "logo": "https://www.google.com/s2/favicons?domain=globalpayments.com&sz=128"
+        },
+        {
+          "id": "visa",
+          "name": "Visa",
+          "kind": "public",
+          "ticker": "V",
+          "cik": "0001403161",
+          "logo": "https://www.google.com/s2/favicons?domain=visa.com&sz=128"
+        },
+        {
+          "id": "mastercard",
+          "name": "Mastercard",
+          "kind": "public",
+          "ticker": "MA",
+          "cik": "0001141391",
+          "logo": "https://www.google.com/s2/favicons?domain=mastercard.com&sz=128"
+        },
+        {
+          "id": "plaid",
+          "name": "Plaid",
+          "kind": "private",
+          "logo": "https://www.google.com/s2/favicons?domain=plaid.com&sz=128"
+        },
+        {
+          "id": "stripe",
+          "name": "Stripe",
+          "kind": "private",
+          "logo": "https://www.google.com/s2/favicons?domain=stripe.com&sz=128"
+        },
+        {
+          "id": "worldpay",
+          "name": "Worldpay / FIS",
+          "kind": "private",
+          "logo": "https://www.google.com/s2/favicons?domain=worldpay.com&sz=128"
+        },
+        {
+          "id": "first-data",
+          "name": "First Data / Fiserv",
+          "kind": "private",
+          "logo": "https://www.google.com/s2/favicons?domain=fiserv.com&sz=128"
+        },
+        {
+          "id": "tsys",
+          "name": "TSYS / Global Payments",
+          "kind": "private",
+          "logo": "https://www.google.com/s2/favicons?domain=globalpayments.com&sz=128"
+        }
+      ]
     },
     {
-     "id": "tora",
-     "name": "TORA / LSEG",
-     "kind": "private"
+      "id": "regtech",
+      "label": "Regtech / surveillance",
+      "group": "Compliance tech",
+      "companies": [
+        {
+          "id": "nice",
+          "name": "NICE Ltd",
+          "kind": "public",
+          "ticker": "NICE",
+          "cik": "0001003935",
+          "logo": "https://www.google.com/s2/favicons?domain=nice.com&sz=128"
+        },
+        {
+          "id": "verafin",
+          "name": "Verafin / Nasdaq",
+          "kind": "private",
+          "logo": "https://www.google.com/s2/favicons?domain=verafin.com&sz=128"
+        },
+        {
+          "id": "eventus",
+          "name": "Eventus",
+          "kind": "private",
+          "logo": "https://www.google.com/s2/favicons?domain=eventus.com&sz=128"
+        },
+        {
+          "id": "solidus-labs",
+          "name": "Solidus Labs",
+          "kind": "private",
+          "logo": "https://www.google.com/s2/favicons?domain=soliduslabs.com&sz=128"
+        },
+        {
+          "id": "chainalysis",
+          "name": "Chainalysis",
+          "kind": "private",
+          "logo": "https://www.google.com/s2/favicons?domain=chainalysis.com&sz=128"
+        }
+      ]
     },
     {
-     "id": "ts-imagine",
-     "name": "TS Imagine / ION",
-     "kind": "private"
+      "id": "crypto_infra",
+      "label": "Crypto infrastructure",
+      "group": "Crypto",
+      "companies": [
+        {
+          "id": "coinbase",
+          "name": "Coinbase",
+          "kind": "public",
+          "ticker": "COIN",
+          "cik": "0001679788",
+          "logo": "https://www.google.com/s2/favicons?domain=coinbase.com&sz=128"
+        },
+        {
+          "id": "fireblocks",
+          "name": "Fireblocks",
+          "kind": "private",
+          "logo": "https://www.google.com/s2/favicons?domain=fireblocks.com&sz=128"
+        },
+        {
+          "id": "anchorage",
+          "name": "Anchorage Digital",
+          "kind": "private",
+          "logo": "https://www.google.com/s2/favicons?domain=anchorage.com&sz=128"
+        },
+        {
+          "id": "bitgo",
+          "name": "BitGo",
+          "kind": "private",
+          "logo": "https://www.google.com/s2/favicons?domain=bitgo.com&sz=128"
+        },
+        {
+          "id": "bridge",
+          "name": "Bridge / Stripe",
+          "kind": "private"
+        }
+      ]
     },
     {
-     "id": "portware",
-     "name": "Portware / FactSet",
-     "kind": "private"
+      "id": "post_trade",
+      "label": "Post-trade infrastructure",
+      "group": "Post-trade",
+      "companies": [
+        {
+          "id": "dtcc",
+          "name": "DTCC",
+          "kind": "private",
+          "logo": "https://www.google.com/s2/favicons?domain=dtcc.com&sz=128"
+        },
+        {
+          "id": "occ",
+          "name": "OCC",
+          "kind": "private",
+          "logo": "https://www.google.com/s2/favicons?domain=theocc.com&sz=128"
+        },
+        {
+          "id": "euroclear",
+          "name": "Euroclear",
+          "kind": "private",
+          "logo": "https://www.google.com/s2/favicons?domain=euroclear.com&sz=128"
+        },
+        {
+          "id": "cls",
+          "name": "CLS Group",
+          "kind": "private",
+          "logo": "https://www.google.com/s2/favicons?domain=cls-group.com&sz=128"
+        }
+      ]
     }
-   ]
-  },
-  {
-   "id": "market_data_tech",
-   "label": "Market-data tech",
-   "group": "Trading tech",
-   "companies": [
+  ],
+  "edges": [
     {
-     "id": "exegy",
-     "name": "Exegy",
-     "kind": "private"
+      "from": "ion-group",
+      "to": "fidessa",
+      "kind": "acquire",
+      "amount_bn": 1.9,
+      "date": "2018-04",
+      "label": "ION acquires Fidessa for GBP 1.5B",
+      "source": "ION press release",
+      "confidence": "confirmed"
     },
     {
-     "id": "vela",
-     "name": "Vela Trading Systems",
-     "kind": "private"
+      "from": "fis",
+      "to": "worldpay",
+      "kind": "acquire",
+      "amount_bn": 43.0,
+      "date": "2019-07",
+      "label": "FIS acquires Worldpay for $43B",
+      "source": "FIS press release",
+      "confidence": "confirmed"
     },
     {
-     "id": "activ-financial",
-     "name": "Activ Financial",
-     "kind": "private"
+      "from": "fisv",
+      "to": "first-data",
+      "kind": "acquire",
+      "amount_bn": 22.0,
+      "date": "2019-07",
+      "label": "Fiserv acquires First Data for $22B",
+      "source": "Fiserv press release",
+      "confidence": "confirmed"
     },
     {
-     "id": "quodd",
-     "name": "Quodd",
-     "kind": "private"
+      "from": "gpn",
+      "to": "tsys",
+      "kind": "acquire",
+      "amount_bn": 21.5,
+      "date": "2019-09",
+      "label": "Global Payments acquires TSYS for $21.5B",
+      "source": "Global Payments press release",
+      "confidence": "confirmed"
     },
     {
-     "id": "maystreet",
-     "name": "MayStreet / LSEG",
-     "kind": "private"
+      "from": "visa",
+      "to": "plaid",
+      "kind": "terminated",
+      "amount_bn": 5.3,
+      "date": "2021-01",
+      "label": "Visa $5.3B Plaid acquisition terminated after DOJ antitrust challenge",
+      "source": "DOJ press release",
+      "confidence": "confirmed"
+    },
+    {
+      "from": "stripe",
+      "to": "bridge",
+      "kind": "acquire",
+      "amount_bn": 1.1,
+      "date": "2024-10",
+      "label": "Stripe acquires stablecoin platform Bridge for $1.1B",
+      "source": "Stripe press release",
+      "confidence": "confirmed"
     }
-   ]
-  },
-  {
-   "id": "fintech_infra",
-   "label": "Fintech infrastructure",
-   "group": "Fintech",
-   "companies": [
+  ],
+  "aggregates": [
     {
-     "id": "fis",
-     "name": "FIS",
-     "kind": "public",
-     "ticker": "FIS",
-     "cik": "0001136893"
+      "id": "FINT",
+      "label": "Fintech infrastructure",
+      "members": [
+        "fis",
+        "fisv",
+        "jkhy",
+        "qtwo",
+        "mq",
+        "pypl",
+        "gpn"
+      ],
+      "metric": "revenue"
     },
     {
-     "id": "fisv",
-     "name": "Fiserv",
-     "kind": "public",
-     "ticker": "FISV",
-     "cik": "0000798354"
-    },
-    {
-     "id": "jkhy",
-     "name": "Jack Henry",
-     "kind": "public",
-     "ticker": "JKHY",
-     "cik": "0000779152"
-    },
-    {
-     "id": "qtwo",
-     "name": "Q2 Holdings",
-     "kind": "public",
-     "ticker": "QTWO",
-     "cik": "0001410384"
-    },
-    {
-     "id": "mq",
-     "name": "Marqeta",
-     "kind": "public",
-     "ticker": "MQ",
-     "cik": "0001522540"
-    },
-    {
-     "id": "pypl",
-     "name": "PayPal",
-     "kind": "public",
-     "ticker": "PYPL",
-     "cik": "0001633917"
-    },
-    {
-     "id": "gpn",
-     "name": "Global Payments",
-     "kind": "public",
-     "ticker": "GPN",
-     "cik": "0001123360"
-    },
-    {
-     "id": "visa",
-     "name": "Visa",
-     "kind": "public",
-     "ticker": "V",
-     "cik": "0001403161"
-    },
-    {
-     "id": "mastercard",
-     "name": "Mastercard",
-     "kind": "public",
-     "ticker": "MA",
-     "cik": "0001141391"
-    },
-    {
-     "id": "plaid",
-     "name": "Plaid",
-     "kind": "private"
-    },
-    {
-     "id": "stripe",
-     "name": "Stripe",
-     "kind": "private"
-    },
-    {
-     "id": "worldpay",
-     "name": "Worldpay / FIS",
-     "kind": "private"
-    },
-    {
-     "id": "first-data",
-     "name": "First Data / Fiserv",
-     "kind": "private"
-    },
-    {
-     "id": "tsys",
-     "name": "TSYS / Global Payments",
-     "kind": "private"
+      "id": "PAYNET",
+      "label": "Payment networks",
+      "members": [
+        "visa",
+        "mastercard"
+      ],
+      "metric": "revenue"
     }
-   ]
-  },
-  {
-   "id": "regtech",
-   "label": "Regtech / surveillance",
-   "group": "Compliance tech",
-   "companies": [
+  ],
+  "risk_notes": [
     {
-     "id": "nice",
-     "name": "NICE Ltd",
-     "kind": "public",
-     "ticker": "NICE",
-     "cik": "0001003935"
+      "id": "ems-overlap",
+      "text": "EMS coverage here complements market_structure's OMS vertical (Bloomberg AIM, Charles River, SS&C Eze): OMS = order management/compliance, EMS = execution venue routing. Vendors increasingly bundle both.",
+      "source": "Vendor product disclosures"
     },
     {
-     "id": "verafin",
-     "name": "Verafin / Nasdaq",
-     "kind": "private"
+      "id": "cross-universe-deals",
+      "text": "Notable tech M&A owned by parents in other universes: Nasdaq-Verafin $2.75B (2020), FactSet-Portware $265M (2015), LSEG-TORA $325M (2022) — acquirers sit in market_structure/vendor universes.",
+      "source": "Company press releases"
     },
     {
-     "id": "eventus",
-     "name": "Eventus",
-     "kind": "private"
-    },
-    {
-     "id": "solidus-labs",
-     "name": "Solidus Labs",
-     "kind": "private"
-    },
-    {
-     "id": "chainalysis",
-     "name": "Chainalysis",
-     "kind": "private"
+      "id": "fis-worldpay",
+      "text": "FIS announced the sale of a majority stake in Worldpay (2023) and completed the sale of its remaining interest (2024) — Worldpay is shown as a historical acquired node.",
+      "source": "FIS press releases"
     }
-   ]
-  },
-  {
-   "id": "crypto_infra",
-   "label": "Crypto infrastructure",
-   "group": "Crypto",
-   "companies": [
-    {
-     "id": "coinbase",
-     "name": "Coinbase",
-     "kind": "public",
-     "ticker": "COIN",
-     "cik": "0001679788"
-    },
-    {
-     "id": "fireblocks",
-     "name": "Fireblocks",
-     "kind": "private"
-    },
-    {
-     "id": "anchorage",
-     "name": "Anchorage Digital",
-     "kind": "private"
-    },
-    {
-     "id": "bitgo",
-     "name": "BitGo",
-     "kind": "private"
-    },
-    {
-     "id": "bridge",
-     "name": "Bridge / Stripe",
-     "kind": "private"
-    }
-   ]
-  },
-  {
-   "id": "post_trade",
-   "label": "Post-trade infrastructure",
-   "group": "Post-trade",
-   "companies": [
-    {
-     "id": "dtcc",
-     "name": "DTCC",
-     "kind": "private"
-    },
-    {
-     "id": "occ",
-     "name": "OCC",
-     "kind": "private"
-    },
-    {
-     "id": "euroclear",
-     "name": "Euroclear",
-     "kind": "private"
-    },
-    {
-     "id": "cls",
-     "name": "CLS Group",
-     "kind": "private"
-    }
-   ]
-  }
- ],
- "edges": [
-  {
-   "from": "ion-group",
-   "to": "fidessa",
-   "kind": "acquire",
-   "amount_bn": 1.9,
-   "date": "2018-04",
-   "label": "ION acquires Fidessa for GBP 1.5B",
-   "source": "ION press release",
-   "confidence": "confirmed"
-  },
-  {
-   "from": "fis",
-   "to": "worldpay",
-   "kind": "acquire",
-   "amount_bn": 43.0,
-   "date": "2019-07",
-   "label": "FIS acquires Worldpay for $43B",
-   "source": "FIS press release",
-   "confidence": "confirmed"
-  },
-  {
-   "from": "fisv",
-   "to": "first-data",
-   "kind": "acquire",
-   "amount_bn": 22.0,
-   "date": "2019-07",
-   "label": "Fiserv acquires First Data for $22B",
-   "source": "Fiserv press release",
-   "confidence": "confirmed"
-  },
-  {
-   "from": "gpn",
-   "to": "tsys",
-   "kind": "acquire",
-   "amount_bn": 21.5,
-   "date": "2019-09",
-   "label": "Global Payments acquires TSYS for $21.5B",
-   "source": "Global Payments press release",
-   "confidence": "confirmed"
-  },
-  {
-   "from": "visa",
-   "to": "plaid",
-   "kind": "terminated",
-   "amount_bn": 5.3,
-   "date": "2021-01",
-   "label": "Visa $5.3B Plaid acquisition terminated after DOJ antitrust challenge",
-   "source": "DOJ press release",
-   "confidence": "confirmed"
-  },
-  {
-   "from": "stripe",
-   "to": "bridge",
-   "kind": "acquire",
-   "amount_bn": 1.1,
-   "date": "2024-10",
-   "label": "Stripe acquires stablecoin platform Bridge for $1.1B",
-   "source": "Stripe press release",
-   "confidence": "confirmed"
-  }
- ],
- "aggregates": [
-  {
-   "id": "FINT",
-   "label": "Fintech infrastructure",
-   "members": [
-    "fis",
-    "fisv",
-    "jkhy",
-    "qtwo",
-    "mq",
-    "pypl",
-    "gpn"
-   ],
-   "metric": "revenue"
-  },
-  {
-   "id": "PAYNET",
-   "label": "Payment networks",
-   "members": [
-    "visa",
-    "mastercard"
-   ],
-   "metric": "revenue"
-  }
- ],
- "risk_notes": [
-  {
-   "id": "ems-overlap",
-   "text": "EMS coverage here complements market_structure's OMS vertical (Bloomberg AIM, Charles River, SS&C Eze): OMS = order management/compliance, EMS = execution venue routing. Vendors increasingly bundle both.",
-   "source": "Vendor product disclosures"
-  },
-  {
-   "id": "cross-universe-deals",
-   "text": "Notable tech M&A owned by parents in other universes: Nasdaq-Verafin $2.75B (2020), FactSet-Portware $265M (2015), LSEG-TORA $325M (2022) \u2014 acquirers sit in market_structure/vendor universes.",
-   "source": "Company press releases"
-  },
-  {
-   "id": "fis-worldpay",
-   "text": "FIS announced the sale of a majority stake in Worldpay (2023) and completed the sale of its remaining interest (2024) \u2014 Worldpay is shown as a historical acquired node.",
-   "source": "FIS press releases"
-  }
- ]
+  ]
 }

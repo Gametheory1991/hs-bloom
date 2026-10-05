@@ -1,881 +1,949 @@
 {
- "universe_id": "ai_buildout",
- "title": "AI buildout",
- "as_of": "2026-10-03",
- "_schema_note": "Generic coverage-map schema. The same code must later accept broker-dealer, bank, crypto and fixed-income universes: no AI-specific hardcoding in the XBRL fetcher or graph renderer \u2014 both take a universe_id and read verticals/companies/edges from the file.",
- "verticals": [
-  {
-   "id": "chips",
-   "label": "Chips & compute",
-   "group": "Supply chain",
-   "companies": [
+  "universe_id": "ai_buildout",
+  "title": "AI buildout",
+  "as_of": "2026-10-03",
+  "_schema_note": "Generic coverage-map schema. The same code must later accept broker-dealer, bank, crypto and fixed-income universes: no AI-specific hardcoding in the XBRL fetcher or graph renderer — both take a universe_id and read verticals/companies/edges from the file.",
+  "verticals": [
     {
-     "id": "nvidia",
-     "name": "Nvidia",
-     "kind": "public",
-     "ticker": "NVDA",
-     "cik": "0001045810"
+      "id": "chips",
+      "label": "Chips & compute",
+      "group": "Supply chain",
+      "companies": [
+        {
+          "id": "nvidia",
+          "name": "Nvidia",
+          "kind": "public",
+          "ticker": "NVDA",
+          "cik": "0001045810",
+          "logo": "https://www.google.com/s2/favicons?domain=nvidia.com&sz=128"
+        },
+        {
+          "id": "broadcom",
+          "name": "Broadcom",
+          "kind": "public",
+          "ticker": "AVGO",
+          "cik": "0001730168",
+          "logo": "https://www.google.com/s2/favicons?domain=broadcom.com&sz=128"
+        },
+        {
+          "id": "amd",
+          "name": "AMD",
+          "kind": "public",
+          "ticker": "AMD",
+          "cik": "0000002488",
+          "logo": "https://www.google.com/s2/favicons?domain=amd.com&sz=128"
+        },
+        {
+          "id": "intel",
+          "name": "Intel",
+          "kind": "public",
+          "ticker": "INTC",
+          "cik": "0000050863",
+          "logo": "https://www.google.com/s2/favicons?domain=intel.com&sz=128"
+        },
+        {
+          "id": "marvell",
+          "name": "Marvell",
+          "kind": "public",
+          "ticker": "MRVL",
+          "cik": "0001835632",
+          "logo": "https://www.google.com/s2/favicons?domain=marvell.com&sz=128"
+        },
+        {
+          "id": "arm",
+          "name": "Arm",
+          "kind": "public",
+          "ticker": "ARM",
+          "cik": "0001973239",
+          "logo": "https://www.google.com/s2/favicons?domain=arm.com&sz=128"
+        },
+        {
+          "id": "tsmc",
+          "name": "TSMC",
+          "kind": "public",
+          "ticker": "TSM",
+          "cik": "0001046179",
+          "logo": "https://www.google.com/s2/favicons?domain=tsmc.com&sz=128"
+        },
+        {
+          "id": "asml",
+          "name": "ASML",
+          "kind": "public",
+          "ticker": "ASML",
+          "cik": "0000937966",
+          "logo": "https://www.google.com/s2/favicons?domain=asml.com&sz=128"
+        },
+        {
+          "id": "amat",
+          "name": "Applied Materials",
+          "kind": "public",
+          "ticker": "AMAT",
+          "cik": "0000006951",
+          "logo": "https://www.google.com/s2/favicons?domain=appliedmaterials.com&sz=128"
+        },
+        {
+          "id": "lam",
+          "name": "Lam Research",
+          "kind": "public",
+          "ticker": "LRCX",
+          "cik": "0000707549",
+          "logo": "https://www.google.com/s2/favicons?domain=lamresearch.com&sz=128"
+        },
+        {
+          "id": "kla",
+          "name": "KLA",
+          "kind": "public",
+          "ticker": "KLAC",
+          "cik": "0000319201",
+          "logo": "https://www.google.com/s2/favicons?domain=kla.com&sz=128"
+        },
+        {
+          "id": "micron",
+          "name": "Micron",
+          "kind": "public",
+          "ticker": "MU",
+          "cik": "0000723125",
+          "logo": "https://www.google.com/s2/favicons?domain=micron.com&sz=128"
+        }
+      ]
     },
     {
-     "id": "broadcom",
-     "name": "Broadcom",
-     "kind": "public",
-     "ticker": "AVGO",
-     "cik": "0001730168"
+      "id": "hyperscalers",
+      "label": "Hyperscalers",
+      "group": "Hyperscalers",
+      "companies": [
+        {
+          "id": "microsoft",
+          "name": "Microsoft",
+          "kind": "public",
+          "ticker": "MSFT",
+          "cik": "0000789019",
+          "logo": "https://www.google.com/s2/favicons?domain=microsoft.com&sz=128"
+        },
+        {
+          "id": "alphabet",
+          "name": "Alphabet",
+          "kind": "public",
+          "ticker": "GOOGL",
+          "cik": "0001652044",
+          "logo": "https://www.google.com/s2/favicons?domain=google.com&sz=128"
+        },
+        {
+          "id": "amazon",
+          "name": "Amazon",
+          "kind": "public",
+          "ticker": "AMZN",
+          "cik": "0001018724",
+          "logo": "https://www.google.com/s2/favicons?domain=amazon.com&sz=128"
+        },
+        {
+          "id": "meta",
+          "name": "Meta",
+          "kind": "public",
+          "ticker": "META",
+          "cik": "0001326801",
+          "logo": "https://www.google.com/s2/favicons?domain=meta.com&sz=128"
+        },
+        {
+          "id": "oracle",
+          "name": "Oracle",
+          "kind": "public",
+          "ticker": "ORCL",
+          "cik": "0001341439",
+          "logo": "https://www.google.com/s2/favicons?domain=oracle.com&sz=128"
+        },
+        {
+          "id": "apple",
+          "name": "Apple",
+          "kind": "public",
+          "ticker": "AAPL",
+          "cik": "0000320193",
+          "logo": "https://www.google.com/s2/favicons?domain=apple.com&sz=128"
+        }
+      ]
     },
     {
-     "id": "amd",
-     "name": "AMD",
-     "kind": "public",
-     "ticker": "AMD",
-     "cik": "0000002488"
+      "id": "neoclouds",
+      "label": "Neoclouds & miners",
+      "group": "Neoclouds",
+      "companies": [
+        {
+          "id": "coreweave",
+          "name": "CoreWeave",
+          "kind": "public",
+          "ticker": "CRWV",
+          "cik": "0001769628",
+          "logo": "https://www.google.com/s2/favicons?domain=coreweave.com&sz=128"
+        },
+        {
+          "id": "nebius",
+          "name": "Nebius",
+          "kind": "public",
+          "ticker": "NBIS",
+          "cik": "0001513845",
+          "logo": "https://www.google.com/s2/favicons?domain=nebius.com&sz=128"
+        },
+        {
+          "id": "hut8",
+          "name": "Hut 8",
+          "kind": "public",
+          "ticker": "HUT",
+          "cik": "0001964789",
+          "logo": "https://www.google.com/s2/favicons?domain=hut8.com&sz=128"
+        },
+        {
+          "id": "iren",
+          "name": "IREN",
+          "kind": "public",
+          "ticker": "IREN",
+          "cik": "0001878848",
+          "logo": "https://www.google.com/s2/favicons?domain=iren.com&sz=128"
+        },
+        {
+          "id": "clsk",
+          "name": "CleanSpark",
+          "kind": "public",
+          "ticker": "CLSK",
+          "cik": "0000827876",
+          "logo": "https://www.google.com/s2/favicons?domain=cleanspark.com&sz=128"
+        },
+        {
+          "id": "cifr",
+          "name": "Cipher Mining",
+          "kind": "public",
+          "ticker": "CIFR",
+          "cik": "0001819989",
+          "logo": "https://www.google.com/s2/favicons?domain=ciphermining.com&sz=128"
+        },
+        {
+          "id": "wulf",
+          "name": "TeraWulf",
+          "kind": "public",
+          "ticker": "WULF",
+          "cik": "0001083301",
+          "logo": "https://www.google.com/s2/favicons?domain=terawulf.com&sz=128"
+        },
+        {
+          "id": "btdr",
+          "name": "Bitdeer",
+          "kind": "public",
+          "ticker": "BTDR",
+          "cik": "0001899123",
+          "logo": "https://www.google.com/s2/favicons?domain=bitdeer.com&sz=128"
+        },
+        {
+          "id": "apld",
+          "name": "Applied Digital",
+          "kind": "public",
+          "ticker": "APLD",
+          "cik": "0001144879",
+          "logo": "https://www.google.com/s2/favicons?domain=applieddigital.com&sz=128"
+        },
+        {
+          "id": "lambda",
+          "name": "Lambda",
+          "kind": "private",
+          "logo": "https://www.google.com/s2/favicons?domain=lambda.ai&sz=128"
+        },
+        {
+          "id": "nscale",
+          "name": "Nscale",
+          "kind": "private",
+          "logo": "https://www.google.com/s2/favicons?domain=nscale.com&sz=128"
+        },
+        {
+          "id": "sharon",
+          "name": "Sharon AI",
+          "kind": "private"
+        },
+        {
+          "id": "crusoe",
+          "name": "Crusoe",
+          "kind": "private",
+          "logo": "https://www.google.com/s2/favicons?domain=crusoe.ai&sz=128"
+        },
+        {
+          "id": "firmus",
+          "name": "Firmus",
+          "kind": "private"
+        },
+        {
+          "id": "naver",
+          "name": "Naver",
+          "kind": "private",
+          "logo": "https://www.google.com/s2/favicons?domain=naver.com&sz=128"
+        }
+      ]
     },
     {
-     "id": "intel",
-     "name": "Intel",
-     "kind": "public",
-     "ticker": "INTC",
-     "cik": "0000050863"
+      "id": "labs",
+      "label": "AI labs",
+      "group": "AI labs",
+      "companies": [
+        {
+          "id": "openai",
+          "name": "OpenAI",
+          "kind": "private",
+          "logo": "https://www.google.com/s2/favicons?domain=openai.com&sz=128"
+        },
+        {
+          "id": "xai",
+          "name": "xAI",
+          "kind": "private",
+          "logo": "https://www.google.com/s2/favicons?domain=x.ai&sz=128"
+        },
+        {
+          "id": "anthropic",
+          "name": "Anthropic",
+          "kind": "private",
+          "logo": "https://www.google.com/s2/favicons?domain=anthropic.com&sz=128"
+        },
+        {
+          "id": "ssi",
+          "name": "Safe Superintelligence",
+          "kind": "private"
+        }
+      ]
     },
     {
-     "id": "marvell",
-     "name": "Marvell",
-     "kind": "public",
-     "ticker": "MRVL",
-     "cik": "0001835632"
+      "id": "reit",
+      "label": "Data-center REITs",
+      "group": "Power & real estate",
+      "companies": [
+        {
+          "id": "dlr",
+          "name": "Digital Realty",
+          "kind": "public",
+          "ticker": "DLR",
+          "cik": "0001297996",
+          "logo": "https://www.google.com/s2/favicons?domain=digitalrealty.com&sz=128"
+        },
+        {
+          "id": "eqix",
+          "name": "Equinix",
+          "kind": "public",
+          "ticker": "EQIX",
+          "cik": "0001101239",
+          "logo": "https://www.google.com/s2/favicons?domain=equinix.com&sz=128"
+        }
+      ]
     },
     {
-     "id": "arm",
-     "name": "Arm",
-     "kind": "public",
-     "ticker": "ARM",
-     "cik": "0001973239"
+      "id": "power",
+      "label": "Power & uranium",
+      "group": "Power & real estate",
+      "companies": [
+        {
+          "id": "ceg",
+          "name": "Constellation Energy",
+          "kind": "public",
+          "ticker": "CEG",
+          "cik": "0001868275",
+          "logo": "https://www.google.com/s2/favicons?domain=constellationenergy.com&sz=128"
+        },
+        {
+          "id": "vst",
+          "name": "Vistra",
+          "kind": "public",
+          "ticker": "VST",
+          "cik": "0001692819",
+          "logo": "https://www.google.com/s2/favicons?domain=vistracorp.com&sz=128"
+        },
+        {
+          "id": "nrg",
+          "name": "NRG Energy",
+          "kind": "public",
+          "ticker": "NRG",
+          "cik": "0001013871",
+          "logo": "https://www.google.com/s2/favicons?domain=nrg.com&sz=128"
+        },
+        {
+          "id": "talen",
+          "name": "Talen Energy",
+          "kind": "public",
+          "ticker": "TLN",
+          "cik": "0001622536",
+          "logo": "https://www.google.com/s2/favicons?domain=talenenergy.com&sz=128"
+        },
+        {
+          "id": "oklo",
+          "name": "Oklo",
+          "kind": "public",
+          "ticker": "OKLO",
+          "cik": "0001849056",
+          "logo": "https://www.google.com/s2/favicons?domain=oklo.com&sz=128"
+        },
+        {
+          "id": "smr",
+          "name": "NuScale",
+          "kind": "public",
+          "ticker": "SMR",
+          "cik": "0001822966",
+          "logo": "https://www.google.com/s2/favicons?domain=nuscalepower.com&sz=128"
+        },
+        {
+          "id": "ccj",
+          "name": "Cameco",
+          "kind": "public",
+          "ticker": "CCJ",
+          "cik": "0001009001",
+          "logo": "https://www.google.com/s2/favicons?domain=cameco.com&sz=128"
+        },
+        {
+          "id": "uuuu",
+          "name": "Energy Fuels",
+          "kind": "public",
+          "ticker": "UUUU",
+          "cik": "0001385849",
+          "logo": "https://www.google.com/s2/favicons?domain=energyfuels.com&sz=128"
+        },
+        {
+          "id": "leu",
+          "name": "Centrus Energy",
+          "kind": "public",
+          "ticker": "LEU",
+          "cik": "0001065059",
+          "logo": "https://www.google.com/s2/favicons?domain=centrusenergy.com&sz=128"
+        },
+        {
+          "id": "gev",
+          "name": "GE Vernova",
+          "kind": "public",
+          "ticker": "GEV",
+          "cik": "0001996810",
+          "logo": "https://www.google.com/s2/favicons?domain=gevernova.com&sz=128"
+        }
+      ]
     },
     {
-     "id": "tsmc",
-     "name": "TSMC",
-     "kind": "public",
-     "ticker": "TSM",
-     "cik": "0001046179"
+      "id": "electrical",
+      "label": "Electrical & cooling",
+      "group": "Supply chain",
+      "companies": [
+        {
+          "id": "vrt",
+          "name": "Vertiv",
+          "kind": "public",
+          "ticker": "VRT",
+          "cik": "0001674101",
+          "logo": "https://www.google.com/s2/favicons?domain=vertiv.com&sz=128"
+        },
+        {
+          "id": "etn",
+          "name": "Eaton",
+          "kind": "public",
+          "ticker": "ETN",
+          "cik": "0001551182",
+          "logo": "https://www.google.com/s2/favicons?domain=eaton.com&sz=128"
+        },
+        {
+          "id": "hubb",
+          "name": "Hubbell",
+          "kind": "public",
+          "ticker": "HUBB",
+          "cik": "0000048898",
+          "logo": "https://www.google.com/s2/favicons?domain=hubbell.com&sz=128"
+        },
+        {
+          "id": "emr",
+          "name": "Emerson",
+          "kind": "public",
+          "ticker": "EMR",
+          "cik": "0000032604",
+          "logo": "https://www.google.com/s2/favicons?domain=emerson.com&sz=128"
+        },
+        {
+          "id": "mod",
+          "name": "Modine",
+          "kind": "public",
+          "ticker": "MOD",
+          "cik": "0000067347",
+          "logo": "https://www.google.com/s2/favicons?domain=modine.com&sz=128"
+        },
+        {
+          "id": "tt",
+          "name": "Trane",
+          "kind": "public",
+          "ticker": "TT",
+          "cik": "0001466258",
+          "logo": "https://www.google.com/s2/favicons?domain=tranetechnologies.com&sz=128"
+        },
+        {
+          "id": "carr",
+          "name": "Carrier",
+          "kind": "public",
+          "ticker": "CARR",
+          "cik": "0001783180",
+          "logo": "https://www.google.com/s2/favicons?domain=carrier.com&sz=128"
+        },
+        {
+          "id": "jci",
+          "name": "Johnson Controls",
+          "kind": "public",
+          "ticker": "JCI",
+          "cik": "0000833444",
+          "logo": "https://www.google.com/s2/favicons?domain=johnsoncontrols.com&sz=128"
+        },
+        {
+          "id": "nvt",
+          "name": "nVent Electric",
+          "kind": "public",
+          "ticker": "NVT",
+          "cik": "0001720635",
+          "logo": "https://www.google.com/s2/favicons?domain=nvent.com&sz=128"
+        },
+        {
+          "id": "powl",
+          "name": "Powell Industries",
+          "kind": "public",
+          "ticker": "POWL",
+          "cik": "0000080420",
+          "logo": "https://www.google.com/s2/favicons?domain=powellind.com&sz=128"
+        }
+      ]
     },
     {
-     "id": "asml",
-     "name": "ASML",
-     "kind": "public",
-     "ticker": "ASML",
-     "cik": "0000937966"
+      "id": "networking",
+      "label": "Networking",
+      "group": "Supply chain",
+      "companies": [
+        {
+          "id": "anet",
+          "name": "Arista",
+          "kind": "public",
+          "ticker": "ANET",
+          "cik": "0001596532",
+          "logo": "https://www.google.com/s2/favicons?domain=arista.com&sz=128"
+        },
+        {
+          "id": "csco",
+          "name": "Cisco",
+          "kind": "public",
+          "ticker": "CSCO",
+          "cik": "0000858877",
+          "logo": "https://www.google.com/s2/favicons?domain=cisco.com&sz=128"
+        },
+        {
+          "id": "cien",
+          "name": "Ciena",
+          "kind": "public",
+          "ticker": "CIEN",
+          "cik": "0000936395",
+          "logo": "https://www.google.com/s2/favicons?domain=ciena.com&sz=128"
+        }
+      ]
     },
     {
-     "id": "amat",
-     "name": "Applied Materials",
-     "kind": "public",
-     "ticker": "AMAT",
-     "cik": "0000006951"
+      "id": "storage",
+      "label": "Storage & memory",
+      "group": "Supply chain",
+      "companies": [
+        {
+          "id": "stx",
+          "name": "Seagate",
+          "kind": "public",
+          "ticker": "STX",
+          "cik": "0001137789",
+          "logo": "https://www.google.com/s2/favicons?domain=seagate.com&sz=128"
+        },
+        {
+          "id": "wdc",
+          "name": "Western Digital",
+          "kind": "public",
+          "ticker": "WDC",
+          "cik": "0000106040",
+          "logo": "https://www.google.com/s2/favicons?domain=wdc.com&sz=128"
+        },
+        {
+          "id": "sndx",
+          "name": "SanDisk",
+          "kind": "public",
+          "ticker": "SNDK",
+          "cik": "0002023554",
+          "logo": "https://www.google.com/s2/favicons?domain=sandisk.com&sz=128"
+        }
+      ]
     },
     {
-     "id": "lam",
-     "name": "Lam Research",
-     "kind": "public",
-     "ticker": "LRCX",
-     "cik": "0000707549"
+      "id": "servers",
+      "label": "Servers & hardware",
+      "group": "Supply chain",
+      "companies": [
+        {
+          "id": "dell",
+          "name": "Dell",
+          "kind": "public",
+          "ticker": "DELL",
+          "cik": "0001571996",
+          "logo": "https://www.google.com/s2/favicons?domain=dell.com&sz=128"
+        },
+        {
+          "id": "smci",
+          "name": "Super Micro",
+          "kind": "public",
+          "ticker": "SMCI",
+          "cik": "0001375365",
+          "logo": "https://www.google.com/s2/favicons?domain=supermicro.com&sz=128"
+        },
+        {
+          "id": "hpe",
+          "name": "HPE",
+          "kind": "public",
+          "ticker": "HPE",
+          "cik": "0001645590",
+          "logo": "https://www.google.com/s2/favicons?domain=hpe.com&sz=128"
+        }
+      ]
     },
     {
-     "id": "kla",
-     "name": "KLA",
-     "kind": "public",
-     "ticker": "KLAC",
-     "cik": "0000319201"
+      "id": "construction",
+      "label": "Construction / EPC",
+      "group": "Power & real estate",
+      "companies": [
+        {
+          "id": "eme",
+          "name": "EMCOR",
+          "kind": "public",
+          "ticker": "EME",
+          "cik": "0000105634",
+          "logo": "https://www.google.com/s2/favicons?domain=emcorgroup.com&sz=128"
+        },
+        {
+          "id": "fix",
+          "name": "Comfort Systems",
+          "kind": "public",
+          "ticker": "FIX",
+          "cik": "0001035983",
+          "logo": "https://www.google.com/s2/favicons?domain=comfortsystemsusa.com&sz=128"
+        }
+      ]
     },
     {
-     "id": "micron",
-     "name": "Micron",
-     "kind": "public",
-     "ticker": "MU",
-     "cik": "0000723125"
+      "id": "financial",
+      "label": "Financiers",
+      "group": "Financial firms",
+      "companies": [
+        {
+          "id": "wallst",
+          "name": "Wall Street funds",
+          "kind": "private"
+        },
+        {
+          "id": "softbank",
+          "name": "SoftBank",
+          "kind": "private",
+          "logo": "https://www.google.com/s2/favicons?domain=softbank.jp&sz=128"
+        }
+      ]
     }
-   ]
-  },
-  {
-   "id": "hyperscalers",
-   "label": "Hyperscalers",
-   "group": "Hyperscalers",
-   "companies": [
+  ],
+  "edges": [
     {
-     "id": "microsoft",
-     "name": "Microsoft",
-     "kind": "public",
-     "ticker": "MSFT",
-     "cik": "0000789019"
+      "amount_bn": 100.0,
+      "confidence": "reported",
+      "date": "2025-09",
+      "from": "nvidia",
+      "kind": "equity",
+      "label": "up to $100B investment + data-center chip supply",
+      "source": "Reuters",
+      "to": "openai"
     },
     {
-     "id": "alphabet",
-     "name": "Alphabet",
-     "kind": "public",
-     "ticker": "GOOGL",
-     "cik": "0001652044"
+      "amount_bn": 30.0,
+      "confidence": "reported",
+      "date": "2026",
+      "from": "nvidia",
+      "kind": "equity",
+      "label": "$30B in OpenAI $122B round @ $852B valuation",
+      "source": "The Next Web",
+      "to": "openai"
     },
     {
-     "id": "amazon",
-     "name": "Amazon",
-     "kind": "public",
-     "ticker": "AMZN",
-     "cik": "0001018724"
+      "amount_bn": 2.0,
+      "confidence": "reported",
+      "date": "2026-01",
+      "from": "nvidia",
+      "kind": "equity",
+      "label": "$2B Class A @ $87.20; 5GW AI factories by 2030",
+      "source": "TechCrunch",
+      "to": "coreweave"
     },
     {
-     "id": "meta",
-     "name": "Meta",
-     "kind": "public",
-     "ticker": "META",
-     "cik": "0001326801"
+      "amount_bn": 6.3,
+      "confidence": "reported",
+      "date": "2025-09",
+      "from": "nvidia",
+      "kind": "backstop",
+      "label": "$6.3B cloud purchase; Nvidia buys any unsold capacity",
+      "source": "Reuters",
+      "to": "coreweave"
     },
     {
-     "id": "oracle",
-     "name": "Oracle",
-     "kind": "public",
-     "ticker": "ORCL",
-     "cik": "0001341439"
+      "amount_bn": 2.0,
+      "confidence": "reported",
+      "date": "2026-02",
+      "from": "nvidia",
+      "kind": "equity",
+      "label": "$2B commitment",
+      "source": "CNBC",
+      "to": "nebius"
     },
     {
-     "id": "apple",
-     "name": "Apple",
-     "kind": "public",
-     "ticker": "AAPL",
-     "cik": "0000320193"
+      "amount_bn": 10.0,
+      "confidence": "reported",
+      "date": "2026",
+      "from": "nvidia",
+      "kind": "equity",
+      "label": "pledged up to $10B alongside Microsoft",
+      "source": "404k Research / company disclosures",
+      "to": "anthropic"
+    },
+    {
+      "amount_bn": 125.0,
+      "confidence": "reported",
+      "date": "2026",
+      "from": "wallst",
+      "kind": "debt",
+      "label": "$125B financing package",
+      "source": "The Economist",
+      "to": "xai"
+    },
+    {
+      "amount_bn": 64.6,
+      "confidence": "reported",
+      "date": "2026-10",
+      "from": "softbank",
+      "kind": "equity",
+      "label": "cumulative; ~13% stake; funded partly by $11.1B bond sale",
+      "source": "The Next Web",
+      "to": "openai"
+    },
+    {
+      "amount_bn": 50.0,
+      "confidence": "reported",
+      "date": "2026",
+      "from": "amazon",
+      "kind": "equity",
+      "label": "$50B commitment in OpenAI $122B round",
+      "source": "The Next Web",
+      "to": "openai"
+    },
+    {
+      "amount_bn": 11.0,
+      "confidence": "reported",
+      "date": "2019/2023",
+      "from": "microsoft",
+      "kind": "equity",
+      "label": "$1B (2019) + ~$10B (2023); ~49% profit-sharing stake",
+      "source": "press reports",
+      "to": "openai"
+    },
+    {
+      "amount_bn": 5.0,
+      "confidence": "reported",
+      "date": "2026",
+      "from": "microsoft",
+      "kind": "equity",
+      "label": "pledged up to $5B",
+      "source": "404k Research / company disclosures",
+      "to": "anthropic"
+    },
+    {
+      "amount_bn": 13.0,
+      "confidence": "reported",
+      "date": "2024-2026",
+      "from": "amazon",
+      "kind": "equity",
+      "label": "$8B convertible notes + $5B preferred; up to $20B more committed",
+      "source": "press reports",
+      "to": "anthropic"
+    },
+    {
+      "amount_bn": 22.4,
+      "confidence": "reported",
+      "date": "2025-09",
+      "from": "openai",
+      "kind": "purchase",
+      "label": "$11.9B + $4B + $6.5B expansions; Stargate capacity",
+      "source": "Reuters",
+      "to": "coreweave"
+    },
+    {
+      "amount_bn": 105.0,
+      "confidence": "reported",
+      "date": "2026",
+      "from": "openai",
+      "kind": "purchase",
+      "label": "neocloud compute commitments (reported total)",
+      "source": "The Economist",
+      "to": "nebius"
+    },
+    {
+      "amount_bn": 17.4,
+      "confidence": "reported",
+      "date": "2025",
+      "from": "microsoft",
+      "kind": "purchase",
+      "label": "GPU infra capacity, 5-year term",
+      "source": "Reuters",
+      "to": "nebius"
+    },
+    {
+      "amount_bn": 110.0,
+      "confidence": "reported",
+      "date": "2026-10",
+      "from": "anthropic",
+      "kind": "purchase",
+      "label": "AWS/Trainium compute, ~10yr; shortfall payable",
+      "source": "Reuters (confidential IPO prospectus)",
+      "to": "amazon"
+    },
+    {
+      "amount_bn": 111.1,
+      "confidence": "reported",
+      "date": "2026-10",
+      "from": "anthropic",
+      "kind": "purchase",
+      "label": "Google cloud/TPU, 2026-2033; shortfall payable",
+      "source": "Reuters (confidential IPO prospectus)",
+      "to": "alphabet"
+    },
+    {
+      "amount_bn": 31.4,
+      "confidence": "reported",
+      "date": "2026-10",
+      "from": "anthropic",
+      "kind": "purchase",
+      "label": "Azure compute, 2026-2033",
+      "source": "Reuters (confidential IPO prospectus)",
+      "to": "microsoft"
+    },
+    {
+      "amount_bn": 161.2,
+      "confidence": "reported",
+      "date": "2026-10",
+      "from": "anthropic",
+      "kind": "lease",
+      "label": "equipment leases, largely non-cancelable",
+      "source": "Reuters (confidential IPO prospectus)",
+      "to": "broadcom"
+    },
+    {
+      "amount_bn": 84.5,
+      "confidence": "reported",
+      "date": "2026-10",
+      "from": "anthropic",
+      "kind": "purchase",
+      "label": "Nvidia-based capacity; mostly cancelable w/ 90d notice",
+      "source": "Reuters (confidential IPO prospectus)",
+      "to": "xai"
+    },
+    {
+      "amount_bn": 30.0,
+      "confidence": "reported",
+      "date": "2026",
+      "from": "anthropic",
+      "kind": "purchase",
+      "label": "$30B Azure compute purchase commitment (separate disclosure)",
+      "source": "404k Research",
+      "to": "microsoft"
+    },
+    {
+      "amount_bn": 10.0,
+      "confidence": "reported",
+      "date": "2025-08",
+      "from": "alphabet",
+      "kind": "purchase",
+      "label": "6-year Google cloud deal",
+      "source": "Reuters",
+      "to": "meta"
+    },
+    {
+      "amount_bn": 50.0,
+      "confidence": "reported",
+      "date": "2026",
+      "from": "nvidia",
+      "kind": "purchase",
+      "label": "chip-purchase / capacity commitment (reported)",
+      "source": "The Economist",
+      "to": "hut8"
+    },
+    {
+      "amount_bn": 1.5,
+      "confidence": "reported",
+      "date": "2026",
+      "from": "nvidia",
+      "kind": "equity",
+      "label": "equity stake (reported)",
+      "source": "The Economist",
+      "to": "lambda"
+    },
+    {
+      "amount_bn": 0.9,
+      "confidence": "reported",
+      "date": "2026",
+      "from": "nvidia",
+      "kind": "equity",
+      "label": "equity stake (reported)",
+      "source": "The Economist",
+      "to": "nscale"
+    },
+    {
+      "amount_bn": 4.9,
+      "confidence": "reported",
+      "date": "2026",
+      "from": "nvidia",
+      "kind": "purchase",
+      "label": "chip-purchase deal (reported)",
+      "source": "The Economist",
+      "to": "sharon"
+    },
+    {
+      "amount_bn": 3.4,
+      "confidence": "reported",
+      "date": "2026",
+      "from": "nvidia",
+      "kind": "purchase",
+      "label": "chip-purchase deal (reported)",
+      "source": "The Economist",
+      "to": "iren"
     }
-   ]
-  },
-  {
-   "id": "neoclouds",
-   "label": "Neoclouds & miners",
-   "group": "Neoclouds",
-   "companies": [
+  ],
+  "aggregates": [
     {
-     "id": "coreweave",
-     "name": "CoreWeave",
-     "kind": "public",
-     "ticker": "CRWV",
-     "cik": "0001769628"
-    },
-    {
-     "id": "nebius",
-     "name": "Nebius",
-     "kind": "public",
-     "ticker": "NBIS",
-     "cik": "0001513845"
-    },
-    {
-     "id": "hut8",
-     "name": "Hut 8",
-     "kind": "public",
-     "ticker": "HUT",
-     "cik": "0001964789"
-    },
-    {
-     "id": "iren",
-     "name": "IREN",
-     "kind": "public",
-     "ticker": "IREN",
-     "cik": "0001878848"
-    },
-    {
-     "id": "clsk",
-     "name": "CleanSpark",
-     "kind": "public",
-     "ticker": "CLSK",
-     "cik": "0000827876"
-    },
-    {
-     "id": "cifr",
-     "name": "Cipher Mining",
-     "kind": "public",
-     "ticker": "CIFR",
-     "cik": "0001819989"
-    },
-    {
-     "id": "wulf",
-     "name": "TeraWulf",
-     "kind": "public",
-     "ticker": "WULF",
-     "cik": "0001083301"
-    },
-    {
-     "id": "btdr",
-     "name": "Bitdeer",
-     "kind": "public",
-     "ticker": "BTDR",
-     "cik": "0001899123"
-    },
-    {
-     "id": "apld",
-     "name": "Applied Digital",
-     "kind": "public",
-     "ticker": "APLD",
-     "cik": "0001144879"
-    },
-    {
-     "id": "lambda",
-     "name": "Lambda",
-     "kind": "private"
-    },
-    {
-     "id": "nscale",
-     "name": "Nscale",
-     "kind": "private"
-    },
-    {
-     "id": "sharon",
-     "name": "Sharon AI",
-     "kind": "private"
-    },
-    {
-     "id": "crusoe",
-     "name": "Crusoe",
-     "kind": "private"
-    },
-    {
-     "id": "firmus",
-     "name": "Firmus",
-     "kind": "private"
-    },
-    {
-     "id": "naver",
-     "name": "Naver",
-     "kind": "private"
+      "id": "HYPER6",
+      "label": "Big-6 hyperscalers",
+      "members": [
+        "microsoft",
+        "alphabet",
+        "amazon",
+        "meta",
+        "oracle",
+        "apple"
+      ],
+      "metric": "capex"
     }
-   ]
-  },
-  {
-   "id": "labs",
-   "label": "AI labs",
-   "group": "AI labs",
-   "companies": [
+  ],
+  "risk_notes": [
     {
-     "id": "openai",
-     "name": "OpenAI",
-     "kind": "private"
+      "id": "circular",
+      "source": "Reuters / The Economist",
+      "text": "Nvidia funds customers (equity) who buy Nvidia chips, and backstops neocloud capacity — revenue and financing flow in a loop."
     },
     {
-     "id": "xai",
-     "name": "xAI",
-     "kind": "private"
+      "id": "anthropic-commitments",
+      "source": "Reuters / Morningstar",
+      "text": "Anthropic's ~$518B of compute commitments over ~10yr are ~80% non-cancelable or payable regardless of usage, against ~$20B cash at end-2025 (Reuters, confidential IPO prospectus)."
     },
     {
-     "id": "anthropic",
-     "name": "Anthropic",
-     "kind": "private"
+      "id": "coreweave-debt",
+      "source": "TechCrunch / PitchBook",
+      "text": "CoreWeave carried ~$18.8B in debt obligations (Sep 2025, PitchBook) against ~$1.4B quarterly revenue; GPUs pledged as collateral."
     },
     {
-     "id": "ssi",
-     "name": "Safe Superintelligence",
-     "kind": "private"
+      "id": "nvda-portfolio",
+      "source": "company earnings disclosure",
+      "text": "Nvidia's AI equity portfolio reached $99B (Jul 2026, company earnings disclosure), up from ~$7B a year earlier; ~$50B in frontier labs."
     }
-   ]
-  },
-  {
-   "id": "reit",
-   "label": "Data-center REITs",
-   "group": "Power & real estate",
-   "companies": [
-    {
-     "id": "dlr",
-     "name": "Digital Realty",
-     "kind": "public",
-     "ticker": "DLR",
-     "cik": "0001297996"
-    },
-    {
-     "id": "eqix",
-     "name": "Equinix",
-     "kind": "public",
-     "ticker": "EQIX",
-     "cik": "0001101239"
-    }
-   ]
-  },
-  {
-   "id": "power",
-   "label": "Power & uranium",
-   "group": "Power & real estate",
-   "companies": [
-    {
-     "id": "ceg",
-     "name": "Constellation Energy",
-     "kind": "public",
-     "ticker": "CEG",
-     "cik": "0001868275"
-    },
-    {
-     "id": "vst",
-     "name": "Vistra",
-     "kind": "public",
-     "ticker": "VST",
-     "cik": "0001692819"
-    },
-    {
-     "id": "nrg",
-     "name": "NRG Energy",
-     "kind": "public",
-     "ticker": "NRG",
-     "cik": "0001013871"
-    },
-    {
-     "id": "talen",
-     "name": "Talen Energy",
-     "kind": "public",
-     "ticker": "TLN",
-     "cik": "0001622536"
-    },
-    {
-     "id": "oklo",
-     "name": "Oklo",
-     "kind": "public",
-     "ticker": "OKLO",
-     "cik": "0001849056"
-    },
-    {
-     "id": "smr",
-     "name": "NuScale",
-     "kind": "public",
-     "ticker": "SMR",
-     "cik": "0001822966"
-    },
-    {
-     "id": "ccj",
-     "name": "Cameco",
-     "kind": "public",
-     "ticker": "CCJ",
-     "cik": "0001009001"
-    },
-    {
-     "id": "uuuu",
-     "name": "Energy Fuels",
-     "kind": "public",
-     "ticker": "UUUU",
-     "cik": "0001385849"
-    },
-    {
-     "id": "leu",
-     "name": "Centrus Energy",
-     "kind": "public",
-     "ticker": "LEU",
-     "cik": "0001065059"
-    },
-    {
-     "id": "gev",
-     "name": "GE Vernova",
-     "kind": "public",
-     "ticker": "GEV",
-     "cik": "0001996810"
-    }
-   ]
-  },
-  {
-   "id": "electrical",
-   "label": "Electrical & cooling",
-   "group": "Supply chain",
-   "companies": [
-    {
-     "id": "vrt",
-     "name": "Vertiv",
-     "kind": "public",
-     "ticker": "VRT",
-     "cik": "0001674101"
-    },
-    {
-     "id": "etn",
-     "name": "Eaton",
-     "kind": "public",
-     "ticker": "ETN",
-     "cik": "0001551182"
-    },
-    {
-     "id": "hubb",
-     "name": "Hubbell",
-     "kind": "public",
-     "ticker": "HUBB",
-     "cik": "0000048898"
-    },
-    {
-     "id": "emr",
-     "name": "Emerson",
-     "kind": "public",
-     "ticker": "EMR",
-     "cik": "0000032604"
-    },
-    {
-     "id": "mod",
-     "name": "Modine",
-     "kind": "public",
-     "ticker": "MOD",
-     "cik": "0000067347"
-    },
-    {
-     "id": "tt",
-     "name": "Trane",
-     "kind": "public",
-     "ticker": "TT",
-     "cik": "0001466258"
-    },
-    {
-     "id": "carr",
-     "name": "Carrier",
-     "kind": "public",
-     "ticker": "CARR",
-     "cik": "0001783180"
-    },
-    {
-     "id": "jci",
-     "name": "Johnson Controls",
-     "kind": "public",
-     "ticker": "JCI",
-     "cik": "0000833444"
-    },
-    {
-     "id": "nvt",
-     "name": "nVent Electric",
-     "kind": "public",
-     "ticker": "NVT",
-     "cik": "0001720635"
-    },
-    {
-     "id": "powl",
-     "name": "Powell Industries",
-     "kind": "public",
-     "ticker": "POWL",
-     "cik": "0000080420"
-    }
-   ]
-  },
-  {
-   "id": "networking",
-   "label": "Networking",
-   "group": "Supply chain",
-   "companies": [
-    {
-     "id": "anet",
-     "name": "Arista",
-     "kind": "public",
-     "ticker": "ANET",
-     "cik": "0001596532"
-    },
-    {
-     "id": "csco",
-     "name": "Cisco",
-     "kind": "public",
-     "ticker": "CSCO",
-     "cik": "0000858877"
-    },
-    {
-     "id": "cien",
-     "name": "Ciena",
-     "kind": "public",
-     "ticker": "CIEN",
-     "cik": "0000936395"
-    }
-   ]
-  },
-  {
-   "id": "storage",
-   "label": "Storage & memory",
-   "group": "Supply chain",
-   "companies": [
-    {
-     "id": "stx",
-     "name": "Seagate",
-     "kind": "public",
-     "ticker": "STX",
-     "cik": "0001137789"
-    },
-    {
-     "id": "wdc",
-     "name": "Western Digital",
-     "kind": "public",
-     "ticker": "WDC",
-     "cik": "0000106040"
-    },
-    {
-     "id": "sndx",
-     "name": "SanDisk",
-     "kind": "public",
-     "ticker": "SNDK",
-     "cik": "0002023554"
-    }
-   ]
-  },
-  {
-   "id": "servers",
-   "label": "Servers & hardware",
-   "group": "Supply chain",
-   "companies": [
-    {
-     "id": "dell",
-     "name": "Dell",
-     "kind": "public",
-     "ticker": "DELL",
-     "cik": "0001571996"
-    },
-    {
-     "id": "smci",
-     "name": "Super Micro",
-     "kind": "public",
-     "ticker": "SMCI",
-     "cik": "0001375365"
-    },
-    {
-     "id": "hpe",
-     "name": "HPE",
-     "kind": "public",
-     "ticker": "HPE",
-     "cik": "0001645590"
-    }
-   ]
-  },
-  {
-   "id": "construction",
-   "label": "Construction / EPC",
-   "group": "Power & real estate",
-   "companies": [
-    {
-     "id": "eme",
-     "name": "EMCOR",
-     "kind": "public",
-     "ticker": "EME",
-     "cik": "0000105634"
-    },
-    {
-     "id": "fix",
-     "name": "Comfort Systems",
-     "kind": "public",
-     "ticker": "FIX",
-     "cik": "0001035983"
-    }
-   ]
-  },
-  {
-   "id": "financial",
-   "label": "Financiers",
-   "group": "Financial firms",
-   "companies": [
-    {
-     "id": "wallst",
-     "name": "Wall Street funds",
-     "kind": "private"
-    },
-    {
-     "id": "softbank",
-     "name": "SoftBank",
-     "kind": "private"
-    }
-   ]
-  }
- ],
- "edges": [
-  {
-   "amount_bn": 100.0,
-   "confidence": "reported",
-   "date": "2025-09",
-   "from": "nvidia",
-   "kind": "equity",
-   "label": "up to $100B investment + data-center chip supply",
-   "source": "Reuters",
-   "to": "openai"
-  },
-  {
-   "amount_bn": 30.0,
-   "confidence": "reported",
-   "date": "2026",
-   "from": "nvidia",
-   "kind": "equity",
-   "label": "$30B in OpenAI $122B round @ $852B valuation",
-   "source": "The Next Web",
-   "to": "openai"
-  },
-  {
-   "amount_bn": 2.0,
-   "confidence": "reported",
-   "date": "2026-01",
-   "from": "nvidia",
-   "kind": "equity",
-   "label": "$2B Class A @ $87.20; 5GW AI factories by 2030",
-   "source": "TechCrunch",
-   "to": "coreweave"
-  },
-  {
-   "amount_bn": 6.3,
-   "confidence": "reported",
-   "date": "2025-09",
-   "from": "nvidia",
-   "kind": "backstop",
-   "label": "$6.3B cloud purchase; Nvidia buys any unsold capacity",
-   "source": "Reuters",
-   "to": "coreweave"
-  },
-  {
-   "amount_bn": 2.0,
-   "confidence": "reported",
-   "date": "2026-02",
-   "from": "nvidia",
-   "kind": "equity",
-   "label": "$2B commitment",
-   "source": "CNBC",
-   "to": "nebius"
-  },
-  {
-   "amount_bn": 10.0,
-   "confidence": "reported",
-   "date": "2026",
-   "from": "nvidia",
-   "kind": "equity",
-   "label": "pledged up to $10B alongside Microsoft",
-   "source": "404k Research / company disclosures",
-   "to": "anthropic"
-  },
-  {
-   "amount_bn": 125.0,
-   "confidence": "reported",
-   "date": "2026",
-   "from": "wallst",
-   "kind": "debt",
-   "label": "$125B financing package",
-   "source": "The Economist",
-   "to": "xai"
-  },
-  {
-   "amount_bn": 64.6,
-   "confidence": "reported",
-   "date": "2026-10",
-   "from": "softbank",
-   "kind": "equity",
-   "label": "cumulative; ~13% stake; funded partly by $11.1B bond sale",
-   "source": "The Next Web",
-   "to": "openai"
-  },
-  {
-   "amount_bn": 50.0,
-   "confidence": "reported",
-   "date": "2026",
-   "from": "amazon",
-   "kind": "equity",
-   "label": "$50B commitment in OpenAI $122B round",
-   "source": "The Next Web",
-   "to": "openai"
-  },
-  {
-   "amount_bn": 11.0,
-   "confidence": "reported",
-   "date": "2019/2023",
-   "from": "microsoft",
-   "kind": "equity",
-   "label": "$1B (2019) + ~$10B (2023); ~49% profit-sharing stake",
-   "source": "press reports",
-   "to": "openai"
-  },
-  {
-   "amount_bn": 5.0,
-   "confidence": "reported",
-   "date": "2026",
-   "from": "microsoft",
-   "kind": "equity",
-   "label": "pledged up to $5B",
-   "source": "404k Research / company disclosures",
-   "to": "anthropic"
-  },
-  {
-   "amount_bn": 13.0,
-   "confidence": "reported",
-   "date": "2024-2026",
-   "from": "amazon",
-   "kind": "equity",
-   "label": "$8B convertible notes + $5B preferred; up to $20B more committed",
-   "source": "press reports",
-   "to": "anthropic"
-  },
-  {
-   "amount_bn": 22.4,
-   "confidence": "reported",
-   "date": "2025-09",
-   "from": "openai",
-   "kind": "purchase",
-   "label": "$11.9B + $4B + $6.5B expansions; Stargate capacity",
-   "source": "Reuters",
-   "to": "coreweave"
-  },
-  {
-   "amount_bn": 105.0,
-   "confidence": "reported",
-   "date": "2026",
-   "from": "openai",
-   "kind": "purchase",
-   "label": "neocloud compute commitments (reported total)",
-   "source": "The Economist",
-   "to": "nebius"
-  },
-  {
-   "amount_bn": 17.4,
-   "confidence": "reported",
-   "date": "2025",
-   "from": "microsoft",
-   "kind": "purchase",
-   "label": "GPU infra capacity, 5-year term",
-   "source": "Reuters",
-   "to": "nebius"
-  },
-  {
-   "amount_bn": 110.0,
-   "confidence": "reported",
-   "date": "2026-10",
-   "from": "anthropic",
-   "kind": "purchase",
-   "label": "AWS/Trainium compute, ~10yr; shortfall payable",
-   "source": "Reuters (confidential IPO prospectus)",
-   "to": "amazon"
-  },
-  {
-   "amount_bn": 111.1,
-   "confidence": "reported",
-   "date": "2026-10",
-   "from": "anthropic",
-   "kind": "purchase",
-   "label": "Google cloud/TPU, 2026-2033; shortfall payable",
-   "source": "Reuters (confidential IPO prospectus)",
-   "to": "alphabet"
-  },
-  {
-   "amount_bn": 31.4,
-   "confidence": "reported",
-   "date": "2026-10",
-   "from": "anthropic",
-   "kind": "purchase",
-   "label": "Azure compute, 2026-2033",
-   "source": "Reuters (confidential IPO prospectus)",
-   "to": "microsoft"
-  },
-  {
-   "amount_bn": 161.2,
-   "confidence": "reported",
-   "date": "2026-10",
-   "from": "anthropic",
-   "kind": "lease",
-   "label": "equipment leases, largely non-cancelable",
-   "source": "Reuters (confidential IPO prospectus)",
-   "to": "broadcom"
-  },
-  {
-   "amount_bn": 84.5,
-   "confidence": "reported",
-   "date": "2026-10",
-   "from": "anthropic",
-   "kind": "purchase",
-   "label": "Nvidia-based capacity; mostly cancelable w/ 90d notice",
-   "source": "Reuters (confidential IPO prospectus)",
-   "to": "xai"
-  },
-  {
-   "amount_bn": 30.0,
-   "confidence": "reported",
-   "date": "2026",
-   "from": "anthropic",
-   "kind": "purchase",
-   "label": "$30B Azure compute purchase commitment (separate disclosure)",
-   "source": "404k Research",
-   "to": "microsoft"
-  },
-  {
-   "amount_bn": 10.0,
-   "confidence": "reported",
-   "date": "2025-08",
-   "from": "alphabet",
-   "kind": "purchase",
-   "label": "6-year Google cloud deal",
-   "source": "Reuters",
-   "to": "meta"
-  },
-  {
-   "amount_bn": 50.0,
-   "confidence": "reported",
-   "date": "2026",
-   "from": "nvidia",
-   "kind": "purchase",
-   "label": "chip-purchase / capacity commitment (reported)",
-   "source": "The Economist",
-   "to": "hut8"
-  },
-  {
-   "amount_bn": 1.5,
-   "confidence": "reported",
-   "date": "2026",
-   "from": "nvidia",
-   "kind": "equity",
-   "label": "equity stake (reported)",
-   "source": "The Economist",
-   "to": "lambda"
-  },
-  {
-   "amount_bn": 0.9,
-   "confidence": "reported",
-   "date": "2026",
-   "from": "nvidia",
-   "kind": "equity",
-   "label": "equity stake (reported)",
-   "source": "The Economist",
-   "to": "nscale"
-  },
-  {
-   "amount_bn": 4.9,
-   "confidence": "reported",
-   "date": "2026",
-   "from": "nvidia",
-   "kind": "purchase",
-   "label": "chip-purchase deal (reported)",
-   "source": "The Economist",
-   "to": "sharon"
-  },
-  {
-   "amount_bn": 3.4,
-   "confidence": "reported",
-   "date": "2026",
-   "from": "nvidia",
-   "kind": "purchase",
-   "label": "chip-purchase deal (reported)",
-   "source": "The Economist",
-   "to": "iren"
-  }
- ],
- "aggregates": [
-  {
-   "id": "HYPER6",
-   "label": "Big-6 hyperscalers",
-   "members": [
-    "microsoft",
-    "alphabet",
-    "amazon",
-    "meta",
-    "oracle",
-    "apple"
-   ],
-   "metric": "capex"
-  }
- ],
- "risk_notes": [
-  {
-   "id": "circular",
-   "source": "Reuters / The Economist",
-   "text": "Nvidia funds customers (equity) who buy Nvidia chips, and backstops neocloud capacity \u2014 revenue and financing flow in a loop."
-  },
-  {
-   "id": "anthropic-commitments",
-   "source": "Reuters / Morningstar",
-   "text": "Anthropic's ~$518B of compute commitments over ~10yr are ~80% non-cancelable or payable regardless of usage, against ~$20B cash at end-2025 (Reuters, confidential IPO prospectus)."
-  },
-  {
-   "id": "coreweave-debt",
-   "source": "TechCrunch / PitchBook",
-   "text": "CoreWeave carried ~$18.8B in debt obligations (Sep 2025, PitchBook) against ~$1.4B quarterly revenue; GPUs pledged as collateral."
-  },
-  {
-   "id": "nvda-portfolio",
-   "source": "company earnings disclosure",
-   "text": "Nvidia's AI equity portfolio reached $99B (Jul 2026, company earnings disclosure), up from ~$7B a year earlier; ~$50B in frontier labs."
-  }
- ]
+  ]
 }

@@ -1,1 +1,285 @@
-{"_schema_note":"Generic coverage-map schema (same as ai_buildout): verticals -> companies [{id, name, ticker?, cik?, kind: public|private, status?, note?}], edges [{from, to, kind, label, amount_bn?, date?, source, confidence}], aggregates, risk_notes. The generic fetchers (fetch_universe_capex, fetch_universe_graph) take this universe_id with no TSV-specific hardcoding. status: operating | notice_filed | announced | preparing | positioned | rumored | active.","aggregates":[],"as_of":"2026-10-03","edges":[{"confidence":"confirmed","date":"2026-09","from":"ondo","kind":"partnership","label":"tokenized fund distribution","source":"Traders Magazine","to":"dtcc"},{"confidence":"confirmed","date":"2026-09","from":"bullish","kind":"acquisition","label":"transfer agency for onchain issuance","source":"Traders Magazine","to":"equiniti"},{"confidence":"reported","date":"2026-09","from":"backpack","kind":"competitor","label":"parallel 1:1 tokenized-stock models (Solana)","source":"cleansky.io","to":"backed"}],"order":{"authority":"Exchange Act Section 36(a)(1)","earliest_trading":"2026-10-17","excluded":["synthetics / tokenized linked securities / security-based swaps","options, warrants, rights","1940 Act fund shares (Section 18/22 issues noted)"],"expires":"2031-09-17","file_no":"4-927","issued":"2026-09-17","issuer_veto":"30-day written issuer notice before listing third-party tokens; issuer may object within that window","notice_mechanics":"Public website notice >=30 calendar days before operating; written notice to tradingandmarkets@sec.gov within 1 business day of publication. ~30 lettered disclosure items; revised notices on 5-business-day / 20-day / quarterly cycles.","other_conditions":["US person only","auditable public smart contracts on permissionless ledger","equal rights (dividends, votes, liquidation)","no primary issuance — secondary only","no leverage/borrowing/hypothecation/credit","trading halts concurrent with primary listing exchange","trades reported within 10 minutes","anti-fraud (10b-5) still applies","no statutory disqualification"],"pairing":"tokenized NMS stock <-> tokenized NMS stock | non-security crypto (e.g. GENIUS Act payment stablecoin) | tokenized money market fund","press_release":"2026-90","release":"34-106402","tier1_symbols":75,"tier1_volume_cap":"0.25% of prior-month ADV","tier2_symbols":250,"tier2_volume_cap":"2.5% of prior-month ADV"},"risk_notes":["No TSV operating notice (Condition C) had been published on any operator website as of 2026-09-20; SEC staff expect first notices 'next quarter' (Sept 22 interview). Earliest possible trading: 2026-10-17.","No central SEC registry exists — Condition C notices live on each operator's own website; written notice goes to tradingandmarkets@sec.gov within 1 business day of publication.","Issuer veto: any S&P 500 / Russell 1000 constituent can block third-party tokenization of its shares within 30 days of issuer notice.","Only ~15.6% of the $3.06B tokenized-stock market fits the order (cleansky.io, 2026-09-20): transfer-restricted issuer tokens need permissioned AMMs; synthetic/derivative tokens are excluded outright.","Robinhood's current EU stock tokens and Kraken's xStocks do not qualify (derivative contracts / no shareholder rights).","Backed (xStocks) is not a US person and cannot operate a TSV.","Covered Firm exemption is contingent on a qualifying TSV operating — BTCS/Imperium has no launch date or capital commitment.","Exemption expires 2026-09-17 -> 2031-09-17; SEC may modify under Section 36; public comments open under File No. 4-927."],"title":"Tokenized Securities","universe_id":"tokenized_securities","verticals":[{"companies":[{"cik":"0001679788","id":"coinbase","kind":"public","name":"Coinbase","note":"Pushed for tokenized equities since 2024; named as likely beneficiary. No TSV notice filed as of 2026-10-03.","status":"positioned","ticker":"COIN"},{"cik":"0001783879","id":"robinhood","kind":"public","name":"Robinhood","note":"CEO campaigned for tokenized stocks since 2025; current EU stock tokens are derivatives (excluded by order). Crypto exec: caps constrain a US launch. No TSV notice filed.","status":"positioned","ticker":"HOOD"},{"cik":null,"id":"kraken","kind":"private","name":"Kraken","note":"xStocks distributor; current xStocks are synthetic exposure without shareholder rights — excluded in current form.","status":"positioned","ticker":null},{"cik":"0001872195","id":"bullish","kind":"public","name":"Bullish","note":"Acquired transfer agent Equiniti for native onchain issuance with issuer permission (issuer-permissioned model, not a TSV announcement).","status":"positioned","ticker":"BLSH"},{"cik":null,"id":"backpack","kind":"private","name":"Backpack Securities","note":"SEC-registered broker-dealer; tokenized 17 US stocks/ETFs on Solana since 2026-06-12, 1:1 backed; US users currently excluded.","status":"positioned","ticker":null},{"cik":null,"id":"securitize","kind":"private","name":"Securitize","note":"Tokenized-stock issuer/platform (transfer-restricted issuance). No TSV notice on website as of 2026-09-20 check.","status":"positioned","ticker":null},{"cik":null,"id":"superstate","kind":"private","name":"Superstate","note":"Tokenized-stock issuer (allowlisted addresses). No TSV notice on website as of 2026-09-20 check.","status":"positioned","ticker":null},{"cik":null,"id":"oasis_pro","kind":"private","name":"Oasis Pro","note":"Regulated ATS; no TSV notice on website as of 2026-09-20 check.","status":"positioned","ticker":null}],"group":"Venues","id":"tsv_operators","label":"TSV operators (watchlist)"},{"companies":[{"cik":null,"id":"ondo","kind":"private","name":"Ondo Finance","note":"Tokenized funds; DTCC distribution partnership announced 2026-09.","status":"active","ticker":null},{"cik":null,"id":"dinari","kind":"private","name":"Dinari","note":"Tokenized US stocks (dShares), broker-dealer backed, 1:1.","status":"active","ticker":null},{"cik":null,"id":"backed","kind":"private","name":"Backed Finance (xStocks)","note":"xStocks issuer; NOT a US person — ineligible as TSV operator under the order.","status":"active","ticker":null},{"cik":null,"id":"figure","kind":"private","name":"Figure","note":"Tokenized-stock issuer/platform.","status":"active","ticker":null}],"group":"Issuers","id":"issuers","label":"Tokenized-stock issuers"},{"companies":[{"cik":"0001436229","id":"btcs","kind":"public","name":"BTCS Inc. (Imperium)","note":"Completed preparations for Imperium tokenized-equity liquidity provisioning under the Covered Firm exemption (announced 2026-09-28). No launch date; contingent on a qualifying TSV operating.","status":"preparing","ticker":"BTCS"}],"group":"Liquidity","id":"covered_firms","label":"Covered Firms (liquidity providers)"},{"companies":[{"cik":null,"id":"dtcc","kind":"private","name":"DTCC","note":"Tokenization service full launch due Oct 2026; Nasdaq DTC pilot (Mar 2026 approval) lets tokenized DTC-eligible securities trade on the same order book — separate from TSV framework.","status":"active","ticker":null},{"cik":null,"id":"equiniti","kind":"private","name":"Equiniti","note":"Transfer agency acquired by Bullish for native onchain share issuance.","status":"active","ticker":null}],"group":"Infrastructure","id":"market_infra","label":"Adjacent market infrastructure"},{"companies":[{"cik":"0001120193","id":"nasdaq","kind":"public","name":"Nasdaq","note":"DTC tokenization pilot venue (Mar 2026 SEC approval); incumbent venue — tokenized orders interact with the same order book as traditional shares.","status":"active","ticker":"NDAQ"},{"cik":"0001571949","id":"ice","kind":"public","name":"Intercontinental Exchange","note":"NYSE developing separate 24/7 tokenization platform (regulatory approval pending); incumbent venue.","status":"active","ticker":"ICE"}],"group":"Listed","id":"related_listed","label":"Related listed equities (incumbents)"}]}
+{
+  "_schema_note": "Generic coverage-map schema (same as ai_buildout): verticals -> companies [{id, name, ticker?, cik?, kind: public|private, status?, note?}], edges [{from, to, kind, label, amount_bn?, date?, source, confidence}], aggregates, risk_notes. The generic fetchers (fetch_universe_capex, fetch_universe_graph) take this universe_id with no TSV-specific hardcoding. status: operating | notice_filed | announced | preparing | positioned | rumored | active.",
+  "aggregates": [],
+  "as_of": "2026-10-03",
+  "edges": [
+    {
+      "confidence": "confirmed",
+      "date": "2026-09",
+      "from": "ondo",
+      "kind": "partnership",
+      "label": "tokenized fund distribution",
+      "source": "Traders Magazine",
+      "to": "dtcc"
+    },
+    {
+      "confidence": "confirmed",
+      "date": "2026-09",
+      "from": "bullish",
+      "kind": "acquisition",
+      "label": "transfer agency for onchain issuance",
+      "source": "Traders Magazine",
+      "to": "equiniti"
+    },
+    {
+      "confidence": "reported",
+      "date": "2026-09",
+      "from": "backpack",
+      "kind": "competitor",
+      "label": "parallel 1:1 tokenized-stock models (Solana)",
+      "source": "cleansky.io",
+      "to": "backed"
+    }
+  ],
+  "order": {
+    "authority": "Exchange Act Section 36(a)(1)",
+    "earliest_trading": "2026-10-17",
+    "excluded": [
+      "synthetics / tokenized linked securities / security-based swaps",
+      "options, warrants, rights",
+      "1940 Act fund shares (Section 18/22 issues noted)"
+    ],
+    "expires": "2031-09-17",
+    "file_no": "4-927",
+    "issued": "2026-09-17",
+    "issuer_veto": "30-day written issuer notice before listing third-party tokens; issuer may object within that window",
+    "notice_mechanics": "Public website notice >=30 calendar days before operating; written notice to tradingandmarkets@sec.gov within 1 business day of publication. ~30 lettered disclosure items; revised notices on 5-business-day / 20-day / quarterly cycles.",
+    "other_conditions": [
+      "US person only",
+      "auditable public smart contracts on permissionless ledger",
+      "equal rights (dividends, votes, liquidation)",
+      "no primary issuance — secondary only",
+      "no leverage/borrowing/hypothecation/credit",
+      "trading halts concurrent with primary listing exchange",
+      "trades reported within 10 minutes",
+      "anti-fraud (10b-5) still applies",
+      "no statutory disqualification"
+    ],
+    "pairing": "tokenized NMS stock <-> tokenized NMS stock | non-security crypto (e.g. GENIUS Act payment stablecoin) | tokenized money market fund",
+    "press_release": "2026-90",
+    "release": "34-106402",
+    "tier1_symbols": 75,
+    "tier1_volume_cap": "0.25% of prior-month ADV",
+    "tier2_symbols": 250,
+    "tier2_volume_cap": "2.5% of prior-month ADV"
+  },
+  "risk_notes": [
+    "No TSV operating notice (Condition C) had been published on any operator website as of 2026-09-20; SEC staff expect first notices 'next quarter' (Sept 22 interview). Earliest possible trading: 2026-10-17.",
+    "No central SEC registry exists — Condition C notices live on each operator's own website; written notice goes to tradingandmarkets@sec.gov within 1 business day of publication.",
+    "Issuer veto: any S&P 500 / Russell 1000 constituent can block third-party tokenization of its shares within 30 days of issuer notice.",
+    "Only ~15.6% of the $3.06B tokenized-stock market fits the order (cleansky.io, 2026-09-20): transfer-restricted issuer tokens need permissioned AMMs; synthetic/derivative tokens are excluded outright.",
+    "Robinhood's current EU stock tokens and Kraken's xStocks do not qualify (derivative contracts / no shareholder rights).",
+    "Backed (xStocks) is not a US person and cannot operate a TSV.",
+    "Covered Firm exemption is contingent on a qualifying TSV operating — BTCS/Imperium has no launch date or capital commitment.",
+    "Exemption expires 2026-09-17 -> 2031-09-17; SEC may modify under Section 36; public comments open under File No. 4-927."
+  ],
+  "title": "Tokenized Securities",
+  "universe_id": "tokenized_securities",
+  "verticals": [
+    {
+      "companies": [
+        {
+          "cik": "0001679788",
+          "id": "coinbase",
+          "kind": "public",
+          "name": "Coinbase",
+          "note": "Pushed for tokenized equities since 2024; named as likely beneficiary. No TSV notice filed as of 2026-10-03.",
+          "status": "positioned",
+          "ticker": "COIN",
+          "logo": "https://www.google.com/s2/favicons?domain=coinbase.com&sz=128"
+        },
+        {
+          "cik": "0001783879",
+          "id": "robinhood",
+          "kind": "public",
+          "name": "Robinhood",
+          "note": "CEO campaigned for tokenized stocks since 2025; current EU stock tokens are derivatives (excluded by order). Crypto exec: caps constrain a US launch. No TSV notice filed.",
+          "status": "positioned",
+          "ticker": "HOOD",
+          "logo": "https://www.google.com/s2/favicons?domain=robinhood.com&sz=128"
+        },
+        {
+          "cik": null,
+          "id": "kraken",
+          "kind": "private",
+          "name": "Kraken",
+          "note": "xStocks distributor; current xStocks are synthetic exposure without shareholder rights — excluded in current form.",
+          "status": "positioned",
+          "ticker": null,
+          "logo": "https://www.google.com/s2/favicons?domain=kraken.com&sz=128"
+        },
+        {
+          "cik": "0001872195",
+          "id": "bullish",
+          "kind": "public",
+          "name": "Bullish",
+          "note": "Acquired transfer agent Equiniti for native onchain issuance with issuer permission (issuer-permissioned model, not a TSV announcement).",
+          "status": "positioned",
+          "ticker": "BLSH",
+          "logo": "https://www.google.com/s2/favicons?domain=bullish.com&sz=128"
+        },
+        {
+          "cik": null,
+          "id": "backpack",
+          "kind": "private",
+          "name": "Backpack Securities",
+          "note": "SEC-registered broker-dealer; tokenized 17 US stocks/ETFs on Solana since 2026-06-12, 1:1 backed; US users currently excluded.",
+          "status": "positioned",
+          "ticker": null,
+          "logo": "https://www.google.com/s2/favicons?domain=backpack.exchange&sz=128"
+        },
+        {
+          "cik": null,
+          "id": "securitize",
+          "kind": "private",
+          "name": "Securitize",
+          "note": "Tokenized-stock issuer/platform (transfer-restricted issuance). No TSV notice on website as of 2026-09-20 check.",
+          "status": "positioned",
+          "ticker": null,
+          "logo": "https://www.google.com/s2/favicons?domain=securitize.io&sz=128"
+        },
+        {
+          "cik": null,
+          "id": "superstate",
+          "kind": "private",
+          "name": "Superstate",
+          "note": "Tokenized-stock issuer (allowlisted addresses). No TSV notice on website as of 2026-09-20 check.",
+          "status": "positioned",
+          "ticker": null,
+          "logo": "https://www.google.com/s2/favicons?domain=superstate.co&sz=128"
+        },
+        {
+          "cik": null,
+          "id": "oasis_pro",
+          "kind": "private",
+          "name": "Oasis Pro",
+          "note": "Regulated ATS; no TSV notice on website as of 2026-09-20 check.",
+          "status": "positioned",
+          "ticker": null,
+          "logo": "https://www.google.com/s2/favicons?domain=oasispro.com&sz=128"
+        }
+      ],
+      "group": "Venues",
+      "id": "tsv_operators",
+      "label": "TSV operators (watchlist)"
+    },
+    {
+      "companies": [
+        {
+          "cik": null,
+          "id": "ondo",
+          "kind": "private",
+          "name": "Ondo Finance",
+          "note": "Tokenized funds; DTCC distribution partnership announced 2026-09.",
+          "status": "active",
+          "ticker": null,
+          "logo": "https://www.google.com/s2/favicons?domain=ondo.finance&sz=128"
+        },
+        {
+          "cik": null,
+          "id": "dinari",
+          "kind": "private",
+          "name": "Dinari",
+          "note": "Tokenized US stocks (dShares), broker-dealer backed, 1:1.",
+          "status": "active",
+          "ticker": null,
+          "logo": "https://www.google.com/s2/favicons?domain=dinari.com&sz=128"
+        },
+        {
+          "cik": null,
+          "id": "backed",
+          "kind": "private",
+          "name": "Backed Finance (xStocks)",
+          "note": "xStocks issuer; NOT a US person — ineligible as TSV operator under the order.",
+          "status": "active",
+          "ticker": null,
+          "logo": "https://www.google.com/s2/favicons?domain=backed.fi&sz=128"
+        },
+        {
+          "cik": null,
+          "id": "figure",
+          "kind": "private",
+          "name": "Figure",
+          "note": "Tokenized-stock issuer/platform.",
+          "status": "active",
+          "ticker": null,
+          "logo": "https://www.google.com/s2/favicons?domain=figure.com&sz=128"
+        }
+      ],
+      "group": "Issuers",
+      "id": "issuers",
+      "label": "Tokenized-stock issuers"
+    },
+    {
+      "companies": [
+        {
+          "cik": "0001436229",
+          "id": "btcs",
+          "kind": "public",
+          "name": "BTCS Inc. (Imperium)",
+          "note": "Completed preparations for Imperium tokenized-equity liquidity provisioning under the Covered Firm exemption (announced 2026-09-28). No launch date; contingent on a qualifying TSV operating.",
+          "status": "preparing",
+          "ticker": "BTCS",
+          "logo": "https://www.google.com/s2/favicons?domain=btcs.com&sz=128"
+        }
+      ],
+      "group": "Liquidity",
+      "id": "covered_firms",
+      "label": "Covered Firms (liquidity providers)"
+    },
+    {
+      "companies": [
+        {
+          "cik": null,
+          "id": "dtcc",
+          "kind": "private",
+          "name": "DTCC",
+          "note": "Tokenization service full launch due Oct 2026; Nasdaq DTC pilot (Mar 2026 approval) lets tokenized DTC-eligible securities trade on the same order book — separate from TSV framework.",
+          "status": "active",
+          "ticker": null,
+          "logo": "https://www.google.com/s2/favicons?domain=dtcc.com&sz=128"
+        },
+        {
+          "cik": null,
+          "id": "equiniti",
+          "kind": "private",
+          "name": "Equiniti",
+          "note": "Transfer agency acquired by Bullish for native onchain share issuance.",
+          "status": "active",
+          "ticker": null,
+          "logo": "https://www.google.com/s2/favicons?domain=equiniti.com&sz=128"
+        }
+      ],
+      "group": "Infrastructure",
+      "id": "market_infra",
+      "label": "Adjacent market infrastructure"
+    },
+    {
+      "companies": [
+        {
+          "cik": "0001120193",
+          "id": "nasdaq",
+          "kind": "public",
+          "name": "Nasdaq",
+          "note": "DTC tokenization pilot venue (Mar 2026 SEC approval); incumbent venue — tokenized orders interact with the same order book as traditional shares.",
+          "status": "active",
+          "ticker": "NDAQ",
+          "logo": "https://www.google.com/s2/favicons?domain=nasdaq.com&sz=128"
+        },
+        {
+          "cik": "0001571949",
+          "id": "ice",
+          "kind": "public",
+          "name": "Intercontinental Exchange",
+          "note": "NYSE developing separate 24/7 tokenization platform (regulatory approval pending); incumbent venue.",
+          "status": "active",
+          "ticker": "ICE",
+          "logo": "https://www.google.com/s2/favicons?domain=ice.com&sz=128"
+        }
+      ],
+      "group": "Listed",
+      "id": "related_listed",
+      "label": "Related listed equities (incumbents)"
+    }
+  ]
+}
