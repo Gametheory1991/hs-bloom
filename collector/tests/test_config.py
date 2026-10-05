@@ -119,7 +119,7 @@ def test_cycle_config():
             assert sum(x is not None for x in sources) == 1, s.id
     # every tab row references an existing series; overlays too
     tabs = {t.id: t for t in cfg.cycle_tabs}
-    assert list(tabs) == ["risk", "econ", "credit", "profit", "pos", "quant", "etf", "struct"]
+    assert list(tabs) == ["risk", "econ", "credit", "profit", "pos", "quant", "etf", "struct", "ice"]
     for t in cfg.cycle_tabs:
         assert t.label == t.id.upper() or (t.id == "etf" and t.label == "ETFS")
         for p in t.panels:
