@@ -3,6 +3,7 @@ import { fmtAge, fmtClock, isStale } from "./fmt.js";
 import { defiFootData, initDefiViewToggle, renderDefi, renderMidnight } from "./panels/defi.js";
 import { renderBonds, renderEquity } from "./panels/equity.js";
 import { renderMacro } from "./panels/macro.js";
+import { renderAuctions } from "./panels/auctions.js";
 import { renderNews } from "./panels/news.js";
 import { renderCycle } from "./panels/cycle.js";
 import { renderEarningsProfit, renderFiscalEcon } from "./panels/fiscal.js";
@@ -32,7 +33,7 @@ import { initChat } from "./chat.js";
 import { initTabs } from "./tabs.js";
 
 const POLL_MS = 60_000;
-const STALE_MINUTES = { equity: 20, bonds: 130, macro: 390, news: 40, defi: 35, midnight: 35, refs: 35, insights: 70, riskmap: 2880, xcorr: 2880, gse: 86400, vol: 2880, movers: 10080, radar: 2880, hyper: 10080, tsv: 10080, usaspending: 20160, finnhub: 2880, worldbank: 20160, coingecko: 2880, predict: 120, finra: 2880 };  // ~2x cadence
+const STALE_MINUTES = { equity: 20, bonds: 130, macro: 390, news: 40, defi: 35, midnight: 35, refs: 35, insights: 70, riskmap: 2880, xcorr: 2880, gse: 86400, vol: 2880, movers: 10080, radar: 2880, hyper: 10080, tsv: 10080, usaspending: 20160, finnhub: 2880, worldbank: 20160, coingecko: 2880, predict: 120, finra: 2880, auctions: 2880 };  // ~2x cadence
 
 const EMPTY = { rows: [], updated_at: null, source: null };
 
@@ -96,6 +97,7 @@ async function tick() {
     renderEquity(p.equity);
     renderBonds(p.bonds);
     renderMacro(p.macro);
+    renderAuctions(p.auctions ?? EMPTY);
     renderNews(p.news);
     renderDefiPanel(p);
     renderMidnight(p.midnight ?? EMPTY);
@@ -126,6 +128,7 @@ async function tick() {
     foot("equity", "equity", { ...p.equity, source: p.equity.rows[0]?.source });
     foot("bonds", "bonds", p.bonds);
     foot("macro", "macro", p.macro);
+    foot("auctions", "auctions", p.auctions ?? { updated_at: null, source: null });
     foot("news", "news", p.news);
     foot("midnight", "midnight", p.midnight ?? EMPTY);
     foot("refs", "refs", p.refs ?? EMPTY);
