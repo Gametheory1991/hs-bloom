@@ -1,5 +1,15 @@
 ## 2026-10-05 — Treasury auctions + econ calendar: real data on the terminal and in the briefing
 
+**Fix (same day): TIPS/FRN auctions get their own buckets.** The Fiscal Data
+API labels TIPS as security_type "Note" (e.g. the Sep 17 9Y10M TIPS reopening,
+CUSIP 91282CRE3, real yield 2.653%), which was landing in the nominal
+Note-10Y bucket and producing a bogus "-218 bps vs Sep 9" auction-over-auction
+move. `normalize_bucket` now reads `inflation_index_security` /
+`floating_rate` and buckets TIPS as `TIPS-{n}Y`, FRNs as `FRN-{n}Y`
+(config buckets extended: TIPS-5Y/10Y/30Y, FRN-2Y). The Sep 17 record
+re-buckets automatically on the next daily run via the (auction_date, cusip)
+upsert. Briefing Table 7 renders TIPS/FRN tenors as their own rows.
+
 **Auction surveillance, end to end.** `collector/fetchers/auctions.py` now keeps
 per-auction detail records (not just per-bucket series): two docs,
 `auction_results` (completed auctions — high yield, bid-to-cover,
