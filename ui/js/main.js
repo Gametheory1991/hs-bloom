@@ -115,7 +115,9 @@ async function tick() {
                            p.ms_flow ?? { universe_id: "market_structure", verticals: [], edges: [], rollups: {}, capex_stack: {}, risk_notes: [], updated_at: null, source: null },
                            p.bank_flow ?? { universe_id: "bank_fixed_income", verticals: [], edges: [], rollups: {}, capex_stack: {}, risk_notes: [], updated_at: null, source: null },
                            p.tech_flow ?? { universe_id: "technology", verticals: [], edges: [], rollups: {}, capex_stack: {}, risk_notes: [], updated_at: null, source: null },
-                           p.vendor_flow ?? { universe_id: "vendor", verticals: [], edges: [], rollups: {}, capex_stack: {}, risk_notes: [], updated_at: null, source: null });
+                           p.vendor_flow ?? { universe_id: "vendor", verticals: [], edges: [], rollups: {}, capex_stack: {}, risk_notes: [], updated_at: null, source: null },
+                           p.etf_flow ?? { universe_id: "etf", verticals: [], edges: [], rollups: {}, capex_stack: {}, risk_notes: [], updated_at: null, source: null },
+                           p.crypto_flow ?? { universe_id: "crypto", verticals: [], edges: [], rollups: {}, capex_stack: {}, risk_notes: [], updated_at: null, source: null });
     renderTsv(p.tsv ?? { verticals: [], edges: [], risk_notes: [], order: {}, watch: null, updated_at: null, source: null });
     renderInsights(p.insights ?? { alerts: [], trends: [], newsletter: { headline: "No digest yet", bullets: [] } });
     renderPredict(p.predict ?? { edges: [], movers: [], calibration: [], polymarket: [], kalshi: [], tracked_count: 0, resolved_this_run: 0, skipped: [], disclaimer: null, updated_at: null, source: null });
