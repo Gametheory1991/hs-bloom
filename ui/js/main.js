@@ -21,6 +21,7 @@ import { renderScorecard } from "./panels/scorecard.js";
 import { renderCentral } from "./panels/central.js";
 import { renderPredict } from "./panels/predict.js";
 import { renderFinra } from "./panels/finra.js";
+import { renderKoi } from "./panels/koi_scorecard.js";
 import { renderAlerts } from "./panels/alerts.js";
 import { renderBriefcheck } from "./panels/briefcheck.js";
 import { initPalette, updateIndex } from "./palette.js";
@@ -113,6 +114,7 @@ async function tick() {
     renderMovers(p.movers ?? { indexes: {}, asof: null, updated_at: null, source: null });
     renderRadar(p.radar ?? { indicators: [], regime: "UNKNOWN", as_of: null, updated_at: null, source: null },
                 p.riskmap ?? { countries: [], asof: null, updated_at: null, source: null });
+    renderKoi();
     renderHyper(p.hyper ?? { issuances: [], equities: [], note: null, updated_at: null, source: null });
     renderUniverseSelector(p.ai_flow ?? { universe_id: "ai_buildout", verticals: [], edges: [], rollups: {}, capex_stack: {}, risk_notes: [], updated_at: null, source: null },
                            p.ms_flow ?? { universe_id: "market_structure", verticals: [], edges: [], rollups: {}, capex_stack: {}, risk_notes: [], updated_at: null, source: null },
@@ -160,7 +162,7 @@ renderCentral();
 renderAlerts();
 renderBriefcheck();
 refreshSearchIndex();
-setInterval(() => { renderFutures(); renderFlows(); renderScorecard(); renderCentral(); renderBriefcheck(); refreshSearchIndex(); }, 15 * 60_000);
+setInterval(() => { renderFutures(); renderFlows(); renderScorecard(); renderCentral(); renderBriefcheck(); renderKoi(); refreshSearchIndex(); }, 15 * 60_000);
 initDefiViewToggle(() => {
   if (lastDash) renderDefiPanel(lastDash.panels);
 });
