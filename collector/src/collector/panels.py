@@ -440,6 +440,100 @@ def _finnhub_panel(store: Store) -> dict:
             "updated_at": doc.updated_at, "source": doc.source}
 
 
+def _finra_panel(store: Store) -> dict:
+    """Dedicated FINRA tab: every FINRA-sourced dataset in one place.
+
+    Reg SHO daily short volume + OTC threshold list, biweekly short
+    interest, bond market breadth/sentiment, most-active corporate bonds,
+    capped-volume report, margin statistics, TRACE treasury daily and
+    TRACE monthly (currently blocked by the FINRA CDN 403).
+    Each section degrades to empty/None when its fetcher hasn't run yet.
+    """
+    def _d(key: str):
+        doc = store.doc(key)
+        if doc is None:
+            return None, None, None
+        return doc.payload, doc.updated_at, doc.source
+
+    regsho, regsho_upd, regsho_src = _d("regsho_daily")
+    thresh, thresh_upd, thresh_src = _d("regsho_threshold")
+    short, short_upd, short_src = _d("finra_short")
+    breadth, breadth_upd, breadth_src = _d("finra_breadth")
+    corp, corp_upd, corp_src = _d("finra_corp")
+    capped, capped_upd, capped_src = _d("finra_capped")
+    margin, margin_upd, margin_src = _d("finra_margin")
+    treas, treas_upd, treas_src = _d("trace_treasury")
+    monthly, monthly_upd, monthly_src = _d("trace_monthly")
+
+    # Margin debit sparkline (last ~2y of monthly points)
+    margin_hist = []
+    try:
+        pts = store.points("cycle:finra-margin-debit")
+        for d in sorted(pts)[-26:]:
+            margin_hist.append({"d": d.isoformat(), "v": pts[d]})
+    except Exception:  # noqa: BLE001 — sparkline is optional
+        margin_hist = []
+
+    # Breadth AD-spread sparkline: corporate all-securities advancers-decliners
+    breadth_hist = []
+    try:
+        pts = store.points("cycle:finra-breadth-corp-all-adspread")
+        for d in sorted(pts)[-60:]:
+            breadth_hist.append({"d": d.isoformat(), "v": pts[d]})
+    except Exception:  # noqa: BLE001
+        breadth_hist = []
+
+    corp_lists = {}
+    if corp:
+        for dslug, lst in (corp.get("lists") or {}).items():
+            bonds = (lst or {}).get("bonds") or []
+            corp_lists[dslug] = {"as_of": (lst or {}).get("as_of"),
+                                 "count": len(bonds), "bonds": bonds[:15]}
+
+    return {
+        "regsho": ({"as_of": regsho.get("as_of"), "markets": regsho.get("markets", {}),
+                    "top50": (regsho.get("top50") or [])[:25],
+                    "tickers": regsho.get("tickers", {}),
+                    "updated_at": regsho_upd, "source": regsho_src}
+                   if regsho else None),
+        "threshold": ({"as_of": thresh.get("as_of"), "count": thresh.get("count", 0),
+                       "securities": (thresh.get("securities") or [])[:50],
+                       "updated_at": thresh_upd, "source": thresh_src}
+                      if thresh else None),
+        "short_interest": ({"as_of": short.get("as_of"),
+                            "total_short_shares": short.get("total_short_shares"),
+                            "updated_at": short_upd, "source": short_src}
+                           if short else None),
+        "breadth": ({"as_of": breadth.get("as_of"), "status": breadth.get("status"),
+                     "series_count": len(breadth.get("series", []) or []),
+                     "adspread_hist": breadth_hist,
+                     "updated_at": breadth_upd, "source": breadth_src}
+                    if breadth else None),
+        "corp": ({"as_of": corp.get("as_of"), "status": corp.get("status"),
+                  "lists": corp_lists,
+                  "updated_at": corp_upd, "source": corp_src}
+                 if corp else None),
+        "capped": ({"as_of": capped.get("as_of"), "grades": capped.get("grades", {}),
+                    "months": capped.get("months", 0),
+                    "updated_at": capped_upd, "source": capped_src}
+                   if capped else None),
+        "margin": ({"as_of": margin.get("as_of"),
+                    "latest_debit_m": margin.get("latest_debit_m"),
+                    "debit_hist": margin_hist,
+                    "updated_at": margin_upd, "source": margin_src}
+                   if margin else None),
+        "trace_treasury": ({"as_of": treas.get("as_of"),
+                            "series_count": len(treas.get("series", []) or []),
+                            "updated_at": treas_upd, "source": treas_src}
+                           if treas else None),
+        "trace_monthly": ({"as_of": monthly.get("as_of"),
+                           "blocked": monthly.get("status") == "blocked",
+                           "updated_at": monthly_upd, "source": monthly_src}
+                          if monthly else {"as_of": None, "blocked": True,
+                                           "updated_at": None, "source": None}),
+    }
+
+
 def _predict_panel(store: Store) -> dict:
     """Prediction markets (batch 12): venue snapshots, cross-venue edge
     estimates, unusual movers, and the calibration leaderboard. Empty
@@ -512,5 +606,6 @@ def build_dashboard(
             "usaspending": _usaspending_panel(store),
             "finnhub": _finnhub_panel(store),
             "predict": _predict_panel(store),
+            "finra": _finra_panel(store),
         },
     }
