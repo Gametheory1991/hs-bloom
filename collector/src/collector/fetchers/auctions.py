@@ -42,8 +42,15 @@ _TERM_RE = re.compile(r"^(\d+)-(Week|Year)(?: (\d+)-Month)?$")
 _STD_MONTHS = [24, 36, 60, 84, 120, 240, 360]  # 2Y..30Y benchmark tenors
 
 
-def normalize_bucket(security_type: str, security_term: str) -> str | None:
-    """'Note'/'29-Year 11-Month' -> 'Note-30Y'; 'Bill'/'13-Week' -> 'Bill-13W'."""
+def normalize_bucket(security_type: str, security_term: str,
+                     inflation_index_security: str | None = None,
+                     floating_rate: str | None = None) -> str | None:
+    """'Note'/'29-Year 11-Month' -> 'Note-30Y'; 'Bill'/'13-Week' -> 'Bill-13W'.
+
+    TIPS (inflation_index_security='Yes') and FRNs (floating_rate='Yes') get
+    their own buckets (e.g. 'TIPS-10Y', 'FRN-2Y') so their yields never mix
+    with nominal notes/bonds of the same tenor.
+    """
     m = _TERM_RE.match((security_term or "").strip())
     if not m or not security_type:
         return None
@@ -52,7 +59,12 @@ def normalize_bucket(security_type: str, security_term: str) -> str | None:
         return f"{security_type}-{n}W"
     months = n * 12 + extra
     std = min(_STD_MONTHS, key=lambda s: abs(s - months))
-    return f"{security_type}-{std // 12}Y"
+    tenor = f"{std // 12}Y"
+    if (inflation_index_security or "").strip().lower() == "yes":
+        return f"TIPS-{tenor}"
+    if (floating_rate or "").strip().lower() == "yes":
+        return f"FRN-{tenor}"
+    return f"{security_type}-{tenor}"
 
 
 def _num(v) -> float | None:
@@ -71,7 +83,8 @@ def parse_auctions(text: str) -> list[dict]:
         btc = _num(r.get("bid_to_cover_ratio"))
         if btc is None:
             continue  # announced but not yet held
-        bucket = normalize_bucket(r.get("security_type"), r.get("security_term"))
+        bucket = normalize_bucket(r.get("security_type"), r.get("security_term"),
+                               r.get("inflation_index_security"), r.get("floating_rate"))
         if bucket is None:
             continue
         try:
@@ -106,7 +119,8 @@ def parse_detail(r: dict) -> dict | None:
         auction_date = date.fromisoformat(r["auction_date"])
     except (KeyError, TypeError, ValueError):
         return None
-    bucket = normalize_bucket(r.get("security_type"), r.get("security_term"))
+    bucket = normalize_bucket(r.get("security_type"), r.get("security_term"),
+                               r.get("inflation_index_security"), r.get("floating_rate"))
     if bucket is None:
         return None
     total = _num(r.get("total_accepted"))
