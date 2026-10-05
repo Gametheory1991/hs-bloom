@@ -20,7 +20,7 @@ def test_dashboard_shape_on_empty_store(tmp_path):
     client, _ = make_client(tmp_path)
     body = client.get("/api/dashboard").json()
     assert set(body["panels"].keys()) == {
-        "macro", "equity", "bonds", "news", "defi", "midnight", "morpho", "refs", "cycle",
+        "macro", "auctions", "equity", "bonds", "news", "defi", "midnight", "morpho", "refs", "cycle",
         "insights", "ai_flow", "ms_flow", "bank_flow", "tech_flow", "vendor_flow", "etf_flow", "crypto_flow",
         "gse", "hyper", "movers", "radar", "riskmap", "voldash", "xcorr", "tsv",
         "worldbank", "usaspending", "finnhub", "predict", "finra",
@@ -166,3 +166,50 @@ def test_insights_endpoint_defaults_when_digest_missing(tmp_path):
     assert body["trends"] == []
     assert body["delivery"]["state"] == "disabled"
     assert body["generated_at"] is None
+
+
+def test_api_auctions_serves_results_upcoming_and_buckets(tmp_path):
+    client, store = make_client(tmp_path)
+    store.put_doc("auction_results", {"results": [
+        {"auction_date": "2026-09-09", "bucket": "Note-10Y", "high_yield": 4.05,
+         "bid_to_cover": 2.41, "indirect_pct": 60.0, "completed": True, "cusip": "X"},
+        {"auction_date": "2026-10-08", "bucket": "Note-10Y", "high_yield": 4.21,
+         "bid_to_cover": 2.53, "indirect_pct": 61.0, "completed": True, "cusip": "Y"},
+    ]}, source="fiscaldata.treasury.gov")
+    store.put_doc("upcoming_auctions", {"auctions": [
+        {"auction_date": "2026-10-14", "bucket": "Note-3Y", "security_term": "3-Year",
+         "security_type": "Note", "offering_amt": 58000000000},
+    ]}, source="fiscaldata.treasury.gov")
+    body = client.get("/api/auctions").json()
+    assert body["source"] == "fiscaldata.treasury.gov"
+    assert len(body["upcoming"]) == 1
+    assert body["upcoming"][0]["bucket"] == "Note-3Y"
+    assert len(body["recent"]) == 2
+    assert body["buckets"]["Note-10Y"]["high_yield"] == 4.21  # latest wins
+    assert body["buckets"]["Note-10Y"]["bid_to_cover"] == 2.53
+
+
+def test_api_auctions_empty_store(tmp_path):
+    client, _ = make_client(tmp_path)
+    body = client.get("/api/auctions").json()
+    assert body["upcoming"] == [] and body["recent"] == [] and body["buckets"] == {}
+
+
+def test_api_econ_calendar_mirrors_macro_panel(tmp_path):
+    client, store = make_client(tmp_path)
+    store.put_doc("macro_calendar", {"releases": [
+        {"name": "CPI m/m", "country": "USD", "time": "2030-01-01T12:30:00+00:00",
+         "impact": "High", "previous": "0.2%", "consensus": "0.3%", "actual": None},
+    ]}, source="forexfactory")
+    body = client.get("/api/econ-calendar").json()
+    assert len(body["releases"]) == 1
+    assert body["releases"][0]["name"] == "CPI m/m"
+    assert body["past"] == []
+    assert body["source"] == "forexfactory"
+
+
+def test_dashboard_auctions_panel_on_empty_store(tmp_path):
+    client, _ = make_client(tmp_path)
+    panel = client.get("/api/dashboard").json()["panels"]["auctions"]
+    assert panel["upcoming"] == [] and panel["recent"] == []
+    assert panel["source"] == "fiscaldata.treasury.gov"

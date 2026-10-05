@@ -17,9 +17,16 @@ FIX = Path(__file__).parent / "fixtures"
 class FakeStore:
     def __init__(self):
         self.points = {}
+        self._docs = {}
 
     def upsert_points(self, series_id, points):
         self.points[series_id] = list(points)
+
+    def put_doc(self, key, payload, source):
+        self._docs[key] = payload
+
+    def doc(self, key):
+        return None
 
 
 def test_normalize_bucket_reopenings_land_in_benchmark_bucket():
