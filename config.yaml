@@ -45,6 +45,14 @@ cadences:          # seconds between fetcher runs
   tsv_capex: 604800      # tokenized-securities universe XBRL fundamentals; weekly
   tsv_graph: 604800      # tokenized-securities money-flow graph; weekly (zero HTTP)
   tsv_watch: 604800      # TSV regulatory scan (SEC press + Federal Register); weekly
+  bank_capex: 604800     # bank/fixed-income universe XBRL fundamentals; weekly (quarterly data)
+  bank_graph: 604800     # bank/fixed-income money-flow graph; weekly (zero HTTP, overlays bank_capex)
+  bank_capex: 604800     # bank/fixed-income universe XBRL fundamentals; weekly (quarterly data)
+  bank_graph: 604800     # bank/fixed-income money-flow graph; weekly (zero HTTP, overlays bank_capex)
+  tech_capex: 604800     # technology universe XBRL fundamentals; weekly (quarterly data)
+  tech_graph: 604800     # technology money-flow graph; weekly (zero HTTP, overlays tech_capex)
+  vendor_capex: 604800   # vendor universe XBRL fundamentals; weekly (quarterly data)
+  vendor_graph: 604800   # vendor money-flow graph; weekly (zero HTTP, overlays vendor_capex)
   worldbank: 604800    # World Bank macro fundamentals; weekly (annual data)
   usaspending: 604800  # USAspending.gov fiscal pulse; weekly (3 keyless POSTs)
   coingecko: 86400     # CoinGecko top-50 crypto breadth; daily (1 batched call)
@@ -743,6 +751,46 @@ cycle_series:      # market-cycle series (spec 2026-08-24); exactly one source k
   - { id: ms-ice,  name: "ICE",                 unit: idx, yahoo: "ICE" }
   - { id: ms-ndaq, name: "Nasdaq",              unit: idx, yahoo: "NDAQ" }
   - { id: ms-cboe, name: "Cboe Global Markets", unit: idx, yahoo: "CBOE" }
+  # ---- bank/fixed-income universe (19 tickers) ----
+  - { id: bk-jpm,  name: "JPMorgan Chase",    unit: idx, yahoo: "JPM" }
+  - { id: bk-bac,  name: "Bank of America",   unit: idx, yahoo: "BAC" }
+  - { id: bk-c,    name: "Citigroup",         unit: idx, yahoo: "C" }
+  - { id: bk-wfc,  name: "Wells Fargo",       unit: idx, yahoo: "WFC" }
+  - { id: bk-gs,   name: "Goldman Sachs",     unit: idx, yahoo: "GS" }
+  - { id: bk-ms,   name: "Morgan Stanley",    unit: idx, yahoo: "MS" }
+  - { id: bk-usb,  name: "U.S. Bancorp",      unit: idx, yahoo: "USB" }
+  - { id: bk-pnc,  name: "PNC Financial",     unit: idx, yahoo: "PNC" }
+  - { id: bk-tfc,  name: "Truist Financial",  unit: idx, yahoo: "TFC" }
+  - { id: bk-fitb, name: "Fifth Third",       unit: idx, yahoo: "FITB" }
+  - { id: bk-key,  name: "KeyCorp",           unit: idx, yahoo: "KEY" }
+  - { id: bk-rf,   name: "Regions Financial", unit: idx, yahoo: "RF" }
+  - { id: bk-hban, name: "Huntington",        unit: idx, yahoo: "HBAN" }
+  - { id: bk-cof,  name: "Capital One",       unit: idx, yahoo: "COF" }
+  - { id: bk-stt,  name: "State Street",      unit: idx, yahoo: "STT" }
+  - { id: bk-bk,   name: "BNY Mellon",        unit: idx, yahoo: "BK" }
+  - { id: bk-jef,  name: "Jefferies",         unit: idx, yahoo: "JEF" }
+  - { id: bk-fnma, name: "Fannie Mae (OTC)",  unit: idx, yahoo: "FNMA" }
+  - { id: bk-fmcc, name: "Freddie Mac (OTC)", unit: idx, yahoo: "FMCC" }
+  # ---- bank/fixed-income universe (19 tickers) ----
+  - { id: bk-jpm,  name: "JPMorgan Chase",    unit: idx, yahoo: "JPM" }
+  - { id: bk-bac,  name: "Bank of America",   unit: idx, yahoo: "BAC" }
+  - { id: bk-c,    name: "Citigroup",         unit: idx, yahoo: "C" }
+  - { id: bk-wfc,  name: "Wells Fargo",       unit: idx, yahoo: "WFC" }
+  - { id: bk-gs,   name: "Goldman Sachs",     unit: idx, yahoo: "GS" }
+  - { id: bk-ms,   name: "Morgan Stanley",    unit: idx, yahoo: "MS" }
+  - { id: bk-usb,  name: "U.S. Bancorp",      unit: idx, yahoo: "USB" }
+  - { id: bk-pnc,  name: "PNC Financial",     unit: idx, yahoo: "PNC" }
+  - { id: bk-tfc,  name: "Truist Financial",  unit: idx, yahoo: "TFC" }
+  - { id: bk-fitb, name: "Fifth Third",       unit: idx, yahoo: "FITB" }
+  - { id: bk-key,  name: "KeyCorp",           unit: idx, yahoo: "KEY" }
+  - { id: bk-rf,   name: "Regions Financial", unit: idx, yahoo: "RF" }
+  - { id: bk-hban, name: "Huntington",        unit: idx, yahoo: "HBAN" }
+  - { id: bk-cof,  name: "Capital One",       unit: idx, yahoo: "COF" }
+  - { id: bk-stt,  name: "State Street",      unit: idx, yahoo: "STT" }
+  - { id: bk-bk,   name: "BNY Mellon",        unit: idx, yahoo: "BK" }
+  - { id: bk-jef,  name: "Jefferies",         unit: idx, yahoo: "JEF" }
+  - { id: bk-fnma, name: "Fannie Mae (OTC)",  unit: idx, yahoo: "FNMA" }
+  - { id: bk-fmcc, name: "Freddie Mac (OTC)", unit: idx, yahoo: "FMCC" }
   # ---- batch 9: TSV-related listed equities (verified live 2026-10-03) ----
   - { id: tsv-coin, name: "Coinbase", unit: idx, yahoo: "COIN" }
   - { id: tsv-hood, name: "Robinhood", unit: idx, yahoo: "HOOD" }
@@ -750,6 +798,25 @@ cycle_series:      # market-cycle series (spec 2026-08-24); exactly one source k
   - { id: tsv-btcs, name: "BTCS Inc.", unit: idx, yahoo: "BTCS" }
   - { id: tsv-ndaq, name: "Nasdaq", unit: idx, yahoo: "NDAQ" }
   - { id: tsv-ice, name: "Intercontinental Exchange", unit: idx, yahoo: "ICE" }
+  # ---- technology universe (trading tech, fintech, regtech, crypto infra) ----
+  - { id: tech-fis,  name: "FIS",                unit: idx, yahoo: "FIS" }
+  - { id: tech-fisv, name: "Fiserv",             unit: idx, yahoo: "FISV" }
+  - { id: tech-jkhy, name: "Jack Henry",         unit: idx, yahoo: "JKHY" }
+  - { id: tech-qtwo, name: "Q2 Holdings",        unit: idx, yahoo: "QTWO" }
+  - { id: tech-mq,   name: "Marqeta",            unit: idx, yahoo: "MQ" }
+  - { id: tech-pypl, name: "PayPal",             unit: idx, yahoo: "PYPL" }
+  - { id: tech-gpn,  name: "Global Payments",    unit: idx, yahoo: "GPN" }
+  - { id: tech-v,    name: "Visa",               unit: idx, yahoo: "V" }
+  - { id: tech-ma,   name: "Mastercard",         unit: idx, yahoo: "MA" }
+  - { id: tech-nice, name: "NICE Ltd",           unit: idx, yahoo: "NICE" }
+  - { id: tech-coin, name: "Coinbase",           unit: idx, yahoo: "COIN" }
+  # ---- vendor universe (data vendors, index providers, rating agencies) ----
+  - { id: vnd-spgi, name: "S&P Global",         unit: idx, yahoo: "SPGI" }
+  - { id: vnd-mco,  name: "Moody's",            unit: idx, yahoo: "MCO" }
+  - { id: vnd-msci, name: "MSCI",               unit: idx, yahoo: "MSCI" }
+  - { id: vnd-fds,  name: "FactSet",            unit: idx, yahoo: "FDS" }
+  - { id: vnd-morn, name: "Morningstar",        unit: idx, yahoo: "MORN" }
+  - { id: vnd-lseg, name: "LSEG",               unit: idx, yahoo: "LSEG.L" }
   # ---- batch 10: TRACE extensions (verified live 2026-10-03) ----
   - { id: trace-ust-frns-par,  name: "Treasury TRACE FRN par $bn",         unit: "$bn",  external: true }
   - { id: trace-ust-onrun-par, name: "Treasury TRACE on-the-run par $bn",  unit: "$bn",  external: true }
