@@ -1,8 +1,12 @@
 // FINRA tab: every FINRA-sourced dataset in one place.
 // Reads dash.panels.finra (backend _finra_panel).
-// Sections: Reg SHO short volume, threshold list, short interest,
-// market breadth, most-active corporate bonds, capped volume,
+// Sections: Reg SHO short volume (incl. FINRA TRF venue), threshold list,
+// short interest, market breadth, most-active corporate bonds, capped volume,
 // margin statistics, TRACE treasury/monthly, TRACE volume charts.
+// The STRUCT cycle tab (TRACE series, short interest, margin, breadth,
+// sentiment, corp bonds, Reg SHO, capped volume — all Now/Δ1M/Δ1Y tables)
+// also renders on this tab via #cycle-struct; ICE Vantage moved to its own
+// cycle tab on POS.
 import { renderTraceCharts } from "./trace_charts.js";
 const big = (x) =>
   x == null ? "—" : x.toLocaleString("en-US", { maximumFractionDigits: 0 });
