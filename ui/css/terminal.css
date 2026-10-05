@@ -438,3 +438,13 @@ path.map-country:hover { stroke: var(--amber); stroke-width: 1.6; }
   .palette-box { width: 94vw; }
   .alert-row { flex-wrap: wrap; }
 }
+
+/* TRACE volume charts (FINRA tab) */
+.trace-controls { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin: 8px 0; }
+.trace-controls label { display: flex; gap: 6px; align-items: center; font-size: 12px; color: var(--muted); }
+.trace-controls select {
+  background: var(--bg); color: var(--fg); border: 1px solid var(--line);
+  font: inherit; font-size: 12px; padding: 5px 8px; border-radius: 3px;
+}
+.trace-chart { min-height: 340px; }
+#trace-chart-status { margin: 4px 0 12px; font-size: 11px; }
