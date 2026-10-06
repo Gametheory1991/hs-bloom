@@ -3,7 +3,7 @@
 // TODAY ECON + NEXT AUCTIONS + RISK GAUGES. All live from terminal APIs,
 // re-rendered on every dashboard refresh (15-min interval in main.js).
 import { getScorecard, getSeries, getDashboard, getAuctions, getEconCalendar } from "../api.js";
-import { rangePlotDotted, zToPct } from "../rangeviz.js";
+import { rangePlotDotted, zToPct, RANGE_LEGEND } from "../rangeviz.js";
 // TRACE/Treasury monthly volume: reuse the grid's canonical TOTAL math
 // (Treasury Total + all 10 TRACE products, 11 components — corrected 2026-10-05).
 import { TOTAL_PARTS, toMetric, totalVals, rowStats, rangeById } from "./trace_grid.js";
@@ -225,7 +225,7 @@ async function rangeCheckHtml(scoreRows, vol) {
   const volRows = volDefs.filter(([, st]) => st != null)
     .map(([label, st, fv]) => rangeRow(label, fv(st.cur?.v), st.pct ?? null, st.z ?? null));
   return `<table data-sortable><tr><th>Series</th><th>Now</th>` +
-    `<th data-sort="off">Range · percentile</th><th data-sort="off">Range · z-score</th>` +
+    `<th data-sort="off">Range · percentile<br>${RANGE_LEGEND}</th><th data-sort="off">Range · z-score</th>` +
     `<th>%ile</th><th>z</th></tr>${rows.join("")}${volRows.join("")}</table>`;
 }
 

@@ -725,3 +725,7 @@ td.sym { color: #1d4ed8; font-weight: 600; }
 @media (max-width: 640px) {
   .sym-desc { display: block; white-space: normal; }
 }
+
+/* Sparkline legend: tiny "● Now ◆ Avg" key inside Range column headers. */
+.range-legend { display: inline-block; font-size: 9px; font-weight: 400; color: #64748b; white-space: nowrap; }
+th .range-legend { margin-top: 2px; }

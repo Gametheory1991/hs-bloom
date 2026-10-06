@@ -84,9 +84,16 @@ export function rangeCells(s, winLabel) {
     `<td class="${zCls} num" title="Z-score of now vs ${esc(winLabel || "history")}">z ${zTxt}</td>`;
 }
 
+// Compact visible legend for the dotted range sparklines: blue dot = Now
+// (current value), gold diamond = Avg (historical average / 50th percentile).
+// Place once per table — e.g. inside the "Range" column header — not per row.
+export const RANGE_LEGEND =
+  `<span class="range-legend" title="Blue dot = current value (Now) · Gold diamond = historical average (Avg)">` +
+  `<span style="color:#2563eb">●</span> Now <span style="color:#f59e0b">◆</span> Avg</span>`;
+
 // Standard <th> set for the range columns. Place inside the header <tr>.
 export const RANGE_TH =
-  `<th data-sort="off" title="Dotted historical range: blue dot = now (percentile), ◆ = 50th">Range %ile</th>` +
+  `<th data-sort="off" title="Dotted historical range: blue dot = now (percentile), ◆ = 50th">Range %ile<br>${RANGE_LEGEND}</th>` +
   `<th data-sort="off" title="Dotted historical range: blue dot = now (z-score), ◆ = mean">Range z</th>` +
   `<th title="Percentile of current value vs history">%ile</th>` +
   `<th title="Z-score of current value vs history">z</th>`;

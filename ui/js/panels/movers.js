@@ -3,6 +3,7 @@
 // "largest std-dev moves" visual.
 // Data: /api/dashboard "movers" panel. Vanilla JS + inline SVG, no new libs.
 import { fmtAge } from "../fmt.js";
+import { symName } from "../names.js";
 
 const STALE_MINUTES = 10080; // 7d: weekly job
 
@@ -14,22 +15,26 @@ const esc = (s) =>
 function barList(rows, maxAbs) {
   // rows: [{symbol, z, ret_pct}] — green right / red left, std-dev axis
   if (!rows || !rows.length) return `<div class="muted">no data</div>`;
-  const W = 260, mid = 90, maxW = 150;
-  const H = rows.length * 20 + 4;
+  const W = 300, mid = 118, maxW = 150;
+  const RH = 30, H = rows.length * RH + 4;
   let s = `<svg viewBox="0 0 ${W} ${H}" width="${W}" style="max-width:100%;display:block" role="img">`;
   rows.forEach((r, i) => {
-    const y = i * 20 + 2;
+    const y = i * RH + 2;
     const w = maxAbs > 0 ? Math.min(maxW, (Math.abs(r.z) / maxAbs) * maxW) : 0;
     const x = r.z >= 0 ? mid : mid - w;
     const color = r.z >= 0 ? "#2fb56b" : "#e05252";
-    s += `<text x="${mid - 6}" y="${y + 13}" text-anchor="end" font-size="10" fill="#9aa4b2">${esc(r.symbol)}</text>`;
-    s += `<rect x="${x}" y="${y + 3}" width="${Math.max(1, w)}" height="12" rx="2" fill="${color}">` +
-      `<title>${esc(r.symbol)}: ${r.z >= 0 ? "+" : ""}${r.z.toFixed(2)}σ (${r.ret_pct >= 0 ? "+" : ""}${r.ret_pct.toFixed(1)}%)</title></rect>`;
-    s += `<text x="${r.z >= 0 ? x + w + 4 : x - 4}" y="${y + 13}" text-anchor="${r.z >= 0 ? "start" : "end"}" font-size="9" fill="#9aa4b2">${r.z >= 0 ? "+" : ""}${r.z.toFixed(2)}</text>`;
+    const full = symName(r.symbol);
+    const nm = full.includes(" — ") ? full.split(" — ").slice(1).join(" — ") : "";
+    const nmShort = nm.length > 18 ? nm.slice(0, 17) + "…" : nm;
+    const zTxt = `${r.z >= 0 ? "+" : ""}${r.z.toFixed(2)}`;
+    s += `<text x="${mid - 6}" y="${y + 11}" text-anchor="end" font-size="10" font-weight="700" fill="#1e293b">${esc(r.symbol)}</text>`;
+    if (nmShort) s += `<text x="${mid - 6}" y="${y + 23}" text-anchor="end" font-size="8" fill="#94a3b8">${esc(nmShort)}</text>`;
+    s += `<rect x="${x}" y="${y + 8}" width="${Math.max(1, w)}" height="12" rx="2" fill="${color}">` +
+      `<title>${esc(full)}: ${zTxt}σ (${r.ret_pct >= 0 ? "+" : ""}${r.ret_pct.toFixed(1)}%)</title></rect>`;
+    s += `<text x="${r.z >= 0 ? x + w + 4 : x - 4}" y="${y + 19}" text-anchor="${r.z >= 0 ? "start" : "end"}" font-size="9" fill="#9aa4b2">${zTxt}</text>`;
   });
   // zero axis
   s += `<line x1="${mid}" y1="0" x2="${mid}" y2="${H}" stroke="#3a4450" stroke-width="1"/>`;
-  s += `<text x="${W / 2}" y="${H - 0}" font-size="8" fill="#5a6572" text-anchor="middle" transform="translate(0,-${H - 14})"></text>`;
   s += `</svg><div class="muted">standard deviations</div>`;
   return s;
 }

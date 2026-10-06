@@ -9,7 +9,7 @@
 import { getSeries } from "../api.js";
 import { setTraceChartProduct } from "./trace_charts.js";
 import { OUTSTANDING, totalOutstanding, OUTSTANDING_NOTE } from "./outstanding.js";
-import { rangePlotDotted } from "../rangeviz.js";
+import { rangePlotDotted, RANGE_LEGEND } from "../rangeviz.js";
 import { heatStyle, HEAT_LEGEND } from "../heatmap.js";
 
 const PRODUCTS = [
@@ -794,7 +794,7 @@ function renderTable() {
   const head = COLS.map((c) => {
     let title = c.title;
     if (c.key === "cur") title = metricColTitle();
-    if (c.key === "rngpct") title = `Range %ile (${state.rows[0]?.stats?.winLabel || "3Y"})`;
+    if (c.key === "rngpct") title = `Range %ile (${state.rows[0]?.stats?.winLabel || "3Y"})<br>${RANGE_LEGEND}`;
     if (c.key === "rngz") title = `Range z (${state.rows[0]?.stats?.winLabel || "3Y"})`;
     if (c.key === "trend") title = `Trend (${state.rows[0]?.stats?.winLabel || "3Y"})`;
     if (c.key === "d3") title = `Δ ${state.rows[0]?.stats?.winLabel || "3Y"} avg %`;

@@ -92,6 +92,15 @@ def create_app(store: Store, cfg: Config) -> FastAPI:
         elif series_id in cb_names:
             points = store.points(f"cb:{series_id[:-2]}")  # USCB -> cb:US
             name, unit = cb_names[series_id], "%"
+        elif series_id.startswith("auction:"):
+            # UST auction bucket history: auction:{bucket}:{metric} (bid_to_cover,
+            # high_yield, indirect_pct, direct_pct, dealer_pct, offering).
+            points = store.points(series_id)
+            _m = series_id.rsplit(":", 1)[-1]
+            _mu = {"high_yield": "%", "bid_to_cover": "ratio",
+                   "indirect_pct": "%", "direct_pct": "%", "dealer_pct": "%",
+                   "offering": "$"}.get(_m, "")
+            name, unit = f"{series_id[len('auction:'):]}".replace(":", " "), _mu
         elif series_id.startswith("regsho-top-") and (
                 series_id.endswith("-shortvol") or series_id.endswith("-totalvol")):
             # Dynamic per-ticker Reg SHO history (backfilled 2Y, 518 days).

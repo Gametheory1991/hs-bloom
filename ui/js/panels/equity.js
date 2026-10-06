@@ -1,5 +1,6 @@
 import { openChart } from "../chart.js";
 import { fmtBp, fmtNum, fmtPct } from "../fmt.js";
+import { symNameHtml } from "../names.js";
 
 const HORIZONS = ["1d", "1w", "ytd", "1y"];
 
@@ -12,7 +13,7 @@ export function renderEquity(panel) {
   body.innerHTML = `<table data-sortable>
     <tr><th>Index</th><th>Last</th><th>1D</th><th>1W</th><th>YTD</th><th>1Y</th></tr>
     ${panel.rows.map((r, i) =>
-      `<tr class="clickable" data-i="${i}"><td class="sym" title="${r.name}">${r.symbol}</td>` +
+      `<tr class="clickable" data-i="${i}"><td class="sym">${symNameHtml(r.symbol, 34)}</td>` +
       `<td>${fmtNum(r.last)}</td>${cells(r)}</tr>`
     ).join("")}
   </table>`;

@@ -3,7 +3,7 @@
 // spot-vol beta. Data: /api/dashboard "voldash" panel.
 // Vanilla JS + inline SVG, no new libraries.
 import { fmtAge } from "../fmt.js";
-import { rangePlotDotted } from "../rangeviz.js";
+import { rangePlotDotted, RANGE_LEGEND } from "../rangeviz.js";
 import { symNameHtml } from "../names.js";
 
 const STALE_MINUTES = 2880; // 2x the daily voldash cadence
@@ -39,7 +39,7 @@ function tableSection(v) {
   return `
     <div class="panel-subhead"><span>MACRO EQUITY VOLATILITY <span class="muted">1M implied vs realized</span></span></div>
     <div style="overflow-x:auto"><table class="voltable" data-sortable>
-      <thead><tr><th>Ticker</th><th>1M Impl.</th><th>Wkly</th><th>%ile (1Y)</th><th data-sort="off">Range</th><th>1M Real.</th><th>Impl−Real</th><th>%ile (1Y)</th><th data-sort="off">Range</th></tr></thead>
+      <thead><tr><th>Ticker</th><th>1M Impl.</th><th>Wkly</th><th>%ile (1Y)</th><th data-sort="off">Range<br>${RANGE_LEGEND}</th><th>1M Real.</th><th>Impl−Real</th><th>%ile (1Y)</th><th data-sort="off">Range</th></tr></thead>
       <tbody>${trs}</tbody>
     </table></div>
     <div class="muted">Implied = vol index (VIX/VXN/GVZ/OVX/VXSLV); realized = 21d ann. from prices. RTY/TLT/LQD/HYG have no free implied feed — realized only.</div>`;
