@@ -49,7 +49,7 @@ export async function notifyInsights(panel) {
     await registration.showNotification("os-bloom digest", {
       body: lead ? `${lead.name}: ${lead.summary}` : (panel.newsletter?.headline ?? "Digest updated"),
       tag: "osbloom-digest",
-      data: { url: "/#/mkt" },
+      data: { url: "/#/pulse/snapshot" },
     });
     localStorage.setItem(STORAGE_KEY, signature);
   } catch {
