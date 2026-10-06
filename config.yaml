@@ -43,6 +43,15 @@ cadences:          # seconds between fetcher runs
   finra_ids_star: 86400  # FINRA IDS STAR Structured Product Activity Reports; daily ZIPs, keyless, 36-mo backfill
   finra_factbook: 2592000  # FINRA TRACE Fact Book quarterly workbooks (corp/agency/sec XLSX); monthly poll, quarterly release
   finra_factbook_annual: 31536000  # FINRA Fact Book annual Transaction/Issue/Participant workbooks; yearly poll, annual release
+  ofr_stfm: 86400      # OFR Short-Term Funding Monitor (SOFR, cleared repo, MMF, dealer fails/financing); daily
+  frb_ddp: 604800      # FRB SLOOS (quarterly) + Commercial Paper (weekly) via FRED (DDP retiring); weekly poll, idempotent
+  sec_ncen: 2592000    # SEC N-CEN registered-fund census; monthly poll, quarterly receipt batches (~8-16MB)
+  sec_nport: 2592000   # SEC N-PORT holdings aggregates (selective ZIP extraction); monthly poll, quarterly batches
+  sec_pfs: 2592000     # SEC Private Fund Statistics supporting XLSX; monthly poll, quarterly report
+  z1_holdings: 2592000  # FRED Z.1 holdings-by-holder; monthly poll, quarterly data
+  mspd: 2592000        # MSPD Tables 1+3 debt outstanding; monthly poll
+  soma_cusip: 604800   # NY Fed SOMA holdings by CUSIP; weekly poll
+  debt_cube: 86400      # debt-outstanding slice cube; daily compute
   ms_capex: 604800       # market-structure universe XBRL financials; weekly (quarterly data)
   ms_graph: 604800       # market-structure money-flow graph; weekly (zero HTTP, overlays ms_capex)
   tsv_capex: 604800      # tokenized-securities universe XBRL fundamentals; weekly
@@ -245,6 +254,141 @@ cycle_series:      # market-cycle series (spec 2026-08-24); exactly one source k
   - { id: hf-repo-borrow,   name: "HF repo borrowing $",       unit: "$", ofr: FPF-BORROW_REPO_SUM }
   - { id: hf-treasury-long, name: "HF long UST exposure $",    unit: "$", ofr: FPF-ASSETCLASS_LTREASURY_SUM }
   - { id: hf-top10-lev,     name: "Top-10 HF leverage ratio",  unit: "x", ofr: FPF-ALLQHF_GAVN10_LEVERAGERATIO_AVERAGE }
+
+  # ---- batch 13: OFR Hedge Fund Monitor positioning (dataset=fpf; quarterly; same keyless pattern) ----
+  - { id: hf-ust-short,       name: "HF short UST exposure $",          unit: "$", ofr: FPF-ASSETCLASS_STREASURY_SUM }
+  - { id: hf-nav,             name: "Qualifying HF net assets $",       unit: "$", ofr: FPF-ALLQHF_NAV_SUM }
+  - { id: hf-ird-gne,         name: "HF rates-derivatives gross notional $", unit: "$", ofr: FPF-ASSETCLASS_IRD_GNE_SUM }
+  - { id: hf-rv-lev,          name: "Relative-value HF leverage ratio", unit: "x", ofr: FPF-STRATEGY_RV_LEVERAGERATIO_NAVWMEAN }
+  - { id: hf-multi-lev,       name: "Multi-strategy HF leverage ratio", unit: "x", ofr: FPF-STRATEGY_MULTI_LEVERAGERATIO_NAVWMEAN }
+  - { id: hf-macro-lev,       name: "Macro HF leverage ratio",          unit: "x", ofr: FPF-STRATEGY_MACRO_LEVERAGERATIO_NAVWMEAN }
+  - { id: hf-credit-gne,      name: "HF credit gross notional $",       unit: "$", ofr: FPF-ASSETCLASS_CREDIT_GNE_SUM }
+  - { id: hf-credit-long,     name: "HF credit long notional $",        unit: "$", ofr: FPF-ASSETCLASS_CREDIT_LGNE_SUM }
+  - { id: hf-credit-short,    name: "HF credit short notional $",       unit: "$", ofr: FPF-ASSETCLASS_CREDIT_SGNE_SUM }
+  - { id: hf-eq-gne,          name: "HF equity gross notional $",       unit: "$", ofr: FPF-ASSETCLASS_EQUITIES_GNE_SUM }
+  - { id: hf-eq-long,         name: "HF equity long notional $",        unit: "$", ofr: FPF-ASSETCLASS_EQUITIES_LGNE_SUM }
+  - { id: hf-eq-short,        name: "HF equity short notional $",       unit: "$", ofr: FPF-ASSETCLASS_EQUITIES_SGNE_SUM }
+  - { id: hf-fx-gne,          name: "HF FX gross notional $",           unit: "$", ofr: FPF-ASSETCLASS_FX_GNE_SUM }
+  - { id: hf-repo-share-top10,  name: "HF repo borrowing: top-10 share %",  unit: "%", ofr: FPF-BORROW_REPO_GAVN10_PERCENT }
+  - { id: hf-repo-share-11to50, name: "HF repo borrowing: 11-50 share %",   unit: "%", ofr: FPF-BORROW_REPO_GAVN11TO50_PERCENT }
+  - { id: hf-repo-share-51p,    name: "HF repo borrowing: 51+ share %",     unit: "%", ofr: FPF-BORROW_REPO_GAVN51_PERCENT }
+  - { id: hf-pb-borrow,       name: "HF prime-brokerage borrowing $",  unit: "$", ofr: FPF-BORROW_PRIMEBROKER_SUM }
+  - { id: hf-repo-repo,        name: "HF repo exposure $",             unit: "$", ofr: FPF-ASSETCLASS_REPO_REPO_SUM }
+  - { id: hf-repo-rrepo,       name: "HF reverse-repo exposure $",      unit: "$", ofr: FPF-ASSETCLASS_REPO_REVERSEREPO_SUM }
+  - { id: hf-lev-11to50,       name: "HF leverage: funds 11-50",        unit: "x", ofr: FPF-ALLQHF_GAVN11TO50_LEVERAGERATIO_AVERAGE }
+  - { id: hf-lev-51p,          name: "HF leverage: funds 51+",          unit: "x", ofr: FPF-ALLQHF_GAVN51_LEVERAGERATIO_AVERAGE }
+  - { id: hf-rv-cash,          name: "RV HF unencumbered cash % of NAV",    unit: "%", ofr: FPF-STRATEGY_RV_CASHRATIO_NAVWMEAN }
+  - { id: hf-multi-cash,       name: "Multi-strat HF unencumbered cash % of NAV", unit: "%", ofr: FPF-STRATEGY_MULTI_CASHRATIO_NAVWMEAN }
+  - { id: hf-cds-stress-p5,    name: "HF +250bp credit shock: 5th pct %",   unit: "%", ofr: FPF-ALLQHF_CDSUP250BPS_P5 }
+  - { id: hf-cds-stress-p50,   name: "HF +250bp credit shock: median %",    unit: "%", ofr: FPF-ALLQHF_CDSUP250BPS_P50 }
+  # ---- batch 13: OFR Short-Term Funding Monitor (dedicated job; daily/weekly/monthly) ----
+  - { id: stfm-sofr,                name: "SOFR (OFR STFM, daily)",              unit: "%", external: true }
+  - { id: stfm-repo-dvp,            name: "Cleared repo avg rate, prelim (daily)", unit: "%", external: true }
+  - { id: stfm-mmf-total,           name: "Money-market-fund total assets $ (monthly)", unit: "$", external: true }
+  - { id: stfm-dealer-fail-deliver, name: "Primary-dealer fails to deliver $ (weekly)", unit: "$", external: true }
+  - { id: stfm-dealer-fail-receive, name: "Primary-dealer fails to receive $ (weekly)", unit: "$", external: true }
+  - { id: stfm-dealer-repo,         name: "Primary-dealer repo financing $ (weekly)",    unit: "$", external: true }
+  - { id: stfm-dealer-rrp,          name: "Primary-dealer reverse-repo financing $ (weekly)", unit: "$", external: true }
+  # ---- batch 13: FRB SLOOS + Commercial Paper via FRED (dedicated job; weekly poll) ----
+  - { id: sloos-ci-large,  name: "SLOOS: net % tightening, C&I large/mid firms", unit: "%",   external: true }
+  - { id: sloos-ci-small,  name: "SLOOS: net % tightening, C&I small firms",     unit: "%",   external: true }
+  - { id: cp-total,        name: "CP outstanding: all issuers $bn",              unit: "$bn", external: true }
+  - { id: cp-financial,    name: "CP outstanding: financial $bn",                unit: "$bn", external: true }
+  - { id: cp-nonfinancial, name: "CP outstanding: nonfinancial $bn",             unit: "$bn", external: true }
+  - { id: cp-abcp,         name: "CP outstanding: asset-backed $bn",             unit: "$bn", external: true }
+  # ---- TIC Table 1 foreign UST flows (dedicated job; monthly, $mn; + = net buying) ----
+  - { id: tic-flows-treas-net-grand_total,        name: "Foreign net UST buying, all countries $mn/mo (+ = buying)", unit: "$mn", external: true }
+  - { id: tic-flows-treas-net-t12m-grand_total,  name: "Foreign net UST buying, all countries, trailing 12M $mn",   unit: "$mn", external: true }
+  - { id: tic-flows-treas-hold-grand_total,      name: "Foreign UST holdings, all countries $mn",                   unit: "$mn", external: true }
+  - { id: tic-flows-treas-net-japan,             name: "Japan net UST buying $mn/mo (+ = buying)",                  unit: "$mn", external: true }
+  - { id: tic-flows-treas-net-t12m-japan,        name: "Japan net UST buying, trailing 12M $mn",                    unit: "$mn", external: true }
+  - { id: tic-flows-treas-net-china_mainland,   name: "China net UST buying $mn/mo (+ = buying)",                  unit: "$mn", external: true }
+  - { id: tic-flows-treas-net-t12m-china_mainland, name: "China net UST buying, trailing 12M $mn",                  unit: "$mn", external: true }
+  - { id: tic-flows-treas-net-united_kingdom,   name: "UK net UST buying $mn/mo (+ = buying)",                     unit: "$mn", external: true }
+  - { id: tic-flows-treas-net-t12m-united_kingdom, name: "UK net UST buying, trailing 12M $mn",                    unit: "$mn", external: true }
+  - { id: tic-flows-treas-net-cayman_islands,   name: "Cayman Islands net UST buying $mn/mo (+ = buying)",         unit: "$mn", external: true }
+  - { id: tic-flows-treas-net-bahamas,         name: "Bahamas net UST buying $mn/mo (+ = buying)",                unit: "$mn", external: true }
+  - { id: tic-flows-treas-net-belgium,           name: "Belgium net UST buying $mn/mo (+ = buying)",                unit: "$mn", external: true }
+  - { id: cp-other,        name: "CP outstanding: other $bn",                    unit: "$bn", external: true }
+  # ---- batch 13: SEC N-CEN fund census (dedicated quarterly batch; receipt-batch aggregates) ----
+  - { id: ncen-fund-count,   name: "N-CEN: reporting funds (count)",       unit: "count", external: true }
+  - { id: ncen-aum,          name: "N-CEN: total monthly-avg net assets $", unit: "$",     external: true }
+  - { id: ncen-etf-count,    name: "N-CEN: ETFs (count)",                  unit: "count", external: true }
+  - { id: ncen-etf-aum,      name: "N-CEN: ETF monthly-avg net assets $",  unit: "$",     external: true }
+  - { id: ncen-levinv-count, name: "N-CEN: leveraged/inverse funds (count)", unit: "count", external: true }
+  - { id: ncen-levinv-aum,   name: "N-CEN: leveraged/inverse net assets $", unit: "$",    external: true }
+  - { id: ncen-mm-count,     name: "N-CEN: money-market funds (count)",    unit: "count", external: true }
+  - { id: ncen-mm-aum,       name: "N-CEN: money-market net assets $",     unit: "$",     external: true }
+  - { id: ncen-stdv-avg,     name: "N-CEN: mean annualized std dev %",     unit: "%",     external: true }
+  - { id: ncen-seclend-pct,  name: "N-CEN: funds lending securities %",    unit: "%",     external: true }
+  - { id: ncen-loc-pct,      name: "N-CEN: funds with credit line %",       unit: "%",     external: true }
+  # ---- batch 13: SEC N-PORT holdings aggregates (dedicated quarterly batch; ~6-month holdings lag) ----
+  - { id: nport-net-assets,     name: "N-PORT: total net assets $",        unit: "$", external: true }
+  - { id: nport-total-assets,   name: "N-PORT: total assets $",            unit: "$", external: true }
+  - { id: nport-borrow-1y,      name: "N-PORT: borrowings payable <1y $",  unit: "$", external: true }
+  - { id: nport-deriv-notional, name: "N-PORT: derivative notional $",     unit: "$", external: true }
+  - { id: nport-seclend,        name: "N-PORT: securities on loan $",      unit: "$", external: true }
+  # ---- UST positioning cross-check: OFR (quarterly) vs CFTC TFF (weekly) vs OI (weekly); derived by the risk job ----
+  - { id: xcheck-ust-net-ofr,  name: "OFR net UST exposure (long − short) $, quarterly",                    unit: "$",         external: true }
+  - { id: xcheck-ust-net-cftc, name: "CFTC TFF lev-money net UST futures 2Y+5Y+10Y+30Y, weekly",             unit: "contracts", external: true }
+  - { id: xcheck-ust-oi,       name: "CFTC TFF UST futures open interest 2Y+5Y+10Y+30Y, weekly",            unit: "contracts", external: true }
+  - { id: xcheck-ust-agree,    name: "Unwind-confirm legs n/3 (OFR QoQ + CFTC 13-wk + OI 13-wk), weekly",    unit: "score",     external: true }
+  # ---- batch 13: SEC Private Fund Statistics (dedicated quarterly batch; report lags ~2 quarters) ----
+  - { id: pfs-hf-leverage,     name: "PFS: HF gross leverage (assets/NAV)",  unit: "x",  external: true }
+  - { id: pfs-hf-borrowing,    name: "PFS: HF total borrowing $",             unit: "$",  external: true }
+  - { id: pfs-hf-gne-nav,      name: "PFS: HF gross notional / NAV",          unit: "x",  external: true }
+  - { id: pfs-hf-liq-mismatch, name: "PFS: HF liquidity mismatch (pp)",      unit: "pp", external: true }
+  # ---- batch 13: FRED Z.1 holdings-by-holder (dedicated quarterly job; levels $mn) ----
+  - { id: z1-ust-fed,           name: "UST held: Fed SOMA (Z.1, Q)",                       unit: "$m", external: true }
+  - { id: z1-ust-banks,         name: "UST held: U.S. banks (Z.1, Q)",                     unit: "$m", external: true }
+  - { id: z1-ust-mutual-funds,  name: "UST held: mutual funds (Z.1, Q)",                   unit: "$m", external: true }
+  - { id: z1-ust-mmf,           name: "UST held: money market funds (Z.1, Q)",             unit: "$m", external: true }
+  - { id: z1-ust-foreign,       name: "UST held: foreign (Z.1, Q)",                        unit: "$m", external: true }
+  - { id: z1-ust-priv-pension,  name: "UST held: private pension funds (Z.1, Q)",          unit: "$m", external: true }
+  - { id: z1-ust-sl-retire,     name: "UST held: SL govt retirement funds (Z.1, Q)",       unit: "$m", external: true }
+  - { id: z1-ust-life-ins,      name: "UST held: life insurers (Z.1, Q)",                  unit: "$m", external: true }
+  - { id: z1-ust-pc-ins,        name: "UST held: P&C insurers (Z.1, Q)",                   unit: "$m", external: true }
+  - { id: z1-ust-households,    name: "UST held: households + nonprofits (Z.1, Q)",        unit: "$m", external: true }
+  - { id: z1-ust-nonfin-corp,   name: "UST held: nonfinancial corporate (Z.1, Q)",         unit: "$m", external: true }
+  - { id: z1-ust-sl-govt,       name: "UST held: SL governments, ex SLGS (Z.1, Q)",         unit: "$m", external: true }
+  - { id: z1-ust-hedge-funds-net, name: "UST held: hedge funds, NET of shorts (Z.1, Q)",   unit: "$m", external: true }
+  - { id: z1-corp-banks,        name: "Corp bonds held: U.S. banks (Z.1, Q)",              unit: "$m", external: true }
+  - { id: z1-corp-mutual-funds, name: "Corp bonds held: mutual funds (Z.1, Q)",            unit: "$m", external: true }
+  - { id: z1-corp-mmf,          name: "Corp bonds held: money market funds (Z.1, Q)",      unit: "$m", external: true }
+  - { id: z1-corp-priv-pension, name: "Corp bonds held: private pension funds (Z.1, Q)",   unit: "$m", external: true }
+  - { id: z1-corp-life-ins,     name: "Corp bonds held: life insurers (Z.1, Q)",           unit: "$m", external: true }
+  - { id: z1-corp-pc-ins,       name: "Corp bonds held: P&C insurers (Z.1, Q)",            unit: "$m", external: true }
+  - { id: z1-corp-foreign,      name: "Corp bonds held: foreign (Z.1, Q)",                 unit: "$m", external: true }
+  - { id: z1-corp-households,   name: "Corp bonds held: households + nonprofits (Z.1, Q)", unit: "$m", external: true }
+  - { id: z1-corp-nonfin-corp,  name: "Corp bonds held: nonfinancial corporate (Z.1, Q)",  unit: "$m", external: true }
+  - { id: z1-corp-sl-govt,      name: "Corp bonds held: SL governments (Z.1, Q)",          unit: "$m", external: true }
+  - { id: z1-corp-sl-retire,    name: "Corp bonds held: SL govt retirement funds (Z.1, Q)", unit: "$m", external: true }
+  - { id: z1-agency-fed,          name: "Agency/MBS held: Fed SOMA (Z.1, Q)",                unit: "$m", external: true }
+  - { id: z1-agency-banks,        name: "Agency/MBS held: U.S. banks (Z.1, Q)",              unit: "$m", external: true }
+  - { id: z1-agency-mutual-funds, name: "Agency/MBS held: mutual funds (Z.1, Q)",            unit: "$m", external: true }
+  - { id: z1-agency-mmf,          name: "Agency/MBS held: money market funds (Z.1, Q)",      unit: "$m", external: true }
+  - { id: z1-agency-priv-pension, name: "Agency/MBS held: private pension funds (Z.1, Q)",   unit: "$m", external: true }
+  - { id: z1-agency-sl-retire,    name: "Agency/MBS held: SL govt retirement funds (Z.1, Q)", unit: "$m", external: true }
+  - { id: z1-agency-life-ins,     name: "Agency/MBS held: life insurers (Z.1, Q)",           unit: "$m", external: true }
+  - { id: z1-agency-pc-ins,       name: "Agency/MBS held: P&C insurers (Z.1, Q)",            unit: "$m", external: true }
+  - { id: z1-agency-foreign,      name: "Agency/MBS held: foreign (Z.1, Q)",                 unit: "$m", external: true }
+  - { id: z1-agency-households,   name: "Agency/MBS held: households + nonprofits (Z.1, Q)", unit: "$m", external: true }
+  - { id: z1-agency-nonfin-corp,  name: "Agency/MBS held: nonfinancial corporate (Z.1, Q)",  unit: "$m", external: true }
+  - { id: z1-agency-sl-govt,      name: "Agency/MBS held: SL governments (Z.1, Q)",          unit: "$m", external: true }
+  - { id: z1-muni-banks,        name: "Muni bonds held: U.S. banks (Z.1, Q)",              unit: "$m", external: true }
+  - { id: z1-muni-mutual-funds, name: "Muni bonds held: mutual funds (Z.1, Q)",            unit: "$m", external: true }
+  - { id: z1-muni-mmf,          name: "Muni bonds held: money market funds (Z.1, Q)",      unit: "$m", external: true }
+  - { id: z1-muni-life-ins,     name: "Muni bonds held: life insurers (Z.1, Q)",           unit: "$m", external: true }
+  - { id: z1-muni-pc-ins,       name: "Muni bonds held: P&C insurers (Z.1, Q)",            unit: "$m", external: true }
+  - { id: z1-muni-foreign,      name: "Muni bonds held: foreign (Z.1, Q)",                 unit: "$m", external: true }
+  - { id: z1-muni-households,   name: "Muni bonds held: households + nonprofits (Z.1, Q)", unit: "$m", external: true }
+  - { id: z1-muni-nonfin-corp,  name: "Muni bonds held: nonfinancial corporate (Z.1, Q)",  unit: "$m", external: true }
+  - { id: z1-muni-sl-govt,      name: "Muni bonds held: SL governments (Z.1, Q)",          unit: "$m", external: true }
+  - { id: z1-muni-sl-retire,    name: "Muni bonds held: SL govt retirement funds, ~zero (Z.1, Q)", unit: "$m", external: true }
+  - { id: fed-soma-weekly,      name: "Fed SOMA Treasury holdings (FRED, weekly)",         unit: "$m", external: true }
+  # ---- batch 13: MSPD + SOMA totals (dedicated jobs; cube computed daily) ----
+  - { id: mspd-total-outstanding, name: "Total public debt outstanding (MSPD T1, monthly)", unit: "$m",  external: true }
+  - { id: soma-total-par,        name: "SOMA Treasury par, all CUSIPs (NY Fed, weekly)",   unit: "$bn", external: true }
 
   # ---- batch 3: single-symbol Yahoo prices (new `yahoo:` field in CycleSeriesCfg) ----
   - { id: mbb-us,   name: "MBB (agency MBS ETF)",        unit: px,  yahoo: MBB }
@@ -992,6 +1136,25 @@ cycle_tabs:        # layout only; rows reference cycle_series ids
           - { series: small-large }
           - { series: gold-silver }
           - { series: spw-spx }
+      - title: "BANK LENDING & WHOLESALE FUNDING (FRB)"
+        rows:
+          - { series: sloos-ci-large }
+          - { series: sloos-ci-small }
+          - { series: cp-total }
+          - { series: cp-financial }
+          - { series: cp-nonfinancial }
+          - { series: cp-abcp }
+          - { series: cp-other }
+      - title: "PRIVATE FUNDS (SEC, QUARTERLY; N-PORT ~6MO HOLDINGS LAG)"
+        rows:
+          - { series: pfs-hf-leverage }
+          - { series: pfs-hf-borrowing }
+          - { series: pfs-hf-gne-nav }
+          - { series: pfs-hf-liq-mismatch }
+          - { series: nport-net-assets }
+          - { series: nport-deriv-notional }
+          - { series: ncen-etf-aum }
+          - { series: ncen-levinv-aum }
   - id: econ
     label: ECON
     panels:
@@ -1079,6 +1242,9 @@ cycle_tabs:        # layout only; rows reference cycle_series ids
           - { series: hy-ig-ratio }
           - { series: nfci }
           - { series: bank-lending }
+          - { series: sloos-ci-large }
+          - { series: cp-total }
+          - { series: cp-abcp }
           - { series: ig-yield }
           - { series: hy-yield }
   - id: profit
@@ -1138,6 +1304,107 @@ cycle_tabs:        # layout only; rows reference cycle_series ids
           - { series: hf-repo-borrow }
           - { series: hf-treasury-long }
           - { series: hf-top10-lev }
+      - title: "HF LEVERAGE BY STRATEGY & SIZE (OFR, QUARTERLY)"
+        rows:
+          - { series: hf-nav }
+          - { series: hf-rv-lev,    overlay: hf-top10-lev }
+          - { series: hf-multi-lev }
+          - { series: hf-macro-lev }
+          - { series: hf-lev-11to50 }
+          - { series: hf-lev-51p }
+          - { series: hf-rv-cash }
+          - { series: hf-multi-cash }
+          - { series: hf-repo-share-top10 }
+          - { series: hf-repo-share-11to50 }
+          - { series: hf-repo-share-51p }
+          - { series: hf-pb-borrow }
+      - title: "HF ASSET-CLASS EXPOSURE (OFR, QUARTERLY)"
+        rows:
+          - { series: hf-ust-short,  overlay: hf-treasury-long }
+          - { series: hf-ird-gne }
+          - { series: hf-credit-gne }
+          - { series: hf-credit-long }
+          - { series: hf-credit-short }
+          - { series: hf-eq-gne }
+          - { series: hf-eq-long }
+          - { series: hf-eq-short }
+          - { series: hf-fx-gne }
+          - { series: hf-repo-repo }
+          - { series: hf-repo-rrepo }
+      - title: "BASIS-TRADE UNWIND — TRIPLE CONFIRM (OFR Q / CFTC W / OI W)"
+        rows:
+          - { series: xcheck-ust-net-ofr }
+          - { series: xcheck-ust-net-cftc }
+          - { series: xcheck-ust-oi }
+          - { series: xcheck-ust-agree }
+          - { series: trace-ust-par }
+          - { series: us10y }
+          - { series: stfm-sofr }
+      - title: "FOREIGN FLOWS — NET BUYING / SELLING OF UST (TIC, MONTHLY)"
+        rows:
+          - { series: tic-flows-treas-net-grand_total, overlay: tic-flows-treas-net-t12m-grand_total }
+          - { series: tic-flows-treas-net-t12m-grand_total }
+          - { series: tic-flows-treas-hold-grand_total }
+          - { series: tic-flows-treas-net-japan, overlay: tic-flows-treas-net-t12m-japan }
+          - { series: tic-flows-treas-net-china_mainland, overlay: tic-flows-treas-net-t12m-china_mainland }
+          - { series: tic-flows-treas-net-united_kingdom, overlay: tic-flows-treas-net-t12m-united_kingdom }
+          - { series: tic-flows-treas-net-cayman_islands }
+          - { series: tic-flows-treas-net-bahamas }
+          - { series: tic-flows-treas-net-belgium }
+      - title: "HF STRESS — +250BP CREDIT SHOCK (OFR, QUARTERLY)"
+        rows:
+          - { series: hf-cds-stress-p5 }
+          - { series: hf-cds-stress-p50 }
+      - title: "HOLDINGS BY HOLDER — TREASURIES (Z.1, QUARTERLY $m)"
+        rows:
+          - { series: z1-ust-fed }
+          - { series: z1-ust-banks }
+          - { series: z1-ust-mutual-funds }
+          - { series: z1-ust-mmf }
+          - { series: z1-ust-foreign }
+          - { series: z1-ust-priv-pension }
+          - { series: z1-ust-sl-retire }
+          - { series: z1-ust-life-ins }
+          - { series: z1-ust-pc-ins }
+          - { series: z1-ust-households }
+          - { series: z1-ust-nonfin-corp }
+          - { series: z1-ust-sl-govt }
+          - { series: z1-ust-hedge-funds-net }
+      - title: "HOLDINGS BY HOLDER — CORP/AGENCY/MUNI (Z.1, QUARTERLY $m)"
+        rows:
+          - { series: z1-corp-banks }
+          - { series: z1-corp-mutual-funds }
+          - { series: z1-corp-mmf }
+          - { series: z1-corp-priv-pension }
+          - { series: z1-corp-life-ins }
+          - { series: z1-corp-pc-ins }
+          - { series: z1-corp-foreign }
+          - { series: z1-corp-households }
+          - { series: z1-corp-nonfin-corp }
+          - { series: z1-corp-sl-govt }
+          - { series: z1-corp-sl-retire }
+          - { series: z1-agency-fed }
+          - { series: z1-agency-banks }
+          - { series: z1-agency-mutual-funds }
+          - { series: z1-agency-mmf }
+          - { series: z1-agency-priv-pension }
+          - { series: z1-agency-sl-retire }
+          - { series: z1-agency-life-ins }
+          - { series: z1-agency-pc-ins }
+          - { series: z1-agency-foreign }
+          - { series: z1-agency-households }
+          - { series: z1-agency-nonfin-corp }
+          - { series: z1-agency-sl-govt }
+          - { series: z1-muni-banks }
+          - { series: z1-muni-mutual-funds }
+          - { series: z1-muni-mmf }
+          - { series: z1-muni-life-ins }
+          - { series: z1-muni-pc-ins }
+          - { series: z1-muni-foreign }
+          - { series: z1-muni-households }
+          - { series: z1-muni-nonfin-corp }
+          - { series: z1-muni-sl-govt }
+          - { series: z1-muni-sl-retire }
   - id: etf
     label: ETFS
     panels:
@@ -1197,6 +1464,15 @@ cycle_tabs:        # layout only; rows reference cycle_series ids
           - { series: trace-eln-par }
           - { series: trace-eln-trades }
           - { series: trace-corp-cust-share }
+      - title: "SHORT-TERM FUNDING (OFR STFM)"
+        rows:
+          - { series: stfm-sofr,                overlay: stfm-repo-dvp }
+          - { series: stfm-repo-dvp }
+          - { series: stfm-mmf-total }
+          - { series: stfm-dealer-fail-deliver }
+          - { series: stfm-dealer-fail-receive }
+          - { series: stfm-dealer-repo }
+          - { series: stfm-dealer-rrp }
       - title: "SHORT INTEREST (FINRA, 2×/MONTH)"
         rows:
           - { series: finra-short-total }
@@ -1328,7 +1604,7 @@ cftc_pos:            # Socrata; dataset tff|cit|disagg; groups per dataset (see 
   - { dataset: tff, code: "239747", label: "Russell 2000", groups: [lev_money] }
 
 tic:                 # TIC Table 5 (slt_table5.txt), monthly, values in $bn; Grand Total always stored
-  countries: [Japan, United Kingdom, "China, Mainland", Belgium, "Cayman Islands", Luxembourg, Canada, Ireland, France, Taiwan]
+  countries: [Japan, United Kingdom, "China, Mainland", Belgium, "Cayman Islands", Bahamas, Luxembourg, Canada, Ireland, France, Taiwan]
 
 thirteenf:           # SEC EDGAR 13F-HR; quarterly filings (<=45d lag); UA is mandatory — set a real contact before deploy
   user_agent: "os-bloom/1.0 contact harrysugamakc@gmail.com"
@@ -1355,6 +1631,30 @@ dealer:                # NY Fed Primary Dealer Statistics; values in $millions, 
   - { id: corp-trade,   name: "Dealer corp bond trading $m",               keyid: PDTRCS-TOT,        unit: "$m" }
   - { id: corp-hy-pos,   name: "Dealer net HY corp bond position $m",       keyid: PDPOSCSBND-G10,    unit: "$m" }
   - { id: corp-ig-pos,   name: "Dealer net IG corp bond position $m",      keyid: PDPOSCSBND-BELG10, unit: "$m" }
+
+ofr_stfm:            # OFR Short-Term Funding Monitor (base data.financialresearch.gov/v1); keyless.
+                     # Rates are %; volume mnemonics are raw USD (magnitude 0 per /v1/metadata/query).
+  - { id: stfm-sofr,               name: "SOFR (OFR STFM, daily)",              mnemonic: FNYR-SOFR-A,          unit: "%" }
+  - { id: stfm-repo-dvp,           name: "Cleared repo avg rate, prelim (daily)", mnemonic: REPO-DVP_AR_TOT-P,  unit: "%" }
+  - { id: stfm-mmf-total,          name: "Money-market-fund total assets $ (monthly)", mnemonic: MMF-MMF_TOT-M, unit: "$" }
+  - { id: stfm-dealer-fail-deliver, name: "Primary-dealer fails to deliver $ (weekly)", mnemonic: NYPD-PD_AFtD_TOT-A, unit: "$" }
+  - { id: stfm-dealer-fail-receive, name: "Primary-dealer fails to receive $ (weekly)", mnemonic: NYPD-PD_AFtR_TOT-A, unit: "$" }
+  - { id: stfm-dealer-repo,        name: "Primary-dealer repo financing $ (weekly)",    mnemonic: NYPD-PD_RP_TOT-A,   unit: "$" }
+  - { id: stfm-dealer-rrp,         name: "Primary-dealer reverse-repo financing $ (weekly)", mnemonic: NYPD-PD_RRP_TOT-A, unit: "$" }
+
+frb_ddp:             # Federal Reserve Board releases via FRED (the Board's DDP is being
+                     # retired — 2026-07-16 announcement, BYP removal Nov 2026 — and FRED is the
+                     # Board-endorsed successor). SLOOS = net % tightening, quarterly; CP = $bn, weekly SA.
+  - { id: sloos-ci-large,    name: "SLOOS: net % tightening, C&I large/mid firms", fred: DRTSCILM, unit: "%" }
+  - { id: sloos-ci-small,    name: "SLOOS: net % tightening, C&I small firms",     fred: DRTSCIS,  unit: "%" }
+  - { id: cp-total,          name: "CP outstanding: all issuers $bn",              fred_sum: [DFINCP, FFINCP, ABCOMP, NFINCP, OTHCOMP], unit: "$bn" }
+  - { id: cp-financial,      name: "CP outstanding: financial $bn",                fred_sum: [DFINCP, FFINCP], unit: "$bn" }
+  - { id: cp-nonfinancial,   name: "CP outstanding: nonfinancial $bn",            fred: NFINCP, unit: "$bn" }
+  - { id: cp-abcp,           name: "CP outstanding: asset-backed $bn",             fred: ABCOMP, unit: "$bn" }
+  - { id: cp-other,          name: "CP outstanding: other $bn",                   fred: OTHCOMP, unit: "$bn" }
+
+sec_data:            # shared declared-contact UA for all SEC batch fetchers (SEC 403s generic UAs)
+  user_agent: "os-bloom/1.0 contact harrysugamakc@gmail.com"
 
 feeds:             # RSS bundle; a dead feed is skipped silently
   - { name: FT,          url: "https://www.ft.com/rss/home" }
