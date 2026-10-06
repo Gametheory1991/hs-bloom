@@ -1,13 +1,14 @@
-// FINRA tab: every FINRA-sourced dataset in one place.
+// FINRA tab: FINRA-sourced fixed-income datasets.
 // Reads dash.panels.finra (backend _finra_panel).
-// Sections: Reg SHO short volume (incl. FINRA TRF venue), threshold list,
-// short interest, market breadth, most-active corporate bonds, capped volume,
-// margin statistics, TRACE treasury/monthly, TRACE volume charts.
+// Sections: market breadth, most-active corporate bonds, capped volume,
+// TRACE treasury/monthly, TRACE volume charts.
+// Short volume / short interest / margin moved to the EQUITY hub 2026-10-06;
+// STAR moved to FLOW → STAR 2026-10-06.
 // The STRUCT cycle tab (TRACE series, short interest, margin, breadth,
 // sentiment, corp bonds, Reg SHO, capped volume — all Now/Δ1M/Δ1Y tables)
 // also renders on this tab via #cycle-struct; ICE Vantage moved to its own
 // cycle tab on POS.
-import { renderTraceCharts, setTraceChartProduct } from "./trace_charts.js";
+import { renderTraceCharts } from "./trace_charts.js";
 import { renderTraceGrid } from "./trace_grid.js";
 import { refiWallSection, renderOasIndexes } from "./refi_wall.js";
 import { getSeries } from "../api.js";
@@ -35,223 +36,6 @@ function spark(hist, w = 220, h = 44) {
   const last = vs[vs.length - 1];
   const cls = last >= vs[0] ? "up" : "down";
   return `<svg width="${w}" height="${h}" class="spark"><polyline points="${pts}" fill="none" stroke="currentColor" class="${cls}" stroke-width="1.5"/></svg>`;
-}
-
-// Company name + GICS sector for heavily-shorted names (Reg SHO files carry
-// no names). Covers the usual top-50 suspects; unmapped tickers show "—".
-const TICKER_META = {
-  NVDA: ["Nvidia", "Technology"], AAPL: ["Apple", "Technology"], MSFT: ["Microsoft", "Technology"],
-  AMD: ["AMD", "Technology"], AVGO: ["Broadcom", "Technology"], INTC: ["Intel", "Technology"],
-  QCOM: ["Qualcomm", "Technology"], TXN: ["Texas Instruments", "Technology"],
-  AMAT: ["Applied Materials", "Technology"], LRCX: ["Lam Research", "Technology"],
-  MU: ["Micron", "Technology"], KLAC: ["KLA", "Technology"], ADI: ["Analog Devices", "Technology"],
-  MRVL: ["Marvell", "Technology"], ARM: ["Arm Holdings", "Technology"],
-  SMCI: ["Super Micro", "Technology"], DELL: ["Dell", "Technology"], HPQ: ["HP", "Technology"],
-  IBM: ["IBM", "Technology"], ORCL: ["Oracle", "Technology"], CRM: ["Salesforce", "Technology"],
-  ADBE: ["Adobe", "Technology"], INTU: ["Intuit", "Technology"], NOW: ["ServiceNow", "Technology"],
-  PANW: ["Palo Alto Networks", "Technology"], CRWD: ["CrowdStrike", "Technology"],
-  FTNT: ["Fortinet", "Technology"], PLTR: ["Palantir", "Technology"], SNOW: ["Snowflake", "Technology"],
-  DDOG: ["Datadog", "Technology"], NET: ["Cloudflare", "Technology"], MDB: ["MongoDB", "Technology"],
-  SHOP: ["Shopify", "Technology"], XYZ: ["Block", "Technology"], PYPL: ["PayPal", "Technology"],
-  COIN: ["Coinbase", "Financials"], MSTR: ["Strategy", "Technology"],
-  TSLA: ["Tesla", "Consumer Discretionary"], AMZN: ["Amazon", "Consumer Discretionary"],
-  HD: ["Home Depot", "Consumer Discretionary"], MCD: ["McDonald's", "Consumer Discretionary"],
-  NKE: ["Nike", "Consumer Discretionary"], SBUX: ["Starbucks", "Consumer Discretionary"],
-  BKNG: ["Booking", "Consumer Discretionary"], ABNB: ["Airbnb", "Consumer Discretionary"],
-  RIVN: ["Rivian", "Consumer Discretionary"], LCID: ["Lucid", "Consumer Discretionary"],
-  F: ["Ford", "Consumer Discretionary"], GM: ["General Motors", "Consumer Discretionary"],
-  GME: ["GameStop", "Consumer Discretionary"], AMC: ["AMC Entertainment", "Communication Services"],
-  GOOGL: ["Alphabet", "Communication Services"], GOOG: ["Alphabet", "Communication Services"],
-  META: ["Meta", "Communication Services"], NFLX: ["Netflix", "Communication Services"],
-  DIS: ["Disney", "Communication Services"], T: ["AT&T", "Communication Services"],
-  VZ: ["Verizon", "Communication Services"], TMUS: ["T-Mobile", "Communication Services"],
-  EA: ["Electronic Arts", "Communication Services"], TTWO: ["Take-Two", "Communication Services"],
-  RBLX: ["Roblox", "Communication Services"], DJT: ["Trump Media", "Communication Services"],
-  SNAP: ["Snap", "Communication Services"], PINS: ["Pinterest", "Communication Services"],
-  JPM: ["JPMorgan", "Financials"], BAC: ["Bank of America", "Financials"],
-  WFC: ["Wells Fargo", "Financials"], C: ["Citigroup", "Financials"],
-  GS: ["Goldman Sachs", "Financials"], MS: ["Morgan Stanley", "Financials"],
-  AXP: ["Amex", "Financials"], V: ["Visa", "Financials"], MA: ["Mastercard", "Financials"],
-  COF: ["Capital One", "Financials"], SCHW: ["Charles Schwab", "Financials"],
-  HOOD: ["Robinhood", "Financials"], SOFI: ["SoFi", "Financials"],
-  BX: ["Blackstone", "Financials"], KKR: ["KKR", "Financials"], ARES: ["Ares", "Financials"],
-  JNJ: ["Johnson & Johnson", "Healthcare"], UNH: ["UnitedHealth", "Healthcare"],
-  LLY: ["Eli Lilly", "Healthcare"], PFE: ["Pfizer", "Healthcare"], MRK: ["Merck", "Healthcare"],
-  ABBV: ["AbbVie", "Healthcare"], AMGN: ["Amgen", "Healthcare"], GILD: ["Gilead", "Healthcare"],
-  BIIB: ["Biogen", "Healthcare"], REGN: ["Regeneron", "Healthcare"], VRTX: ["Vertex", "Healthcare"],
-  ISRG: ["Intuitive Surgical", "Healthcare"], TMO: ["Thermo Fisher", "Healthcare"],
-  DHR: ["Danaher", "Healthcare"], CVS: ["CVS Health", "Healthcare"], HCA: ["HCA", "Healthcare"],
-  XOM: ["Exxon Mobil", "Energy"], CVX: ["Chevron", "Energy"], COP: ["ConocoPhillips", "Energy"],
-  EOG: ["EOG Resources", "Energy"], SLB: ["SLB", "Energy"], OXY: ["Occidental", "Energy"],
-  MPC: ["Marathon Petroleum", "Energy"], VLO: ["Valero", "Energy"],
-  MARA: ["MARA Holdings", "Energy"], RIOT: ["Riot Platforms", "Energy"],
-  BA: ["Boeing", "Industrials"], CAT: ["Caterpillar", "Industrials"], GE: ["GE Aerospace", "Industrials"],
-  HON: ["Honeywell", "Industrials"], UPS: ["UPS", "Industrials"], FDX: ["FedEx", "Industrials"],
-  LMT: ["Lockheed Martin", "Industrials"], RTX: ["RTX", "Industrials"],
-  NOC: ["Northrop Grumman", "Industrials"], DAL: ["Delta", "Industrials"],
-  UAL: ["United Airlines", "Industrials"],
-  WMT: ["Walmart", "Consumer Staples"], COST: ["Costco", "Consumer Staples"],
-  PG: ["Procter & Gamble", "Consumer Staples"], KO: ["Coca-Cola", "Consumer Staples"],
-  PEP: ["PepsiCo", "Consumer Staples"],
-  NEE: ["NextEra", "Utilities"], DUK: ["Duke Energy", "Utilities"],
-  LIN: ["Linde", "Materials"], FCX: ["Freeport-McMoRan", "Materials"], NEM: ["Newmont", "Materials"],
-  AMT: ["American Tower", "Real Estate"], PLD: ["Prologis", "Real Estate"],
-  SPY: ["S&P 500 ETF", "ETF"], QQQ: ["Nasdaq 100 ETF", "ETF"], IWM: ["Russell 2000 ETF", "ETF"],
-  TLT: ["20Y+ Treasury ETF", "ETF"], HYG: ["HY Bond ETF", "ETF"], LQD: ["IG Bond ETF", "ETF"],
-  // resolved 2026-10-05 for the then-current top-shorted list (SEC + Yahoo);
-  // the backend ticker master now resolves new names dynamically and these
-  // stay as the offline fallback.
-  FNGR: ["FingerMotion", "Technology"], FLUX: ["Flux Power", "Industrials"],
-  QTEX: ["QTREX Quantum", "Technology"], AMOD: ["Alpha Modus", "Technology"],
-  SDEV: ["Stablecoin Development", "Financials"], NIVF: ["NewGenIvf Group", "Healthcare"],
-  AAL: ["American Airlines", "Industrials"], SCKT: ["Socket Mobile", "Technology"],
-  SPCX: ["Space Exploration Technologies", "Industrials"], NU: ["Nu Holdings", "Financials"],
-  SCNX: ["Scienture Holdings", "Healthcare"], NVD: ["2x Short NVDA ETF", "ETF"],
-  BITO: ["ProShares Bitcoin ETF", "ETF"], SOXS: ["Semiconductor Bear 3X", "ETF"],
-  DDC: ["DDC Enterprise", "Consumer Staples"], MSTZ: ["2X Inverse MSTR ETF", "ETF"],
-  RWM: ["Short Russell 2000", "ETF"], CYCU: ["Cycurion", "Technology"],
-  ONDS: ["Ondas Holdings", "Technology"], PLUG: ["Plug Power", "Industrials"],
-  CTVA: ["Corteva", "Materials"],
-};
-const tickerMeta = (t) => {
-  // Backend-resolved names (dynamic ticker master) take precedence; the
-  // static map above is the offline fallback.
-  if (t && typeof t === "object" && t.name) return [t.name, t.sector ?? "Other"];
-  const sym = typeof t === "string" ? t : t?.symbol;
-  return TICKER_META[sym] ?? ["—", "Other"];
-};
-const chg = (x) => x == null ? "—" :
-  `<span class="${x >= 0 ? "up" : "down"}">${x >= 0 ? "+" : ""}${(x * 100).toFixed(1)}%</span>`;
-// Nominal (absolute) change implied by a % ratio: cur - cur/(1+pct).
-const nomFromPct = (cur, pct) =>
-  (cur == null || pct == null || !isFinite(pct) || 1 + pct === 0) ? null : cur - cur / (1 + pct);
-const fmtShNom = (v) => v == null || !isFinite(v) ? "—" :
-  `${v >= 0 ? "+" : "−"}` + (Math.abs(v) >= 1e9 ? (Math.abs(v) / 1e9).toFixed(2) + "B sh" :
-    Math.abs(v) >= 1e6 ? (Math.abs(v) / 1e6).toFixed(1) + "M sh" :
-    Math.abs(v) >= 1e3 ? (Math.abs(v) / 1e3).toFixed(1) + "K sh" :
-    Math.round(Math.abs(v)).toLocaleString("en-US") + " sh");
-// Delta cell for the top-shorted table: nominal (bold) + % (muted).
-// isRatio: nominal shown in percentage points.
-const vcCell = (cur, pct, isRatio) => {
-  if ((pct == null || !isFinite(pct)) && cur == null) return `<td class="num">—</td>`;
-  const nom = nomFromPct(cur, pct);
-  const pHtml = chg(pct);
-  if (nom == null) return `<td class="num">${pHtml}</td>`;
-  const nTxt = isRatio
-    ? `${nom >= 0 ? "+" : "−"}${(Math.abs(nom) * 100).toFixed(1)}pp`
-    : fmtShNom(nom);
-  const cls = nom >= 0 ? "up" : nom < 0 ? "down" : "";
-  return `<td class="num"><span class="${cls}"><b>${nTxt}</b></span> <span class="muted">(${pHtml})</span></td>`;
-};
-
-// ---- Speculator-style per-ticker stats (Finnhub-backed; see ticker_stats
-// fetcher). Rendered into the top-shorted table next to the short data. ----
-const pxFmt = (x) => x == null ? "—" :
-  "$" + x.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-// Finnhub marketCapitalization is in $M.
-const mcapFmt = (x) => {
-  if (x == null) return "—";
-  if (x >= 1e6) return "$" + (x / 1e6).toFixed(2) + "T";
-  if (x >= 1e3) return "$" + (x / 1e3).toFixed(1) + "B";
-  return "$" + x.toFixed(0) + "M";
-};
-const peFmt = (x) => x == null ? `<span class="na">n/a</span>` : x.toFixed(1);
-const spark1y = (pts) => {
-  if (!pts || pts.length < 2) return `<span class="muted">—</span>`;
-  const w = 110, h = 28;
-  const lo = Math.min(...pts), hi = Math.max(...pts), rng = hi - lo || 1;
-  const str = pts.map((v, i) =>
-    `${(i / (pts.length - 1) * w).toFixed(1)},${(h - 2 - ((v - lo) / rng) * (h - 4)).toFixed(1)}`
-  ).join(" ");
-  const cls = pts[pts.length - 1] >= pts[0] ? "up" : "down";
-  return `<svg width="${w}" height="${h}" class="spark"><polyline points="${str}" fill="none" stroke="currentColor" class="${cls}" stroke-width="1.5"/></svg>`;
-};
-const smaTri = (price, sma, label) => {
-  if (price == null || sma == null) return `<span class="muted" title="${label}: n/a">—</span>`;
-  return price >= sma
-    ? `<span class="up" title="${label} ${sma.toFixed(2)} — price above">▲</span>`
-    : `<span class="down" title="${label} ${sma.toFixed(2)} — price below">▼</span>`;
-};
-const rsBar = (rank) => {
-  if (rank == null) return `<span class="muted">—</span>`;
-  return `<span class="rsbar" title="1M return percentile rank within this table"><span class="rsfill" style="width:${rank}%"></span></span> <span class="num">${rank}</span>`;
-};
-
-function regshoSection(r, ts) {
-  if (!r) return `<h3>SHORT VOLUME — REG SHO DAILY</h3><p class="muted">No Reg SHO data yet.</p>`;
-  const mkts = r.markets ?? {};
-  const rows = Object.entries(mkts).map(([k, m]) =>
-    `<tr><td>${m.label ?? k}</td><td>${big(m.short)}</td><td>${big(m.total)}</td>` +
-    `<td>${pct1(m.ratio)}</td></tr>`).join("");
-  const top50 = r.top50 ?? [];
-  const tstats = (ts && ts.tickers) || {};
-  const statsAsOf = ts && ts.as_of;
-  // % of sector short: ticker short vol / sector short vol within this top-50 set.
-  const sectorTot = {};
-  for (const t of top50) {
-    const [, sec] = tickerMeta(t);
-    sectorTot[sec] = (sectorTot[sec] ?? 0) + (t.short_volume ?? 0);
-  }
-  const top = top50.map((t) => {
-    const [name, sec] = tickerMeta(t);
-    const secPct = sectorTot[sec] ? t.short_volume / sectorTot[sec] : null;
-    const s = tstats[t.symbol] || {};
-    // Nominal + % deltas: nominal implied from current value and % ratio.
-    const vvc = (k) => vcCell(t.short_volume, t[k], false);
-    const vrc = (k) => vcCell(t.short_ratio, t[k], true);
-    const sma = ["sma20", "sma50", "sma200"].map((k, i) =>
-      smaTri(s.price, s[k], ["20SMA", "50SMA", "200SMA"][i])).join(" ");
-    return `<tr><td><b>${t.symbol}</b></td><td>${name}</td>` +
-    `<td class="num">${pxFmt(s.price)}</td>` +
-    `<td class="num">${chg(s.pct_1d)}</td>` +
-    `<td class="num">${mcapFmt(s.mcap)}</td>` +
-    `<td class="num">${peFmt(s.pe)}</td>` +
-    `<td class="num">${chg(s.ytd)}</td>` +
-    `<td>${spark1y(s.spark)}</td>` +
-    `<td class="num">${s.off_high52 == null ? "—" : pct1(s.off_high52)}</td>` +
-    `<td class="num">${rsBar(s.rs_1m)}</td>` +
-    `<td class="num sma">${sma}</td>` +
-    `<td class="num">${big(t.short_volume)}</td>` +
-    `<td class="num">${pct1(t.short_ratio)}</td>` +
-    vvc("short_chg_1d") + vvc("short_chg_1w") + vvc("short_chg_1m") + vvc("short_chg_1q") + vvc("short_chg_1y") + vvc("short_chg_3y") +
-    vrc("ratio_chg_1d") + vrc("ratio_chg_1w") + vrc("ratio_chg_1m") + vrc("ratio_chg_1q") + vrc("ratio_chg_1y") + vrc("ratio_chg_3y") +
-    `<td class="num" title="${sec} sector short vol in top-50">${secPct == null ? "—" : (secPct * 100).toFixed(1) + "%"}</td></tr>`;
-  }).join("");
-  return `<h3>SHORT VOLUME — REG SHO DAILY <span class="muted">as of ${r.as_of ?? "—"}</span></h3>
-    <table data-sortable><tr><th>Market</th><th>Short vol</th><th>Total vol</th><th>Short ratio</th></tr>${rows}</table>
-    <h3>TOP SHORTED TICKERS <span class="muted">${top50.length} names · nominal + % changes 1D/1W/1M/1Q/1Y/3Y</span></h3>
-    <div class="table-scroll"><table class="topshorted" data-sortable><tr><th>Symbol</th><th>Name</th>` +
-    `<th colspan="9">Price action <span class="muted">${statsAsOf ? "as of " + statsAsOf : "stats pending"}</span></th>` +
-    `<th>Short vol</th>` +
-    `<th>Short ratio</th><th colspan="6">Δ short vol (nominal + %) — 1D | 1W | 1M | 1Q | 1Y | 3Y</th>` +
-    `<th colspan="6">Δ short ratio (pp + %) — 1D | 1W | 1M | 1Q | 1Y | 3Y</th>` +
-    `<th>% of sector short</th></tr><tr data-sort-row="off"><td colspan="2"></td>` +
-    `<th>Price</th><th>%1D</th><th>Mkt cap</th><th>P/E</th><th>%YTD</th><th data-sort="off">1Y</th><th>Δ52wH</th><th>RS 1M</th><th data-sort="off">20/50/200</th>` +
-    `<td colspan="2"></td>` +
-    `<th>1D</th><th>1W</th><th>1M</th><th>1Q</th><th>1Y</th><th>3Y</th>` +
-    `<th>1D</th><th>1W</th><th>1M</th><th>1Q</th><th>1Y</th><th>3Y</th><td></td></tr>${top}</table></div>
-    <p class="muted">Δ cells show nominal change (bold) + % change (muted): short-vol nominal in shares, short-ratio nominal in percentage points. ` +
-    `% of sector short = ticker short volume ÷ its GICS sector's total short volume within this top-50 — ` +
-    `high values mean shorting is concentrated in the name, not spread across the sector. ` +
-    `RS 1M = percentile rank of the 21-day return within this table (0-99). ` +
-    `Δ52wH = % off the 52-week high. ` +
-    `3Y deltas populate as daily history accumulates (currently ~2Y backfilled).</p>`;
-}
-
-function thresholdSection(t) {
-  if (!t) return `<h3>THRESHOLD LIST — REG SHO</h3><p class="muted">No threshold data yet.</p>`;
-  const secs = (t.securities ?? []).map((s) =>
-    `<tr><td><b>${s.symbol}</b></td><td>${(s.name ?? "").slice(0, 50)}</td>` +
-    `<td>${s.category ?? "—"}</td></tr>`).join("");
-  return `<h3>THRESHOLD LIST — REG SHO <span class="muted">${t.count} securities as of ${t.as_of ?? "—"}</span></h3>
-    ${secs ? `<table data-sortable><tr><th>Symbol</th><th>Name</th><th>Category</th></tr>${secs}</table>` : ""}`;
-}
-
-function shortInterestSection(s) {
-  if (!s) return `<h3>SHORT INTEREST — FINRA</h3><p class="muted">No short-interest data yet.</p>`;
-  return `<h3>SHORT INTEREST — FINRA <span class="muted">settlement ${s.as_of ?? "—"}</span></h3>
-    <table><tr><th>Total short shares</th></tr>
-    <tr><td>${big(s.total_short_shares)}</td></tr></table>`;
 }
 
 // ---- Market breadth & sentiment: full-history uPlot charts + delta table ----
@@ -428,16 +212,6 @@ function cappedSection(c) {
            : `<p class="muted">No grade rows — September pull pending.</p>`}`;
 }
 
-function marginSection(m) {
-  if (!m) return `<h3>MARGIN STATISTICS</h3><p class="muted">No margin data yet.</p>`;
-  const debit = m.latest_debit_m;
-  return `<h3>MARGIN STATISTICS <span class="muted">as of ${m.as_of ?? "—"}</span></h3>
-    <table><tr><th>Debit balances</th><th>Trend (26 pts)</th></tr>
-    <tr><td>${debit == null ? "—" : "$" + (debit / 1000).toFixed(1) + "B"}</td>
-    <td>${spark(m.debit_hist)}</td></tr></table>
-    <p class="muted">Debit balances in $M; chart shows recent history.</p>`;
-}
-
 function traceSection(t, mo) {
   const tHtml = t
     ? `<tr><td>Treasury TRACE daily</td><td>${t.as_of ?? "—"}</td><td>${t.series_count ?? 0} series</td><td class="up">live</td></tr>`
@@ -447,111 +221,6 @@ function traceSection(t, mo) {
     : `<tr><td>TRACE monthly (all products)</td><td>${(mo && mo.as_of) || "—"}</td><td>—</td><td class="down">blocked — FINRA CDN 403</td></tr>`;
   return `<h3>TRACE VOLUMES</h3>
     <table><tr><th>Feed</th><th>As of</th><th>Series</th><th>Status</th></tr>${tHtml}${mHtml}</table>`;
-}
-
-const STAR_ROWS = [
-  ["star-tba-par", "star-tba-trades", "TBA (all issuers)", "star-tba"],
-  ["star-tba-umbs-par", null, "TBA — UMBS", "star-umbs"],
-  ["star-tba-gnma-par", null, "TBA — GNMA", "star-gnma"],
-  ["star-spec-par", "star-spec-trades", "Specified pools", "star-spec"],
-  ["star-agcmo-par", "star-agcmo-trades", "Agency CMO", "star-agcmo"],
-  ["star-nagcmo-par", "star-nagcmo-trades", "Non-agency CMO", "star-nagcmo"],
-  ["star-nagcmbs-par", "star-nagcmbs-trades", "Non-agency CMBS", "star-nagcmbs"],
-  ["star-agcmbs-par", "star-agcmbs-trades", "Agency CMBS", "star-agcmbs"],
-  ["star-abs-par", "star-abs-trades", "ABS", "star-abs"],
-  ["star-clo-par", "star-clo-trades", "CLO", "star-clo"],
-];
-// Nominal+% delta cell: "+$1.2B (+3.4%)" — matches trace_grid.js deltaCell.
-const starDeltaCell = (nom, pct, fmtNom) => {
-  if ((nom == null || !isFinite(nom)) && (pct == null || !isFinite(pct))) return "—";
-  const n = fmtNom(nom);
-  const p = pct1(pct);
-  if (n === "—") return p;
-  if (p === "—") return n;
-  return `${n} <span class="muted">(${p})</span>`;
-};
-const fmtNomB$ = (v) => v == null || !isFinite(v) ? "—" : `${v >= 0 ? "+" : "−"}$${Math.abs(v) >= 1e9 ? (Math.abs(v) / 1e9).toFixed(2) + "B" : (Math.abs(v) / 1e6).toFixed(1) + "M"}`;
-const fmtNomCt = (v) => v == null || !isFinite(v) ? "—" : `${v >= 0 ? "+" : "−"}${Math.round(Math.abs(v)).toLocaleString("en-US")}`;
-// Day-difference between ISO date strings.
-const starDayDiff = (a, b) => Math.round((Date.parse(b) - Date.parse(a)) / 86400000);
-// Compute nominal+% deltas vs N days back from daily {d, v} points.
-function starDeltas(pts) {
-  if (!pts || pts.length < 2) return null;
-  const cur = pts[pts.length - 1];
-  const refBack = (days) => {
-    for (let i = pts.length - 2; i >= 0; i--) {
-      if (starDayDiff(pts[i].d, cur.d) >= days) return pts[i];
-    }
-    return null;
-  };
-  const out = {};
-  for (const [k, days] of [["d1", 1], ["w1", 7], ["m1", 30], ["q1", 91], ["y1", 365], ["y3", 1095]]) {
-    const ref = refBack(days);
-    if (!ref || !ref.v) { out[k] = { nom: null, pct: null }; continue; }
-    out[k] = { nom: cur.v - ref.v, pct: (cur.v - ref.v) / ref.v };
-  }
-  return { cur: cur.v, asof: cur.d, ...out };
-}
-function starSection(s) {
-  if (!s || !s.latest) return `<h3>STRUCTURED PRODUCT ACTIVITY — STAR</h3><p class="muted">No STAR data yet — first pull pending.</p>`;
-  // Placeholder — async fill below once daily series load.
-  return `<h3>STRUCTURED PRODUCT ACTIVITY — STAR <span class="muted">daily · as of ${s.as_of ?? "—"} · click a row for its trend chart</span></h3>
-    <div class="seg" id="star-metric-toggle" role="tablist"><button data-m="vol" class="on">$ Volume</button><button data-m="trades">Trades</button></div>
-    <table class="star-table" data-sortable><thead><tr><th>Product</th><th>Latest</th><th>1D Δ</th><th>1W Δ</th><th>1M Δ</th><th>1Q Δ</th><th>1Y Δ</th><th>3Y Δ</th>${RANGE_TH}</tr></thead>
-    <tbody id="star-tbody"><tr data-sort-row="off"><td colspan="10" class="muted">Loading daily history…</td></tr></tbody></table>
-    <p class="muted">FINRA-ICE Data Services Structured Trading Activity Reports — the public equivalent of the ` +
-    `login-walled ICE Vantage structured aggregates. Daily TBA/specified/CMO/CMBS/ABS/CLO activity by issuer and ` +
-    `investment grade. Full trend lines in the TRACE chart above and the grid below.</p>`;
-}
-async function fillStarSection() {
-  const tbody = document.getElementById("star-tbody");
-  if (!tbody) return;
-  const toggle = document.getElementById("star-metric-toggle");
-  let metric = "vol";
-  const render = async () => {
-    tbody.innerHTML = `<tr data-sort-row="off"><td colspan="10" class="muted">Loading daily history…</td></tr>`;
-    const rows = await Promise.all(STAR_ROWS.map(async ([parId, trId, label, chartId]) => {
-      const sid = metric === "vol" ? parId : trId;
-      if (!sid) return null;
-      try {
-        const s = await getSeries("cycle:" + sid, "max");
-        const pts = (s.points ?? []).map((p) => ({ d: p[0], v: p[1] })).sort((a, b) => a.d < b.d ? -1 : 1);
-        const st = starDeltas(pts);
-        if (!st) return `<tr data-sort-row="off"><td><b>${label}</b></td><td colspan="9" class="muted">no history</td></tr>`;
-        const fmtNom = metric === "vol" ? fmtNomB$ : fmtNomCt;
-        const fmtVal = metric === "vol"
-          ? (v) => "$" + (v / 1e9).toFixed(2) + "B"
-          : (v) => Math.round(v).toLocaleString("en-US");
-        const stats = statsFromValues(pts.map((p) => p.v));
-        const dc = (k) => `<td class="num">${starDeltaCell(st[k].nom, st[k].pct, fmtNom)}</td>`;
-        return `<tr data-star-chart="${chartId}" title="Click to view ${label} chart">` +
-          `<td><b>${label}</b></td><td class="num"><b>${fmtVal(st.cur)}</b> <span class="muted">${st.asof}</span></td>` +
-          dc("d1") + dc("w1") + dc("m1") + dc("q1") + dc("y1") + dc("y3") +
-          rangeCells(stats, "full history") + `</tr>`;
-      } catch { return `<tr data-sort-row="off"><td><b>${label}</b></td><td colspan="9" class="muted">load failed</td></tr>`; }
-    }));
-    tbody.innerHTML = rows.filter(Boolean).join("");
-    // Row click-to-chart (rows are re-created, so re-wire here).
-    tbody.querySelectorAll("tr[data-star-chart]").forEach((tr) => {
-      tr.style.cursor = "pointer";
-      tr.addEventListener("click", () => {
-        document.getElementById("trace-view-grid")?.click();
-        setTraceChartProduct(tr.dataset.starChart);
-        document.getElementById("trace-chart-wrap")?.scrollIntoView({ behavior: "smooth", block: "start" });
-      });
-    });
-  };
-  if (toggle) {
-    toggle.querySelectorAll("button").forEach((b) => {
-      b.addEventListener("click", () => {
-        if (b.dataset.m === metric) return;
-        metric = b.dataset.m;
-        toggle.querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b));
-        render();
-      });
-    });
-  }
-  await render();
 }
 
 export function renderFinra(p) {
@@ -565,15 +234,10 @@ export function renderFinra(p) {
     </div>
     <div id="trace-chart-wrap"></div>
     <div id="trace-grid-wrap" hidden></div>` +
-    starSection(f.star) +
-    regshoSection(f.regsho, f.ticker_stats) +
-    thresholdSection(f.threshold) +
-    shortInterestSection(f.short_interest) +
     breadthSection(f.breadth) +
     corpSection(f.corp) +
     refiWallSection(f.corp?.refi_wall) +
     cappedSection(f.capped) +
-    marginSection(f.margin) +
     traceSection(f.trace_treasury, f.trace_monthly);
   renderTraceCharts();
   renderTraceGrid(f.corp);
@@ -592,5 +256,4 @@ export function renderFinra(p) {
   };
   chartBtn.addEventListener("click", () => setView("chart"));
   gridBtn.addEventListener("click", () => setView("grid"));
-  fillStarSection().catch(() => {});
 }

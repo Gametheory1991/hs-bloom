@@ -24,6 +24,7 @@
     <button type="button" data-hub-link="structure">FLOW</button>
     <button type="button" data-hub-link="desk">DESK</button>
     <button type="button" data-hub-link="regwatch">REG WATCH</button>
+    <button type="button" data-hub-link="equity">EQUITY</button>
   </nav>
   <nav class="sub-row" id="sub-row" aria-label="subtabs"></nav>
   <script>
@@ -152,12 +153,7 @@
   <main class="grid grid-cycle hidden" data-hub="macro" data-sub="cycle" id="cycle-credit"></main>
 
   <!-- ============ MARKETS ============ -->
-  <main class="grid hidden" data-hub="markets" data-sub="equities" style="grid-template-columns: 1fr 1fr;">
-    <section class="panel" id="panel-equity">
-      <div class="panel-title">EQTY</div>
-      <div class="panel-body"></div>
-      <div class="panel-foot muted"></div>
-    </section>
+  <main class="grid hidden" data-hub="markets" data-sub="equities" style="grid-template-columns: 1fr;">
     <section class="panel" id="panel-movers">
       <div class="panel-title">MOVERS — SINGLE-STOCK SIGMA MOVES</div>
       <div class="panel-body"></div>
@@ -223,13 +219,6 @@
       <div class="panel-foot muted"></div>
     </section>
   </main>
-  <main class="grid hidden" data-hub="positioning" data-sub="shorts" style="grid-template-columns: 1fr;">
-    <section class="panel" id="panel-shortinterest">
-      <div class="panel-title">SHORT INTEREST</div>
-      <div class="panel-body"></div>
-      <div class="panel-foot muted"></div>
-    </section>
-  </main>
   <main class="grid hidden" data-hub="positioning" data-sub="predict" style="grid-template-columns: 1fr;">
     <section class="panel" id="panel-predict">
       <div class="panel-title">PREDICT — MARKETS &amp; EDGE ESTIMATES</div>
@@ -255,6 +244,13 @@
   <main class="grid hidden" data-hub="structure" data-sub="factbook" style="grid-template-columns: 1fr;">
     <section class="panel" id="panel-factbook">
       <div class="panel-title">TRACE FACT BOOK</div>
+      <div class="panel-body"></div>
+      <div class="panel-foot muted"></div>
+    </section>
+  </main>
+  <main class="grid hidden" data-hub="structure" data-sub="star" style="grid-template-columns: 1fr;">
+    <section class="panel" id="panel-star">
+      <div class="panel-title">STAR — STRUCTURED PRODUCT ACTIVITY</div>
       <div class="panel-body"></div>
       <div class="panel-foot muted"></div>
     </section>
@@ -327,6 +323,36 @@
   <main class="grid hidden" data-hub="regwatch" data-sub="topics" style="grid-template-columns: 1fr;">
     <section class="panel" id="panel-regwatch-topics">
       <div class="panel-title">REG WATCH — TOPIC WATCH</div>
+      <div class="panel-body"></div>
+      <div class="panel-foot muted"></div>
+    </section>
+  </main>
+
+  <!-- ============ EQUITY ============ -->
+  <main class="grid hidden" data-hub="equity" data-sub="overview" style="grid-template-columns: 1fr;">
+    <section class="panel" id="panel-equity">
+      <div class="panel-title">EQTY</div>
+      <div class="panel-body"></div>
+      <div class="panel-foot muted"></div>
+    </section>
+  </main>
+  <main class="grid hidden" data-hub="equity" data-sub="shortvol" style="grid-template-columns: 1fr;">
+    <section class="panel" id="panel-shortvol">
+      <div class="panel-title">SHORT VOLUME — REG SHO DAILY</div>
+      <div class="panel-body"></div>
+      <div class="panel-foot muted"></div>
+    </section>
+  </main>
+  <main class="grid hidden" data-hub="equity" data-sub="margin" style="grid-template-columns: 1fr;">
+    <section class="panel" id="panel-margin">
+      <div class="panel-title">MARGIN DEBT — FINRA</div>
+      <div class="panel-body"></div>
+      <div class="panel-foot muted"></div>
+    </section>
+  </main>
+  <main class="grid hidden" data-hub="equity" data-sub="shortint" style="grid-template-columns: 1fr;">
+    <section class="panel" id="panel-shortint">
+      <div class="panel-title">SHORT INTEREST — FINRA SETTLEMENT</div>
       <div class="panel-body"></div>
       <div class="panel-foot muted"></div>
     </section>

@@ -13,14 +13,16 @@ export const HUBS = [
     subs: [["equities", "Equities"], ["volcorr", "Vol & Corr"], ["futures", "Futures"],
            ["etfs", "ETFs"], ["scorecard", "Scorecard"], ["digital", "Digital"]] },
   { id: "positioning", label: "POSITIONING",
-    subs: [["positions", "Positions"], ["flows", "13F Flows"], ["shorts", "Short Interest"],
-           ["predict", "Predict"]] },
+    subs: [["positions", "Positions"], ["flows", "13F Flows"], ["predict", "Predict"]] },
   { id: "structure", label: "FLOW",
-    subs: [["trace", "TRACE Volume"], ["factbook", "Fact Book"], ["maps", "Maps"], ["desks", "Desks"]] },
+    subs: [["trace", "TRACE Volume"], ["star", "STAR"], ["factbook", "Fact Book"], ["maps", "Maps"], ["desks", "Desks"]] },
   { id: "desk", label: "DESK",
     subs: [["alerts", "Alerts"], ["briefcheck", "Brief Check"], ["analyst", "Analyst"]] },
   { id: "regwatch", label: "REG WATCH",
     subs: [["news", "News Feed"], ["rules", "Rulemaking Tracker"], ["topics", "Topic Watch"]] },
+  { id: "equity", label: "EQUITY",
+    subs: [["overview", "Overview"], ["shortvol", "Short Volume"], ["margin", "Margin Debt"],
+           ["shortint", "Short Interest"]] },
 ];
 
 // Legacy tab id -> "hub/sub" redirect target.
@@ -36,8 +38,18 @@ const LEGACY = {
 
 const hubById = (id) => HUBS.find((h) => h.id === id);
 
+// Moved hub/sub routes -> new home (location.replace, no history entry).
+const MOVED = {
+  "positioning/shorts": "equity/shortvol",
+};
+
 export function currentRoute() {
   const parts = location.hash.replace(/^#\/?/, "").split("/");
+  const moved = MOVED[parts.slice(0, 2).join("/")];
+  if (moved) {
+    location.replace(`#/${moved}`);
+    return currentRoute();
+  }
   let hub = hubById(parts[0]);
   if (!hub && LEGACY[parts[0]]) {
     // Legacy hash: bounce to the new home without adding a history entry.

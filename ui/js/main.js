@@ -24,7 +24,8 @@ import { renderCentral } from "./panels/central.js";
 import { renderPredict } from "./panels/predict.js";
 import { renderFinra } from "./panels/finra.js";
 import { renderFactbook } from "./panels/factbook.js";
-import { renderShortInterest } from "./panels/shortinterest.js";
+import { renderStar } from "./panels/star.js";
+import { renderShortVol, renderMargin, renderShortInt } from "./panels/equityhub.js";
 import { initSortableObserver } from "./sortable.js";
 import { initExportObserver } from "./export.js";
 import { renderKoi } from "./panels/koi_scorecard.js";
@@ -41,7 +42,7 @@ import { renderDebtCube } from "./panels/debtcube.js";
 import { renderRegwatchNews, renderRegwatchRules, renderRegwatchTopics } from "./panels/regwatch.js";
 
 const POLL_MS = 60_000;
-const STALE_MINUTES = { equity: 20, bonds: 130, macro: 390, auctions: 2880, news: 40, defi: 35, midnight: 35, refs: 35, insights: 70, riskmap: 2880, xcorr: 2880, gse: 86400, vol: 2880, movers: 10080, radar: 2880, hyper: 10080, tsv: 10080, usaspending: 20160, finnhub: 2880, worldbank: 20160, coingecko: 2880, predict: 120, finra: 2880, shortinterest: 2880, factbook: 43200, regwatch: 120 };  // ~2x cadence
+const STALE_MINUTES = { equity: 20, bonds: 130, macro: 390, auctions: 2880, news: 40, defi: 35, midnight: 35, refs: 35, insights: 70, riskmap: 2880, xcorr: 2880, gse: 86400, vol: 2880, movers: 10080, radar: 2880, hyper: 10080, tsv: 10080, usaspending: 20160, finnhub: 2880, worldbank: 20160, coingecko: 2880, predict: 120, finra: 2880, star: 2880, shortvol: 2880, margin: 43200, shortint: 2880, factbook: 43200, regwatch: 120 };  // ~2x cadence
 
 const EMPTY = { rows: [], updated_at: null, source: null };
 
@@ -56,13 +57,17 @@ const PANEL_ENTRIES = [
   ["MACRO — THIS WEEK", "macro/calendar"], ["CENTRAL — FED WATCH", "macro/central"],
   ["UST AUCTIONS", "macro/auctions"], ["WORLD BONDS", "macro/bonds"],
   ["CREDIT — SEGMENTS · UST · STAR · Z-SCORES", "macro/credit"],
-  ["EQTY", "markets/equities"], ["MOVERS — SINGLE-STOCK SIGMA MOVES", "markets/equities"],
+  ["EQTY", "equity/overview"], ["MOVERS — SINGLE-STOCK SIGMA MOVES", "markets/equities"],
   ["VOL — MACRO VOLATILITY DIGEST", "markets/volcorr"], ["X-CORR — CROSS-ASSET CORRELATION & VOL", "markets/volcorr"],
   ["FUTURES — FRONT-MONTH", "markets/futures"], ["FLOWS — 13F NET FLOWS", "positioning/flows"],
   ["SCORECARD — 1D/1M/3M/1Y + 1Y Z", "markets/scorecard"],
   ["CURATED VAULTS — USDC", "markets/digital"],
   ["PREDICT — MARKETS & EDGE", "positioning/predict"],
-  ["FINRA — SHORTS · BREADTH · CORPORATE · TRACE", "structure/trace"],
+  ["FINRA — BREADTH · CORPORATE · TRACE", "structure/trace"],
+  ["STAR — STRUCTURED PRODUCT ACTIVITY", "structure/star"],
+  ["SHORT VOLUME — REG SHO DAILY", "equity/shortvol"],
+  ["MARGIN DEBT — FINRA", "equity/margin"],
+  ["SHORT INTEREST — FINRA SETTLEMENT", "equity/shortint"],
   ["KOI — FINRA/TRACE Y/Y SCORECARD", "structure/trace"],
   ["RISK MAP — WORLD", "structure/maps"], ["COVERAGE MAPS — UNIVERSE & MONEY FLOW", "structure/maps"],
   ["HYPER — HYPERSCALER DESK", "structure/desks"], ["TSV — TOKENIZED SECURITIES VENUE WATCH", "structure/desks"],
@@ -158,8 +163,11 @@ async function tick() {
     renderInsights(p.insights ?? { alerts: [], trends: [], newsletter: { headline: "No digest yet", bullets: [] } });
     renderPredict(p.predict ?? { edges: [], movers: [], calibration: [], polymarket: [], kalshi: [], tracked_count: 0, resolved_this_run: 0, skipped: [], disclaimer: null, updated_at: null, source: null });
     renderFinra(p.finra ?? {});
+    renderStar(p.finra ?? {});
     renderFactbook(p.factbook ?? {});
-    renderShortInterest(p.shortinterest ?? {});
+    renderShortVol(p.shortinterest ?? {}, p.finra?.regsho, p.finra?.ticker_stats);
+    renderMargin(p.finra?.margin);
+    renderShortInt(p.shortinterest ?? {});
     renderRegwatchNews(p.regwatch ?? {});
     renderRegwatchRules(p.regwatch ?? {});
     renderRegwatchTopics(p.regwatch ?? {});
@@ -174,7 +182,10 @@ async function tick() {
     foot("predict", "predict", p.predict ?? { updated_at: null, source: null });
     foot("finra", "finra", { updated_at: p.finra?.regsho?.updated_at ?? null, source: "finra" });
     foot("factbook", "factbook", p.factbook ?? {});
-    foot("shortinterest", "shortinterest", p.shortinterest ?? {});
+    foot("star", "star", p.finra?.star ?? { updated_at: null, source: null });
+    foot("shortvol", "shortvol", p.shortinterest ?? {});
+    foot("margin", "margin", p.finra?.margin ?? { updated_at: null, source: null });
+    foot("shortint", "shortint", p.shortinterest ?? {});
     foot("regwatch-news", "regwatch", p.regwatch ?? {});
     foot("regwatch-rules", "regwatch", p.regwatch ?? {});
     foot("regwatch-topics", "regwatch", p.regwatch ?? {});

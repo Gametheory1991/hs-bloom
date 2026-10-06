@@ -652,3 +652,46 @@ ul.talk.big li { font-size: 16px; padding: 10px 0 10px 20px; }
 .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
 @media (max-width: 760px) { .grid2, .grid3 { grid-template-columns: 1fr; } }
 td.sym { color: #1d4ed8; font-weight: 600; }
+
+/* FLOW landing (2026-10-06): KPIs + chart visible without scrolling.
+   KOI product cards become a single horizontal strip; the TRACE chart is
+   full-width and tall. */
+#panel-koi .koi-grid { display: flex; overflow-x: auto; gap: 6px; padding-bottom: 6px; }
+#panel-koi .koi-card { flex: 0 0 148px; }
+#panel-koi .koi-total { margin-bottom: 6px; }
+#trace-chart-wrap .trace-chart { min-height: 420px; }
+/* STAR / equity hub charts: same generous height */
+.star-chart { min-height: 380px; }
+/* Download button rows */
+.star-dl-row { display: flex; gap: 8px; align-items: center; margin: 6px 0 10px; flex-wrap: wrap; }
+
+/* Mobile optimization (2026-10-06): FLOW, STAR, EQUITY layouts.
+   Tables scroll horizontally inside their containers (never page-level);
+   tap targets >= 44px; KPI tiles stack. */
+@media (max-width: 680px) {
+  /* All tables get a scroll container on small screens */
+  .panel-body { overflow-x: hidden; }
+  .panel-body > table, .star-table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .panel-body > table > thead, .panel-body > table > tbody,
+  .star-table > thead, .star-table > tbody { display: table; min-width: 640px; width: 100%; }
+  /* KOI strip already horizontal — keep cards tappable */
+  #panel-koi .koi-card { flex: 0 0 132px; }
+  /* Chart controls: full-width rows, big tap targets */
+  .trace-controls { gap: 8px; }
+  .trace-controls .seg { display: flex; flex-wrap: wrap; width: 100%; }
+  .trace-controls .seg button { min-height: 44px; padding: 8px 14px; font-size: 13px; }
+  .trace-controls select { min-height: 44px; font-size: 13px; max-width: 100%; }
+  .trace-controls input[type="date"] { min-height: 44px; }
+  .mini-btn { min-height: 44px; padding: 8px 14px; font-size: 13px; }
+  /* Download + metric rows stack */
+  .star-dl-row { gap: 8px; }
+  .star-dl-row .mini-btn { flex: 1 1 auto; }
+  /* KPI metrics stack vertically inside cards */
+  .koi-total-grid { gap: 12px; }
+  .koi-v { font-size: 15px; }
+  /* Sub-tab strips scroll horizontally */
+  .sub-row { overflow-x: auto; }
+  /* Chart height adapts */
+  #trace-chart-wrap .trace-chart { min-height: 300px; }
+  .star-chart { min-height: 300px; }
+}

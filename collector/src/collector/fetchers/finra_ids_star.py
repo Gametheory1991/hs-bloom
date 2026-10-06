@@ -8,7 +8,8 @@ FINRA CDN with no auth:
   ZIP: https://cdn.finra.org/trace/ids/monthly/HISTORIC_SPREPORTS-YYYYMM.zip
   Each ZIP holds one XLSX per trading day:
     FINRA_IDS_STAR-YYYYMMDD.xlsx    (Structured Trading Activity Reports)
-    FINRA_IDS_PXTABLES-YYYYMMDD.xlsx (Pricing Tables — not parsed here)
+    FINRA_IDS_PXTABLES-YYYYMMDD.xlsx (Pricing Tables — parsed by
+                                      collector.fetchers.finra_ids_px)
 
 STAR layout (verified 2026-09-30): sheet "TradingActivity".
   Agency block — columns per issuer (UMBS / FNMA / FHLMC / GNMA), each with
@@ -26,17 +27,16 @@ STAR layout (verified 2026-09-30): sheet "TradingActivity".
 "*" in a cell = trade count < 5 (suppressed); treated as 0 in aggregates.
 $ TRADES are in $000s — stored as $ (x1000).
 
-Stored (daily):
-  cycle:star-tba-par / -trades            TBA total ($ / trades)
-  cycle:star-tba-umbs-par / -fnma-par / -fhlmc-par / -gnma-par   TBA by issuer ($)
-  cycle:star-spec-par / -trades           specified pools
-  cycle:star-agcmo-par / -trades          agency CMO
-  cycle:star-nagcmo-ig-par / -nonig-par   non-agency CMO by grade ($)
-  cycle:star-nagcmbs-ig-par / -nonig-par  non-agency CMBS by grade ($)
-  cycle:star-agcmbs-par / -trades         agency CMBS
-  cycle:star-abs-ig-par / -nonig-par      ABS by grade ($)
-  cycle:star-clo-ig-par / -nonig-par      CBO/CDO/CLO by grade ($)
+Stored (daily) — every published cell is a series:
+  cycle:star-{section}-{par,trades,secids}     section totals (tba/spec/agcmo/
+      nagcmo/nagcmbs/agcmbs/abs/clo/oth); par in $, secids = unique SEC IDs
+  cycle:star-tba-{umbs,fnma,fhlmc,gnma,other-agency}-{par,trades,secids}
+  cycle:star-{tba,spec}-{15y,30y,adj,other}-{par,trades}
+  cycle:star-{agcmo,nagcmo,nagcmbs,agcmbs}-{pi,iopo}[-{ig,nonig}]-{par,trades,secids}
+  cycle:star-{abs,clo}-{ig,nonig}-{par,secids}
 plus a "finra_ids_star" snapshot doc with the latest day's summary.
+Pricing tables (PXTABLES: avg/wtd-avg/quartile prices by coupon/vintage)
+are parsed by finra_ids_px.py.
 
 ZIPs go back to 2011; on an empty store we backfill 36 months (3Y, matching
 Harry's historical-grid requirement), then the daily job re-fetches the
@@ -53,6 +53,7 @@ import zipfile
 from datetime import date
 
 from collector.fetchers.xlsx import read_sheet, to_float
+from collector.fetchers import finra_ids_px
 from collector.http import GetBytes
 from collector.store import Store
 
@@ -65,18 +66,46 @@ REQUEST_GAP = 1.0
 BACKFILL_MONTHS = 36
 
 SERIES_IDS = [
-    "star-tba-par", "star-tba-trades",
-    "star-tba-umbs-par", "star-tba-fnma-par",
-    "star-tba-fhlmc-par", "star-tba-gnma-par",
-    "star-spec-par", "star-spec-trades",
-    "star-agcmo-par", "star-agcmo-trades",
+    "star-tba-par", "star-tba-trades", "star-tba-secids",
+    "star-tba-umbs-par", "star-tba-umbs-trades", "star-tba-umbs-secids",
+    "star-tba-fnma-par", "star-tba-fnma-trades", "star-tba-fnma-secids",
+    "star-tba-fhlmc-par", "star-tba-fhlmc-trades", "star-tba-fhlmc-secids",
+    "star-tba-gnma-par", "star-tba-gnma-trades", "star-tba-gnma-secids",
+    "star-tba-other-agency-par", "star-tba-other-agency-trades",
+    "star-tba-other-agency-secids",
+    "star-tba-15y-par", "star-tba-15y-trades",
+    "star-tba-30y-par", "star-tba-30y-trades",
+    "star-tba-other-par", "star-tba-other-trades",
+    "star-spec-par", "star-spec-trades", "star-spec-secids",
+    "star-spec-15y-par", "star-spec-15y-trades",
+    "star-spec-30y-par", "star-spec-30y-trades",
+    "star-spec-adj-par", "star-spec-adj-trades",
+    "star-spec-other-par", "star-spec-other-trades",
+    "star-agcmo-par", "star-agcmo-trades", "star-agcmo-secids",
+    "star-agcmo-pi-par", "star-agcmo-pi-trades",
+    "star-agcmo-iopo-par", "star-agcmo-iopo-trades",
     "star-nagcmo-ig-par", "star-nagcmo-nonig-par",
-    "star-nagcmo-par", "star-nagcmo-trades",
+    "star-nagcmo-par", "star-nagcmo-trades", "star-nagcmo-secids",
+    "star-nagcmo-pi-ig-par", "star-nagcmo-pi-nonig-par",
+    "star-nagcmo-pi-par", "star-nagcmo-pi-trades",
+    "star-nagcmo-iopo-ig-par", "star-nagcmo-iopo-nonig-par",
+    "star-nagcmo-iopo-par", "star-nagcmo-iopo-trades",
     "star-nagcmbs-ig-par", "star-nagcmbs-nonig-par",
-    "star-nagcmbs-par", "star-nagcmbs-trades",
-    "star-agcmbs-par", "star-agcmbs-trades",
+    "star-nagcmbs-par", "star-nagcmbs-trades", "star-nagcmbs-secids",
+    "star-nagcmbs-pi-ig-par", "star-nagcmbs-pi-nonig-par",
+    "star-nagcmbs-pi-par", "star-nagcmbs-pi-trades",
+    "star-nagcmbs-iopo-ig-par", "star-nagcmbs-iopo-nonig-par",
+    "star-nagcmbs-iopo-par", "star-nagcmbs-iopo-trades",
+    "star-agcmbs-par", "star-agcmbs-trades", "star-agcmbs-secids",
+    "star-agcmbs-pi-ig-par", "star-agcmbs-pi-nonig-par",
+    "star-agcmbs-pi-par", "star-agcmbs-pi-trades",
+    "star-agcmbs-iopo-ig-par", "star-agcmbs-iopo-nonig-par",
+    "star-agcmbs-iopo-par", "star-agcmbs-iopo-trades",
     "star-abs-ig-par", "star-abs-nonig-par", "star-abs-par", "star-abs-trades",
+    "star-abs-ig-secids", "star-abs-nonig-secids", "star-abs-secids",
     "star-clo-ig-par", "star-clo-nonig-par", "star-clo-par", "star-clo-trades",
+    "star-clo-ig-secids", "star-clo-nonig-secids", "star-clo-secids",
+    "star-oth-ig-par", "star-oth-nonig-par", "star-oth-par", "star-oth-trades",
 ]
 
 # section header label -> (key, column layout)
@@ -94,6 +123,16 @@ SECTIONS = {
 SINGLE_ROWS = {
     "ABS": "abs",
     "CBO/CDO/CLO": "clo",
+    "OTHER": "oth",
+}
+# sub-breakdown label -> key suffix (for granular series)
+SUB_LABELS = {
+    "SINGLE FAMILY 15Y": "15y",
+    "SINGLE FAMILY 30Y": "30y",
+    "ADJUSTABLE/HYBRID": "adj",
+    "OTHER": "other",
+    "P&I": "pi",
+    "IO/PO": "iopo",
 }
 
 
@@ -114,6 +153,11 @@ def parse_star(data: bytes) -> dict[str, float]:
     Keys: (section, metric) e.g. ("tba", "par"), ("tba-umbs", "par"),
     ("nagcmo-ig", "par"), ("abs-nonig", "trades"), ...
     par is in $ (000s x 1000).
+
+    Granularity (2026-10-06): captures every published cell —
+    trade count, unique SEC IDs, and $ trades for each issuer/grade AND each
+    sub-breakdown (15Y/30Y/adj-hybrid/other, P&I/IO/PO), plus the OTHER AGENCY
+    issuer column and the OTHER single-row category.
     """
     rows = read_sheet(data, sheet=1)
     section: str | None = None
@@ -134,52 +178,70 @@ def parse_star(data: bytes) -> dict[str, float]:
         if label in SECTIONS:
             section, layout = SECTIONS[label]
             continue
-        if label in SINGLE_ROWS:
-            # single-row IG-block category: 6 data cols starting at col C
+        if label in SINGLE_ROWS and layout == "ig":
+            # single-row IG-block category: 6 data cols starting at col C.
+            # ("OTHER" is also a TBA/Specified sub-breakdown — only treat it
+            # as a single row inside the IG-grade block.)
             key = SINGLE_ROWS[label]
             vals = [_num(c) for c in row[2:8]]
             if len(vals) < 6:
                 continue
             add(f"{key}-ig-trades", vals[0])
+            add(f"{key}-ig-secids", vals[1])
             add(f"{key}-ig-par", vals[2] * 1000.0)
             add(f"{key}-nonig-trades", vals[3])
+            add(f"{key}-nonig-secids", vals[4])
             add(f"{key}-nonig-par", vals[5] * 1000.0)
             add(f"{key}-trades", vals[0] + vals[3])
+            add(f"{key}-secids", vals[1] + vals[4])
             add(f"{key}-par", (vals[2] + vals[5]) * 1000.0)
             continue
         if section is None or layout is None:
             continue
+        sub = SUB_LABELS.get(label)
         # data row inside a section (data starts at col C, index 2)
         if layout == "agency":
-            vals = [_num(c) for c in row[2:14]]
-            if len(vals) < 12 or all(v == 0 for v in vals):
-                # still record zeros for known subcategory rows so every
-                # trading day has a point; skip unknown labels
-                known = ("SINGLE FAMILY 15Y", "SINGLE FAMILY 30Y",
-                         "ADJUSTABLE/HYBRID", "OTHER", "P&I", "IO/PO")
-                if label not in known:
-                    continue
-                vals = (vals + [0.0] * 12)[:12]
-            issuers = ("umbs", "fnma", "fhlmc", "gnma")
+            # 5 issuers x (trades, secids, $000s) = 15 cols
+            vals = [_num(c) for c in row[2:17]]
+            known = ("SINGLE FAMILY 15Y", "SINGLE FAMILY 30Y",
+                     "ADJUSTABLE/HYBRID", "OTHER", "P&I", "IO/PO")
+            if label not in known:
+                continue
+            vals = (vals + [0.0] * 15)[:15]
+            issuers = ("umbs", "fnma", "fhlmc", "gnma", "other-agency")
             for i, iss in enumerate(issuers):
-                tr, _sec, par3 = vals[3 * i], vals[3 * i + 1], vals[3 * i + 2]
+                tr, sec, par3 = vals[3 * i], vals[3 * i + 1], vals[3 * i + 2]
                 add(f"{section}-trades", tr)
+                add(f"{section}-secids", sec)
                 add(f"{section}-par", par3 * 1000.0)
+                if sub:
+                    add(f"{section}-{sub}-trades", tr)
+                    add(f"{section}-{sub}-secids", sec)
+                    add(f"{section}-{sub}-par", par3 * 1000.0)
                 if section == "tba":
                     add(f"tba-{iss}-par", par3 * 1000.0)
                     add(f"tba-{iss}-trades", tr)
+                    add(f"tba-{iss}-secids", sec)
         elif layout == "ig":
             vals = [_num(c) for c in row[2:8]]
-            known = ("P&I", "IO/PO")
-            if label not in known:
+            if label not in ("P&I", "IO/PO"):
                 continue
             vals = (vals + [0.0] * 6)[:6]
-            add(f"{section}-ig-trades", vals[0])
-            add(f"{section}-ig-par", vals[2] * 1000.0)
-            add(f"{section}-nonig-trades", vals[3])
-            add(f"{section}-nonig-par", vals[5] * 1000.0)
-            add(f"{section}-trades", vals[0] + vals[3])
-            add(f"{section}-par", (vals[2] + vals[5]) * 1000.0)
+            for gi, grade in enumerate(("ig", "nonig")):
+                tr, sec, par3 = vals[3 * gi], vals[3 * gi + 1], vals[3 * gi + 2]
+                add(f"{section}-{grade}-trades", tr)
+                add(f"{section}-{grade}-secids", sec)
+                add(f"{section}-{grade}-par", par3 * 1000.0)
+                add(f"{section}-trades", tr)
+                add(f"{section}-secids", sec)
+                add(f"{section}-par", par3 * 1000.0)
+                if sub:
+                    add(f"{section}-{sub}-{grade}-trades", tr)
+                    add(f"{section}-{sub}-{grade}-secids", sec)
+                    add(f"{section}-{sub}-{grade}-par", par3 * 1000.0)
+                    add(f"{section}-{sub}-trades", tr)
+                    add(f"{section}-{sub}-secids", sec)
+                    add(f"{section}-{sub}-par", par3 * 1000.0)
     return out
 
 
@@ -208,15 +270,18 @@ def _iter_star_files(zip_data: bytes):
 async def fetch_finra_ids_star(store: Store, get_bytes: GetBytes,
                                today: date | None = None,
                                backfill_months: int = BACKFILL_MONTHS) -> str:
-    """Daily job: STAR structured-product activity.
+    """Daily job: STAR structured-product activity + PXTABLES pricing.
 
-    On an empty store, backfills `backfill_months` of monthly ZIPs (3Y).
-    Otherwise re-fetches the current + previous month ZIPs (idempotent).
+    On an empty store, backfills `backfill_months` of monthly ZIPs (3Y)
+    for STAR; PXTABLES (new dataset) only backfills the most recent
+    PX_BACKFILL_MONTHS months. Otherwise re-fetches the current +
+    previous month ZIPs (idempotent). The monthly ZIP is downloaded once
+    and both the STAR and PXTABLES daily files are parsed from it.
     """
     today = today or date.today()
     errors: list[str] = []
 
-    async def process_month(y: int, m: int) -> int:
+    async def process_month(y: int, m: int, parse_px: bool) -> int:
         url = ZIP_URL.format(f"{y}{m:02d}")
         try:
             data = await _fetch_zip(url, get_bytes)
@@ -236,32 +301,54 @@ async def fetch_finra_ids_star(store: Store, get_bytes: GetBytes,
             for sid, spts in by_series.items():
                 store.upsert_points(sid, spts)
             n += 1
+        if parse_px:
+            for day, xlsx in finra_ids_px.iter_pxtables_files(data):
+                try:
+                    finra_ids_px.store_pxtables(store, day, xlsx)
+                except Exception as exc:  # noqa: BLE001 — one bad day skips
+                    log.warning("ids_px bad day %s: %s", day, exc)
+                    continue
         return n
 
-    # backfill on empty store (older months first)
-    if len(store.points("cycle:star-tba-par")) < 20:
+    def prev_month(y: int, m: int) -> tuple[int, int]:
+        return (12, y - 1) if m == 1 else (m - 1, y)
+
+    star_backfill = len(store.points("cycle:star-tba-par")) < 20
+    px_backfill = finra_ids_px.needs_backfill(store)
+    # (year, month, parse_pxtables)
+    plan: list[tuple[int, int, bool]] = []
+    # backfill on empty store (previous month first, then older)
+    if star_backfill:
         y, m = today.year, today.month
-        total = 0
         log.info("finra_ids_star: starting %d-month backfill (store has <20 days)",
                  backfill_months)
         for i in range(backfill_months):
-            m -= 1
-            if m == 0:
-                m, y = 12, y - 1
-            n = await process_month(y, m)
-            total += n
-            if (i + 1) % 6 == 0:
-                log.info("finra_ids_star: backfill %d/%d months, %d files so far",
-                         i + 1, backfill_months, total)
-            await asyncio.sleep(REQUEST_GAP)
-        log.info("finra_ids_star backfilled %d daily files", total)
+            pm_, py_ = prev_month(y, m)
+            y, m = py_, pm_
+            plan.append((y, m, i < finra_ids_px.PX_BACKFILL_MONTHS))
     # always (re)fetch current + previous month (idempotent upserts;
     # catches late postings as FINRA updates the monthly ZIP in place)
     y, m = today.year, today.month
-    await process_month(y, m)
-    pm, py = (12, y - 1) if m == 1 else (m - 1, y)
+    plan.append((y, m, True))
+    pm, py = prev_month(y, m)
     if (py, pm) != (y, m):
-        await process_month(py, pm)
+        plan.append((py, pm, True))
+    if px_backfill and not star_backfill:
+        # STAR already populated but PXTABLES is new: one extra older
+        # month so PX gets ~3 months of history from the daily job
+        em, ey = prev_month(py, pm)
+        plan.insert(0, (ey, em, True))
+
+    total = 0
+    for i, (yy, mm, ppx) in enumerate(plan):
+        n = await process_month(yy, mm, ppx)
+        total += n
+        if star_backfill and (i + 1) % 6 == 0:
+            log.info("finra_ids_star: backfill %d/%d months, %d files so far",
+                     i + 1, backfill_months, total)
+        await asyncio.sleep(REQUEST_GAP)
+    if star_backfill:
+        log.info("finra_ids_star backfilled %d daily files", total)
 
     # snapshot doc: latest day summary
     latest: date | None = None
@@ -286,6 +373,23 @@ async def fetch_finra_ids_star(store: Store, get_bytes: GetBytes,
         "series": SERIES_IDS,
         "latest": summary,
     }, source=SOURCE)
+    # PXTABLES snapshot doc: latest day summary (series are dynamic, so
+    # the doc carries counts + a few sentinel values, not the full list)
+    px_latest: date | None = None
+    px_sheets = sorted(finra_ids_px.SHEET_KEYS.values())
+    try:
+        pts = store.points(finra_ids_px.SENTINEL)
+        if pts:
+            px_latest = max(pts)
+    except Exception:  # noqa: BLE001 — doc is best-effort
+        pass
+    store.put_doc("finra_ids_px", {
+        "as_of": px_latest.isoformat() if px_latest else None,
+        "sheets": px_sheets,
+        "series_prefix": "cycle:starpx-",
+        "note": ("per-sheet pricing metrics; weekly CMBS sheet dated at "
+                 "week end"),
+    }, source=finra_ids_px.SOURCE)
     if errors:
         log.warning("finra_ids_star errors: %s", "; ".join(errors[:3]))
     return SOURCE

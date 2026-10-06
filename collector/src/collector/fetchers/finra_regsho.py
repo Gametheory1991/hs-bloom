@@ -194,6 +194,8 @@ def _store_day(store: Store, day: date, per_market: dict[str, list[dict]]) -> di
                             [(day, v["short"])])
         store.upsert_points(f"cycle:regsho-top-{safe}-totalvol",
                             [(day, v["total"])])
+        store.upsert_points(f"cycle:regsho-top-{safe}-shortexempt",
+                            [(day, v["exempt"])])
     return combined
 
 

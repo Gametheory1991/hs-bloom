@@ -359,7 +359,7 @@ async function drawChart() {
     const axisStyle = { stroke: "#6b7280", grid: { stroke: "#e5e7eb" } };
     const opts = {
       width: Math.max(300, chartDiv.clientWidth || 760),
-      height: 340,
+      height: 400,
       series: [{}, { label: series.name ?? currentTitle(), stroke: "#2563eb", width: 1.5, spanGaps: true }],
       axes: [axisStyle, { ...axisStyle }],
       hooks: { drawClear: [bandsHook(bands)] },

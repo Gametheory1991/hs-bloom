@@ -59,7 +59,7 @@ def _settlement_candidates(today: date) -> list[date]:
 
 
 def parse_short(text: str) -> tuple[date, dict[str, dict]]:
-    """Return (settlement date, {symbol: {short, prev, adv, dtc, chg_pct}})."""
+    """Return (settlement date, {symbol: {short, prev, adv, dtc, chg_pct, chg_nom, name}})."""
     reader = csv.reader(io.StringIO(text), delimiter="|")
     header = next(reader, None)
     if not header or "currentShortPositionQuantity" not in "|".join(header):
@@ -72,11 +72,13 @@ def parse_short(text: str) -> tuple[date, dict[str, dict]]:
             continue
         try:
             sym = row[1].strip().upper()
+            name = row[2].strip()
             short = float(row[5] or 0)
             prev = float(row[6] or 0)
             adv = float(row[8] or 0)
             dtc = row[9].strip()
             chg = row[11].strip()
+            chg_nom = row[12].strip()
             sdate = date.fromisoformat(row[13].strip())
         except (ValueError, IndexError):
             continue
@@ -87,6 +89,8 @@ def parse_short(text: str) -> tuple[date, dict[str, dict]]:
                 "short": short, "prev": prev, "adv": adv,
                 "dtc": float(dtc) if dtc else None,
                 "chg_pct": float(chg) if chg else None,
+                "chg_nom": float(chg_nom) if chg_nom else None,
+                "name": name or None,
             }
     if asof is None:
         raise ValueError("no data rows parsed")
