@@ -2,6 +2,7 @@
 // net flow plus new/closed/increased/decreased counts and the top position
 // changes. Fed by /api/thirteenf (docs written by the thirteenf job).
 import { getThirteenF } from "../api.js";
+import { heatStyle, HEAT_LEGEND } from "../heatmap.js";
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -43,7 +44,7 @@ export async function renderFlows() {
       const p = pct == null || !isFinite(pct) ? "—" : `${pct > 0 ? "+" : ""}${pct.toFixed(1)}%`;
       return `<tr><td class="sym">${esc(c.issuer || c.cusip)}</td>` +
         `<td class="muted">${KIND_LABEL[c.kind] ?? esc(c.kind)}</td>` +
-        `<td class="${dc}">${fmtUsd(d)} <span class="muted">(${p})</span></td></tr>`;
+        `<td class="${dc}"${heatStyle({ pct: pct == null ? null : pct / 100 })}>${fmtUsd(d)} <span class="muted">(${p})</span></td></tr>`;
     }).join("");
     return `<section class="flow-card">
       <div class="flow-head">
@@ -52,7 +53,7 @@ export async function renderFlows() {
       </div>
       <div class="flow-meta muted">filed ${esc(f.filing_date)} vs ${esc(f.prev_filing_date)} ·
         ${f.n_new ?? 0} new · ${f.n_closed ?? 0} closed · ${f.n_increased ?? 0} adds · ${f.n_decreased ?? 0} trims</div>
-      <table data-sortable><tr><th>Position</th><th>Kind</th><th>Δ $ (Δ %)</th></tr>${top}</table>
+      <div>${HEAT_LEGEND}</div><table data-sortable><tr><th>Position</th><th>Kind</th><th>Δ $ (Δ %)</th></tr>${top}</table>
     </section>`;
   }).join("");
   const foot = document.querySelector("#panel-flows .panel-foot");

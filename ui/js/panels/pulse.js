@@ -7,6 +7,8 @@ import { rangePlotDotted, zToPct } from "../rangeviz.js";
 // TRACE/Treasury monthly volume: reuse the grid's canonical TOTAL math
 // (Treasury Total + all 10 TRACE products, 11 components — corrected 2026-10-05).
 import { TOTAL_PARTS, toMetric, totalVals, rowStats, rangeById } from "./trace_grid.js";
+import { heatStyle, HEAT_LEGEND } from "../heatmap.js";
+import { symNameHtml } from "../names.js";
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -434,10 +436,10 @@ function p_movers(dash) {
   rows.sort((a, b) => Math.abs(b.z ?? 0) - Math.abs(a.z ?? 0));
   const top = rows.slice(0, 6);
   if (!top.length) return `<p class="muted">No movers data.</p>`;
-  return `<table><tr><th>Sym</th><th>Δ1D</th><th>σ</th></tr>` + top.map((r) => {
+  return `<div>${HEAT_LEGEND}</div><table><tr><th>Sym</th><th>Δ1D</th><th>σ</th></tr>` + top.map((r) => {
     const cls = (r.z ?? 0) >= 0 ? "up" : "down";
-    return `<tr><td class="sym">${esc(r.symbol)}</td>` +
-      `<td class="${cls} num">${r.ret_pct != null ? `${r.ret_pct >= 0 ? "+" : ""}${r.ret_pct.toFixed(1)}%` : "—"}</td>` +
+    return `<tr><td class="sym">${symNameHtml(r.symbol, 30)}</td>` +
+      `<td class="${cls} num"${heatStyle({ z: r.z })}>${r.ret_pct != null ? `${r.ret_pct >= 0 ? "+" : ""}${r.ret_pct.toFixed(1)}%` : "—"}</td>` +
       `<td class="num">${r.z != null ? `${r.z >= 0 ? "+" : ""}${r.z.toFixed(1)}σ` : "—"}</td></tr>`;
   }).join("") + `</table>`;
 }

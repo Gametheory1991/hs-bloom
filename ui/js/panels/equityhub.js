@@ -7,6 +7,7 @@ import { getSeries } from "../api.js";
 import { rangeCells, statsFromValues, RANGE_TH } from "../rangeviz.js";
 import { RANGES, rangeById } from "./trace_grid.js";
 import { matrixToCSV, exportTablesXLSX, todayStamp } from "../export.js";
+import { heatStyle, heatBg, HEAT_LEGEND } from "../heatmap.js";
 
 const big = (x) =>
   x == null ? "—" : Number(x).toLocaleString("en-US", { maximumFractionDigits: 0 });
@@ -44,77 +45,7 @@ function backDelta(pts, days) {
 
 // ---- Company name + GICS sector for heavily-shorted names (Reg SHO files
 // carry no names). Static fallback; backend resolves new names dynamically.
-const TICKER_META = {
-  NVDA: ["Nvidia", "Technology"], AAPL: ["Apple", "Technology"], MSFT: ["Microsoft", "Technology"],
-  AMD: ["AMD", "Technology"], AVGO: ["Broadcom", "Technology"], INTC: ["Intel", "Technology"],
-  QCOM: ["Qualcomm", "Technology"], TXN: ["Texas Instruments", "Technology"],
-  AMAT: ["Applied Materials", "Technology"], LRCX: ["Lam Research", "Technology"],
-  MU: ["Micron", "Technology"], KLAC: ["KLA", "Technology"], ADI: ["Analog Devices", "Technology"],
-  MRVL: ["Marvell", "Technology"], ARM: ["Arm Holdings", "Technology"],
-  SMCI: ["Super Micro", "Technology"], DELL: ["Dell", "Technology"], HPQ: ["HP", "Technology"],
-  IBM: ["IBM", "Technology"], ORCL: ["Oracle", "Technology"], CRM: ["Salesforce", "Technology"],
-  ADBE: ["Adobe", "Technology"], INTU: ["Intuit", "Technology"], NOW: ["ServiceNow", "Technology"],
-  PANW: ["Palo Alto Networks", "Technology"], CRWD: ["CrowdStrike", "Technology"],
-  FTNT: ["Fortinet", "Technology"], PLTR: ["Palantir", "Technology"], SNOW: ["Snowflake", "Technology"],
-  DDOG: ["Datadog", "Technology"], NET: ["Cloudflare", "Technology"], MDB: ["MongoDB", "Technology"],
-  SHOP: ["Shopify", "Technology"], XYZ: ["Block", "Technology"], PYPL: ["PayPal", "Technology"],
-  COIN: ["Coinbase", "Financials"], MSTR: ["Strategy", "Technology"],
-  TSLA: ["Tesla", "Consumer Discretionary"], AMZN: ["Amazon", "Consumer Discretionary"],
-  HD: ["Home Depot", "Consumer Discretionary"], MCD: ["McDonald's", "Consumer Discretionary"],
-  NKE: ["Nike", "Consumer Discretionary"], SBUX: ["Starbucks", "Consumer Discretionary"],
-  BKNG: ["Booking", "Consumer Discretionary"], ABNB: ["Airbnb", "Consumer Discretionary"],
-  RIVN: ["Rivian", "Consumer Discretionary"], LCID: ["Lucid", "Consumer Discretionary"],
-  F: ["Ford", "Consumer Discretionary"], GM: ["General Motors", "Consumer Discretionary"],
-  GME: ["GameStop", "Consumer Discretionary"], AMC: ["AMC Entertainment", "Communication Services"],
-  GOOGL: ["Alphabet", "Communication Services"], GOOG: ["Alphabet", "Communication Services"],
-  META: ["Meta", "Communication Services"], NFLX: ["Netflix", "Communication Services"],
-  DIS: ["Disney", "Communication Services"], T: ["AT&T", "Communication Services"],
-  VZ: ["Verizon", "Communication Services"], TMUS: ["T-Mobile", "Communication Services"],
-  EA: ["Electronic Arts", "Communication Services"], TTWO: ["Take-Two", "Communication Services"],
-  RBLX: ["Roblox", "Communication Services"], DJT: ["Trump Media", "Communication Services"],
-  SNAP: ["Snap", "Communication Services"], PINS: ["Pinterest", "Communication Services"],
-  JPM: ["JPMorgan", "Financials"], BAC: ["Bank of America", "Financials"],
-  WFC: ["Wells Fargo", "Financials"], C: ["Citigroup", "Financials"],
-  GS: ["Goldman Sachs", "Financials"], MS: ["Morgan Stanley", "Financials"],
-  AXP: ["Amex", "Financials"], V: ["Visa", "Financials"], MA: ["Mastercard", "Financials"],
-  COF: ["Capital One", "Financials"], SCHW: ["Charles Schwab", "Financials"],
-  HOOD: ["Robinhood", "Financials"], SOFI: ["SoFi", "Financials"],
-  BX: ["Blackstone", "Financials"], KKR: ["KKR", "Financials"], ARES: ["Ares", "Financials"],
-  JNJ: ["Johnson & Johnson", "Healthcare"], UNH: ["UnitedHealth", "Healthcare"],
-  LLY: ["Eli Lilly", "Healthcare"], PFE: ["Pfizer", "Healthcare"], MRK: ["Merck", "Healthcare"],
-  ABBV: ["AbbVie", "Healthcare"], AMGN: ["Amgen", "Healthcare"], GILD: ["Gilead", "Healthcare"],
-  BIIB: ["Biogen", "Healthcare"], REGN: ["Regeneron", "Healthcare"], VRTX: ["Vertex", "Healthcare"],
-  ISRG: ["Intuitive Surgical", "Healthcare"], TMO: ["Thermo Fisher", "Healthcare"],
-  DHR: ["Danaher", "Healthcare"], CVS: ["CVS Health", "Healthcare"], HCA: ["HCA", "Healthcare"],
-  XOM: ["Exxon Mobil", "Energy"], CVX: ["Chevron", "Energy"], COP: ["ConocoPhillips", "Energy"],
-  EOG: ["EOG Resources", "Energy"], SLB: ["SLB", "Energy"], OXY: ["Occidental", "Energy"],
-  MPC: ["Marathon Petroleum", "Energy"], VLO: ["Valero", "Energy"],
-  MARA: ["MARA Holdings", "Energy"], RIOT: ["Riot Platforms", "Energy"],
-  BA: ["Boeing", "Industrials"], CAT: ["Caterpillar", "Industrials"], GE: ["GE Aerospace", "Industrials"],
-  HON: ["Honeywell", "Industrials"], UPS: ["UPS", "Industrials"], FDX: ["FedEx", "Industrials"],
-  LMT: ["Lockheed Martin", "Industrials"], RTX: ["RTX", "Industrials"],
-  NOC: ["Northrop Grumman", "Industrials"], DAL: ["Delta", "Industrials"],
-  UAL: ["United Airlines", "Industrials"],
-  WMT: ["Walmart", "Consumer Staples"], COST: ["Costco", "Consumer Staples"],
-  PG: ["Procter & Gamble", "Consumer Staples"], KO: ["Coca-Cola", "Consumer Staples"],
-  PEP: ["PepsiCo", "Consumer Staples"],
-  NEE: ["NextEra", "Utilities"], DUK: ["Duke Energy", "Utilities"],
-  LIN: ["Linde", "Materials"], FCX: ["Freeport-McMoRan", "Materials"], NEM: ["Newmont", "Materials"],
-  AMT: ["American Tower", "Real Estate"], PLD: ["Prologis", "Real Estate"],
-  SPY: ["S&P 500 ETF", "ETF"], QQQ: ["Nasdaq 100 ETF", "ETF"], IWM: ["Russell 2000 ETF", "ETF"],
-  TLT: ["20Y+ Treasury ETF", "ETF"], HYG: ["HY Bond ETF", "ETF"], LQD: ["IG Bond ETF", "ETF"],
-  FNGR: ["FingerMotion", "Technology"], FLUX: ["Flux Power", "Industrials"],
-  QTEX: ["QTREX Quantum", "Technology"], AMOD: ["Alpha Modus", "Technology"],
-  SDEV: ["Stablecoin Development", "Financials"], NIVF: ["NewGenIvf Group", "Healthcare"],
-  AAL: ["American Airlines", "Industrials"], SCKT: ["Socket Mobile", "Technology"],
-  SPCX: ["Space Exploration Technologies", "Industrials"], NU: ["Nu Holdings", "Financials"],
-  SCNX: ["Scienture Holdings", "Healthcare"], NVD: ["2x Short NVDA ETF", "ETF"],
-  BITO: ["ProShares Bitcoin ETF", "ETF"], SOXS: ["Semiconductor Bear 3X", "ETF"],
-  DDC: ["DDC Enterprise", "Consumer Staples"], MSTZ: ["2X Inverse MSTR ETF", "ETF"],
-  RWM: ["Short Russell 2000", "ETF"], CYCU: ["Cycurion", "Technology"],
-  ONDS: ["Ondas Holdings", "Technology"], PLUG: ["Plug Power", "Industrials"],
-  CTVA: ["Corteva", "Materials"],
-};
+import { STOCK_META as TICKER_META } from "../names.js";
 const tickerMeta = (t) => {
   if (t && typeof t === "object" && t.name) return [t.name, t.sector ?? "Other"];
   const sym = typeof t === "string" ? t : t?.symbol;
@@ -138,7 +69,7 @@ const vcCell = (cur, pct, isRatio) => {
     ? `${nom >= 0 ? "+" : "−"}${(Math.abs(nom) * 100).toFixed(1)}pp`
     : fmtShNom(nom);
   const cls = nom >= 0 ? "up" : nom < 0 ? "down" : "";
-  return `<td class="num"><span class="${cls}"><b>${nTxt}</b></span> <span class="muted">(${pHtml})</span></td>`;
+  return `<td class="num"${heatStyle({ pct })}><span class="${cls}"><b>${nTxt}</b></span> <span class="muted">(${pHtml})</span></td>`;
 };
 const pxFmt = (x) => x == null ? "—" :
   "$" + x.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -291,8 +222,8 @@ async function fillSvMarketDeltas() {
       const dS = d1Delta((sv?.points ?? []).map((p) => ({ d: p[0], v: p[1] })));
       const dR = d1Delta((sr?.points ?? []).map((p) => ({ d: p[0], v: p[1] })));
       const c1 = tr.querySelector("[data-d1short]"), c2 = tr.querySelector("[data-d1ratio]");
-      if (c1) c1.innerHTML = dCellSh(dS.nom, dS.pct);
-      if (c2) c2.innerHTML = dCellSh(dR.nom == null ? null : dR.nom * 100, dR.pct);
+      if (c1) { c1.innerHTML = dCellSh(dS.nom, dS.pct); const bg = heatBg({ pct: dS.pct }); if (bg) c1.style.background = bg; }
+      if (c2) { c2.innerHTML = dCellSh(dR.nom == null ? null : dR.nom * 100, dR.pct); const bg = heatBg({ pct: dR.pct }); if (bg) c2.style.background = bg; }
     } catch { /* leave placeholder */ }
   });
 }
@@ -332,6 +263,7 @@ function svRichTopTable(r, ts) {
   }).join("");
   return { html:
     `<h3>TOP SHORTED TICKERS <span class="muted">${top50.length} names · nominal + % changes 1D/1W/1M/1Q/1Y/3Y</span></h3>
+    <div>${HEAT_LEGEND}</div>
     <div class="table-scroll"><table class="topshorted" data-sortable><tr><th>Symbol</th><th>Name</th>` +
     `<th colspan="9">Price action <span class="muted">${statsAsOf ? "as of " + esc(statsAsOf) : "stats pending"}</span></th>` +
     `<th>Short vol</th>` +
@@ -383,7 +315,7 @@ export function renderShortVol(si, finraRegsho, tickerStats) {
       <button id="sv-dl-csv" class="mini-btn">⤓ CSV (markets + top 50 + threshold)</button>
       <button id="sv-dl-xlsx" class="mini-btn">⤓ XLSX (markets + top 50 + threshold)</button>
     </div>
-    <table data-sortable><tr><th>Market</th><th>Short vol (sh)</th><th>Total vol (sh)</th><th>Short ratio</th><th>1D Δ short vol</th><th>1D Δ ratio</th></tr>${mkts}</table>
+    <div>${HEAT_LEGEND}</div><table data-sortable><tr><th>Market</th><th>Short vol (sh)</th><th>Total vol (sh)</th><th>Short ratio</th><th>1D Δ short vol</th><th>1D Δ ratio</th></tr>${mkts}</table>
     <h3>CONSOLIDATED SHORT VOLUME — TREND <span class="muted">CNMS · choose stat and dates</span></h3>
     <div class="trace-controls">
       <span class="seg" id="sv-stat">
@@ -519,7 +451,7 @@ async function fillMarginTable() {
       };
       const cell = (days) => {
         const { nom, pct } = backDelta(pts, days);
-        return `<td class="num">${mgCell(nom, pct)}</td>`;
+        return `<td class="num"${heatStyle({ pct })}>${mgCell(nom, pct)}</td>`;
       };
       const stats = statsFromValues(pts.map((p) => p.v));
       return `<tr><td><b>${esc(def.label)}</b></td>` +
@@ -546,7 +478,7 @@ export function renderMargin(margin) {
     </div>
     <p class="muted">Debit balances in customers' securities margin accounts vs free credit balances. ` +
     `Rising debit + falling free credit = leverage building; the reverse = de-risking.</p>
-    <table data-sortable><tr><th>Series</th><th>Latest</th><th>1M Δ</th><th>3M Δ</th><th>1Y Δ</th><th>3Y Δ</th>${RANGE_TH}</tr>
+    <div>${HEAT_LEGEND}</div><table data-sortable><tr><th>Series</th><th>Latest</th><th>1M Δ</th><th>3M Δ</th><th>1Y Δ</th><th>3Y Δ</th>${RANGE_TH}</tr>
     <tbody id="mg-tbody"><tr data-sort-row="off"><td colspan="8" class="muted">Loading history…</td></tr></tbody></table>
     <h3>MARGIN CHART <span class="muted">choose series and dates</span></h3>
     <div class="trace-controls">
@@ -676,7 +608,7 @@ export function renderShortInt(si) {
       const [wname] = tickerMeta({ name: v.name, symbol: sym });
       return { sym, short: v.short, n, p, adv: v.adv, dtc: v.dtc, name: wname,
         html: `<tr><td><b>${esc(sym)}</b></td><td>${esc(wname)}</td><td>${big(v.short)}</td>` +
-        `<td>${n} <span class="muted">(${p})</span></td><td>${big(v.adv)}</td><td>${v.dtc ?? "—"}</td></tr>` };
+        `<td${heatStyle({ pct: v.chg_pct })}>${n} <span class="muted">(${p})</span></td><td>${big(v.adv)}</td><td>${v.dtc ?? "—"}</td></tr>` };
     });
   body.innerHTML =
     `<h3>SHORT INTEREST — FINRA SETTLEMENT <span class="muted">as of ${esc(s.as_of ?? "—")}</span></h3>
@@ -699,7 +631,7 @@ export function renderShortInt(si) {
     <div id="sint-chart" class="trace-chart"></div>
     <div id="sint-chart-status" class="muted"></div>
     <h3>WATCHLIST <span class="muted">change vs prior settlement</span></h3>
-    <table data-sortable><tr><th>Ticker</th><th>Name</th><th>Short (sh)</th><th>Δ vs prior settl.</th><th>Avg daily vol (sh)</th><th>Days to cover</th></tr>` +
+    <div>${HEAT_LEGEND}</div><table data-sortable><tr><th>Ticker</th><th>Name</th><th>Short (sh)</th><th>Δ vs prior settl.</th><th>Avg daily vol (sh)</th><th>Days to cover</th></tr>` +
     rows.map((r) => r.html).join("") + `</table>`;
 
   const wHeaders = ["Ticker", "Name", "Short (sh)", "Δ nominal (sh)", "Δ %", "Avg daily vol (sh)", "Days to cover"];

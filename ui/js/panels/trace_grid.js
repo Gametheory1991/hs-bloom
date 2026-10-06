@@ -10,6 +10,7 @@ import { getSeries } from "../api.js";
 import { setTraceChartProduct } from "./trace_charts.js";
 import { OUTSTANDING, totalOutstanding, OUTSTANDING_NOTE } from "./outstanding.js";
 import { rangePlotDotted } from "../rangeviz.js";
+import { heatStyle, HEAT_LEGEND } from "../heatmap.js";
 
 const PRODUCTS = [
   { id: "total", label: "TOTAL (Treasury + TRACE)", synthetic: true },
@@ -469,11 +470,8 @@ const fmtSh = (v) => v == null || !isFinite(v) ? "—" :
   v >= 1e9 ? (v / 1e9).toFixed(2) + "B sh" :
   v >= 1e6 ? (v / 1e6).toFixed(1) + "M sh" : fmtN(v) + " sh";
 const pct1 = (x) => x == null || !isFinite(x) ? "—" : `${x >= 0 ? "+" : ""}${(x * 100).toFixed(1)}%`;
-const heat = (x) => {
-  if (x == null || !isFinite(x)) return "";
-  const a = Math.min(Math.abs(x) / 0.25, 1) * 0.45;
-  return ` style="background:rgba(${x >= 0 ? "22,163,74" : "220,38,38"},${a.toFixed(2)})"`;
-};
+// Shared Bloomberg-style heatmap (red = +/hot, blue = −/cold, light theme).
+const heat = (x) => heatStyle({ pct: x });
 // Nominal (absolute) delta formatter — signed, same units as the value column.
 const fmtNomB = (v) => v == null || !isFinite(v) ? "—" : `${v >= 0 ? "+" : "−"}$${fmtB(Math.abs(v))}`;
 const fmtNomN = (v) => v == null || !isFinite(v) ? "—" : `${v >= 0 ? "+" : "−"}${fmtN(Math.abs(v))}`;
@@ -890,6 +888,7 @@ export function renderTraceGrid(corpData) {
       </span>
       <span class="muted" id="trace-grid-asof">Loading…</span>
     </div>
+    <div>${HEAT_LEGEND}</div>
     <table class="trace-grid"><thead><tr>${
       COLS.map((c) => `<th data-sort="${c.key}" class="${c.num ? "num" : ""}">${c.key === "cur" ? metricColTitle() : c.title}</th>`).join("")
     }</tr></thead><tbody><tr><td colspan="20" class="muted">Loading TRACE history…</td></tr></tbody></table>`;

@@ -15,6 +15,7 @@
 //   6. concentration/cashflow risks + risk notes
 // Deal amounts are press-reported commitment sizes, not verified cash flows.
 import { fmtAge, isStale } from "../fmt.js";
+import { ecosystemMap } from "../ecosystem-map.js";
 
 const STALE_MINUTES = 20160; // 2x the weekly universe-graph cadence
 
@@ -42,7 +43,7 @@ const groupColor = (g) => GROUP_COLORS[g] || "#9a9a9a";
 // per-universe state (selector keeps each universe's search/ego intact)
 const _states = {};
 const stateFor = (uid, defaults) =>
-  _states[uid] || (_states[uid] = { q: "", vertical: "all", ego: defaults.ego, fullMap: false, _sel: null });
+  _states[uid] || (_states[uid] = { q: "", vertical: "all", ego: defaults.ego, fullMap: false, landscape: false, _sel: null });
 
 // edge kind -> svg style (batch 7 money-flow kinds + batch 8 deal kinds)
 const edgeStyle = (k) =>
@@ -326,8 +327,10 @@ export function renderUniverse(doc, opts, slot) {
     ${stackChart(doc, opts)}
     <div class="hyper-section-title">COVERAGE MAP — ${nPub} PUBLIC + ${nPriv} PRIVATE</div>
     <input class="ai-search" type="search" placeholder="Search companies…" value="${esc(state.q)}" aria-label="Search companies">
-    <div class="ai-chips">${chips}</div>
-    <div class="ai-cards-slot">${cardsView(doc, state)}</div>
+    <div class="ai-chips">${chips}<button class="ai-chip${state.landscape ? " on" : ""} ai-landscape-toggle" title="Messari-style ecosystem landscape: all nodes grouped by category">Landscape</button></div>
+    <div class="ai-cards-slot">${state.landscape
+      ? ecosystemMap(doc, { asOf: doc.as_of, source: "press-reported deals + SEC XBRL" })
+      : cardsView(doc, state)}</div>
     <div class="ai-sel-slot">${selDetail}</div>
     <div class="hyper-section-title">MONEY FLOW — EGO GRAPH</div>
     <div class="ai-chips">${hubChips}
@@ -352,6 +355,13 @@ export function renderUniverse(doc, opts, slot) {
   if (ft) ft.addEventListener("click", () => { state.fullMap = !state.fullMap; rerender(); });
   slot.querySelectorAll(".ai-card").forEach((c) => {
     const go = () => { state._sel = c.dataset.id; state.ego = c.dataset.id; rerender(); };
+    c.addEventListener("click", go);
+    c.addEventListener("keydown", (e) => { if (e.key === "Enter") go(); });
+  });
+  const lt = slot.querySelector(".ai-landscape-toggle");
+  if (lt) lt.addEventListener("click", () => { state.landscape = !state.landscape; rerender(); });
+  slot.querySelectorAll(".eco-chip").forEach((c) => {
+    const go = () => { state._sel = c.dataset.node; state.ego = c.dataset.node; rerender(); };
     c.addEventListener("click", go);
     c.addEventListener("keydown", (e) => { if (e.key === "Enter") go(); });
   });

@@ -2,6 +2,7 @@ import { openChart } from "../chart.js";
 import { fmtAge, isStale } from "../fmt.js";
 import { getSeries } from "../api.js";
 import { rangeCells, statsFromValues, RANGE_TH } from "../rangeviz.js";
+import { heatStyle, HEAT_LEGEND } from "../heatmap.js";
 
 // Labels come from collector config, not a third-party API, but escape
 // before innerHTML anyway — cheap insurance against a bad config value.
@@ -29,7 +30,7 @@ function fmtChgBoth(chg, value, unit) {
   const base = value != null ? value - chg : null;
   const pct = base != null && base !== 0 ? (chg / base) * 100 : null;
   const p = pct == null || !isFinite(pct) ? "—" : `${pct > 0 ? "+" : ""}${pct.toFixed(1)}%`;
-  return { text: `${m.text} <span class="muted">(${p})</span>`, cls: m.cls };
+  return { text: `${m.text} <span class="muted">(${p})</span>`, cls: m.cls, ratio: pct == null ? null : pct / 100 };
 }
 
 const STALE_MINUTES = 2880; // 2x the daily cycle cadence
@@ -50,7 +51,7 @@ export function renderCycle(cycle) {
     root.innerHTML = tab.panels.map((panel, pi) => `
       <section class="panel">
         <div class="panel-title">${esc(panel.title)}</div>
-        <div class="panel-body"><table data-sortable>
+        <div class="panel-body"><div>${HEAT_LEGEND}</div><table data-sortable>
           <tr><th>Series</th><th>Now</th><th>Δ 1M</th><th>Δ 1Y</th>${RANGE_TH}</tr>
           ${panel.rows.map((r, ri) => {
             const m = fmtChgBoth(r.chg_1m, r.value, r.unit);
@@ -58,8 +59,8 @@ export function renderCycle(cycle) {
             return `<tr class="release clickable" data-p="${pi}" data-r="${ri}" data-sid="${esc(r.id)}">` +
               `<td class="sym">${esc(r.name)}${r.overlay ? ` <span class="muted">⇄</span>` : ""}</td>` +
               `<td>${fmtVal(r.value, r.unit)}</td>` +
-              `<td class="${m.cls}">${m.text}</td>` +
-              `<td class="${y.cls}">${y.text}</td>` +
+              `<td class="${m.cls}"${heatStyle({ pct: m.ratio })}>${m.text}</td>` +
+              `<td class="${y.cls}"${heatStyle({ pct: y.ratio })}>${y.text}</td>` +
               `<td class="range-cell" data-range-for="${esc(r.id)}" colspan="4"><span class="muted">…</span></td></tr>`;
           }).join("")}
         </table></div>

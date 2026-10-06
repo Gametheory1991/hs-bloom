@@ -3,6 +3,7 @@
 // Data: /api/dashboard "xcorr" + "gse" panels. Vanilla JS + inline SVG,
 // no new libraries. Mobile-first: the matrix scrolls horizontally.
 import { fmtAge, fmtUsd } from "../fmt.js";
+import { symName } from "../names.js";
 
 const STALE_MINUTES = 2880; // 2x the daily xcorr cadence
 
@@ -45,7 +46,7 @@ function triHeatmap(labels, matrix, groups) {
   });
   labels.forEach((lab, i) => {
     const y = padT + i * cell + cell / 2;
-    s += `<text x="${padL - 6}" y="${y + 4}" text-anchor="end" font-size="10" fill="#9aa4b2">${esc(lab)}</text>`;
+    s += `<text x="${padL - 6}" y="${y + 4}" text-anchor="end" font-size="10" fill="#9aa4b2"><title>${esc(symName(lab))}</title>${esc(lab)}</text>`;
   });
   for (let i = 0; i < n; i++) {
     for (let j = 0; j <= i; j++) {

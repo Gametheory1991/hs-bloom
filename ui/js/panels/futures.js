@@ -3,6 +3,8 @@
 // for the full chart via the shared overlay.
 import { getSeries } from "../api.js";
 import { openChart } from "../chart.js";
+import { heatStyle, HEAT_LEGEND } from "../heatmap.js";
+import { symNameHtml } from "../names.js";
 
 export const FUTURES = [
   ["fut-es", "ES", "S&P 500"],
@@ -38,16 +40,16 @@ export async function renderFutures() {
       }
     })
   );
-  body.innerHTML = `<table data-sortable>
+  body.innerHTML = `<div>${HEAT_LEGEND}</div><table data-sortable>
       <tr><th>Contract</th><th>Underlying</th><th>Last</th><th>Δ 1D</th><th>Δ 1D %</th></tr>
       ${rows.map((r, i) => {
         const cls = r.chg == null ? "flat" : r.chg === 0 ? "flat" : r.chg > 0 ? "up" : "down";
         const chg = r.chg == null ? "—" : `${r.chg > 0 ? "+" : ""}${fmtPx(r.chg)}`;
         const pct = r.pct == null ? "—" : `${r.pct > 0 ? "+" : ""}${r.pct.toFixed(2)}%`;
         return `<tr class="clickable" data-i="${i}">` +
-          `<td class="sym">${r.sym}</td><td>${r.label}</td>` +
+          `<td class="sym">${symNameHtml(r.sym)}</td><td>${r.label}</td>` +
           `<td>${fmtPx(r.last)}</td>` +
-          `<td class="${cls}">${chg}</td><td class="${cls}">${pct}</td></tr>`;
+          `<td class="${cls}"${heatStyle({ pct: r.pct == null ? null : r.pct / 100 })}>${chg}</td><td class="${cls}"${heatStyle({ pct: r.pct == null ? null : r.pct / 100 })}>${pct}</td></tr>`;
       }).join("")}
     </table>`;
   const asof = rows.map((r) => r.asof).filter(Boolean).sort().pop();

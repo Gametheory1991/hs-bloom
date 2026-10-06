@@ -7,6 +7,7 @@ import { getSeries } from "../api.js";
 import { rangeCells, statsFromValues, RANGE_TH } from "../rangeviz.js";
 import { RANGES, rangeById } from "./trace_grid.js";
 import { matrixToCSV, exportTablesXLSX, todayStamp } from "../export.js";
+import { heatStyle, HEAT_LEGEND } from "../heatmap.js";
 
 const big = (x) =>
   x == null ? "—" : x.toLocaleString("en-US", { maximumFractionDigits: 0 });
@@ -457,7 +458,7 @@ async function fillStarTable() {
           ? (v) => "$" + (v / 1e9).toFixed(2) + "B"
           : (v) => Math.round(v).toLocaleString("en-US");
         const stats = statsFromValues(pts.map((p) => p.v));
-        const dc = (k) => `<td class="num">${starDeltaCell(st[k].nom, st[k].pct, fmtNom)}</td>`;
+        const dc = (k) => `<td class="num"${heatStyle({ pct: st[k].pct })}>${starDeltaCell(st[k].nom, st[k].pct, fmtNom)}</td>`;
         return `<tr data-star-chart="${chartId}" title="Click to chart ${esc(label)}">` +
           `<td><b>${esc(label)}</b></td><td class="num"><b>${fmtVal(st.cur)}</b> <span class="muted">${st.asof}</span></td>` +
           dc("d1") + dc("w1") + dc("m1") + dc("q1") + dc("y1") + dc("y3") +
@@ -542,6 +543,7 @@ export function renderStar(p) {
     </div>
     <h3>STAR TABLE <span class="muted">click a row for its chart</span></h3>
     <div class="seg" id="star-metric-toggle" role="tablist"><button data-m="vol" class="on">$ Volume</button><button data-m="trades">Trades</button></div>
+    <div>${HEAT_LEGEND}</div>
     <table class="star-table" data-sortable><thead><tr><th>Product</th><th>Latest</th><th>1D Δ</th><th>1W Δ</th><th>1M Δ</th><th>1Q Δ</th><th>1Y Δ</th><th>3Y Δ</th>${RANGE_TH}</tr></thead>
     <tbody id="star-tbody"><tr data-sort-row="off"><td colspan="10" class="muted">Loading daily history…</td></tr></tbody></table>`;
 

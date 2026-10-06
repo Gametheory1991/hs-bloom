@@ -11,6 +11,7 @@
 // Harry's standing visuals: 1D/1W/1M/1Q/1Y horizons on every comparison,
 // Bloomberg dotted range sparklines (percentile + z-score), light theme.
 import { getSeries } from "../api.js";
+import { heatStyle, HEAT_LEGEND } from "../heatmap.js";
 
 const HY_BUCKETS = new Set(["BB", "B", "CCC"]);
 
@@ -71,7 +72,7 @@ const bpDelta = (now, ref) => {
   const s = d > 0 ? "+" : "";
   const bpTxt = `${s}${d.toFixed(0)}bp`;
   const pctTxt = pct == null || !isFinite(pct) ? "—" : `(${s}${(pct * 100).toFixed(1)}%)`;
-  return `<td class="num ${cls}"><b>${bpTxt}</b> <span class="muted">${pctTxt}</span></td>`;
+  return `<td class="num ${cls}"${heatStyle({ pct })}><b>${bpTxt}</b> <span class="muted">${pctTxt}</span></td>`;
 };
 
 // ---- index OAS / yield tables (full universe, ICE BofA via FRED) ----
@@ -105,7 +106,7 @@ async function oasTable(rows, title, note) {
       `<td class="num">${so?.pct == null ? "—" : so.pct.toFixed(0)}</td>` +
       `<td>${pctSvg}</td><td>${zSvg}</td></tr>`;
   }).join("");
-  return `<h4>${title}</h4><div class="tbl-wrap"><table class="wall-tbl" data-sortable>` +
+  return `<h4>${title}</h4><div>${HEAT_LEGEND}</div><div class="tbl-wrap"><table class="wall-tbl" data-sortable>` +
     `<tr><th>Bucket</th><th>OAS bp<br><span class="muted">as of</span></th><th>YTW</th>` +
     `<th>1D Δ</th><th>1W Δ</th><th>1M Δ</th><th>1Q Δ</th><th>1Y Δ</th><th>3Y Δ</th>` +
     `<th>%ile</th><th data-sort="off">Range %ile</th><th data-sort="off">Range z</th></tr>${body}</table></div>` +

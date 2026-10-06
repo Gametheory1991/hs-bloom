@@ -2,6 +2,7 @@
 // Reads dash.panels.predict (backend pred_edge doc + venue snapshots).
 // All edge/mispricing figures are model estimates, labeled as such —
 // the backend disclaimer is rendered verbatim in the panel foot.
+import { heatStyle, HEAT_LEGEND } from "../heatmap.js";
 const pct = (x) => (x == null ? "—" : `${(x * 100).toFixed(1)}%`);
 const usd = (x) =>
   x == null ? "—" : "$" + x.toLocaleString("en-US", { maximumFractionDigits: 0 });
@@ -55,12 +56,12 @@ function calibTable(rows) {
 
 function moversTable(movers) {
   if (!movers.length) return "";
-  return `<h3>BIGGEST 1D MOVERS — POLYMARKET</h3><table data-sortable>
+  return `<h3>BIGGEST 1D MOVERS — POLYMARKET</h3><div>${HEAT_LEGEND}</div><table data-sortable>
       <tr><th>Market</th><th>Yes</th><th>Δ 1D</th><th>24h vol</th></tr>
       ${movers.map((m) => {
         const cls = m.chg_1d > 0 ? "up" : "down";
         return `<tr><td>${link(m.url, (m.label ?? "").slice(0, 90))}</td>` +
-          `<td>${pct(m.yes)}</td><td class="${cls}">${m.chg_1d > 0 ? "+" : ""}${(m.chg_1d * 100).toFixed(1)}pp</td>` +
+          `<td>${pct(m.yes)}</td><td class="${cls}"${heatStyle({ pct: m.chg_1d })}>${m.chg_1d > 0 ? "+" : ""}${(m.chg_1d * 100).toFixed(1)}pp</td>` +
           `<td>${usd(m.volume24h)}</td></tr>`;
       }).join("")}
     </table>`;

@@ -4,6 +4,7 @@
 // Vanilla JS + inline SVG, no new libraries.
 import { fmtAge } from "../fmt.js";
 import { rangePlotDotted } from "../rangeviz.js";
+import { symNameHtml } from "../names.js";
 
 const STALE_MINUTES = 2880; // 2x the daily voldash cadence
 
@@ -30,7 +31,7 @@ function tableSection(v) {
       : `<span class="${r.wkly_chg > 0 ? "up" : r.wkly_chg < 0 ? "down" : ""}">${r.wkly_chg > 0 ? "▲" : r.wkly_chg < 0 ? "▼" : "·"} ${Math.abs(r.wkly_chg).toFixed(1)}</span>`;
     const spr = r.spread == null ? "—"
       : `<span class="${r.spread > 0 ? "up" : r.spread < 0 ? "down" : ""}">${r.spread > 0 ? "+" : ""}${r.spread.toFixed(1)}</span>`;
-    return `<tr><td><b>${esc(r.ticker)}</b></td><td>${n1(r.implied)}</td><td>${chg}</td>` +
+    return `<tr><td>${symNameHtml(r.ticker)}</td><td>${n1(r.implied)}</td><td>${chg}</td>` +
       `${pctCell(r.pctile_1y)}<td data-sort="off">${rangePlotDotted({ pct: r.pctile_1y }, "pct")}</td>` +
       `<td>${n1(r.realized)}</td><td>${spr}</td>${pctCell(r.spread_pctile_1y)}` +
       `<td data-sort="off">${rangePlotDotted({ pct: r.spread_pctile_1y }, "pct")}</td></tr>`;
