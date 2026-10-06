@@ -93,6 +93,7 @@ from the index page.
 from __future__ import annotations
 
 import asyncio
+import calendar
 import io
 import logging
 import re
@@ -100,7 +101,9 @@ import zipfile
 import xml.etree.ElementTree as ET
 from datetime import date, timedelta
 
-from collector.fetchers.sec_ncen import quarter_end
+def quarter_end(year: int, q: int) -> date:
+      month = q * 3
+      return date(year, month, calendar.monthrange(year, month)[1])
 from collector.fetchers.xlsx import read_sheet, to_float
 from collector.http import GetBytes, GetText
 from collector.store import Store
