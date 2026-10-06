@@ -64,6 +64,73 @@ const PRODUCTS = [
   { id: "si-amzn",  label: "Short Int — AMZN",  par: "short-AMZN",  unit: "sh", raw: true },
   { id: "si-googl", label: "Short Int — GOOGL", par: "short-GOOGL", unit: "sh", raw: true },
   { id: "si-meta",  label: "Short Int — META",  par: "short-META",  unit: "sh", raw: true },
+  // Market breadth (FINRA, daily since Jan 2018). A/D spread = advances −
+  // declines; advances/declines/hi52/lo52 are issue counts. All daily —
+  // 1D/1W deltas are meaningful. Corp/144A split IG/HY; agency splits by issuer.
+  { id: "br-corp-all-spr",  label: "Breadth — Corp All A/D Spread",  par: "finra-breadth-corp-all-adspread",  unit: "ct", daily: true, breadth: true },
+  { id: "br-corp-ig-spr",   label: "Breadth — Corp IG A/D Spread",   par: "finra-breadth-corp-ig-adspread",   unit: "ct", daily: true, breadth: true },
+  { id: "br-corp-hy-spr",   label: "Breadth — Corp HY A/D Spread",   par: "finra-breadth-corp-hy-adspread",   unit: "ct", daily: true, breadth: true },
+  { id: "br-agcy-all-spr",  label: "Breadth — Agency All A/D Spread", par: "finra-breadth-agency-all-adspread", unit: "ct", daily: true, breadth: true },
+  { id: "br-144a-all-spr",  label: "Breadth — 144A All A/D Spread",  par: "finra-breadth-144a-all-adspread",  unit: "ct", daily: true, breadth: true },
+  { id: "br-144a-ig-spr",   label: "Breadth — 144A IG A/D Spread",   par: "finra-breadth-144a-ig-adspread",   unit: "ct", daily: true, breadth: true },
+  { id: "br-144a-hy-spr",   label: "Breadth — 144A HY A/D Spread",   par: "finra-breadth-144a-hy-adspread",   unit: "ct", daily: true, breadth: true },
+  { id: "br-corp-all-adv",  label: "Breadth — Corp All Advances",    par: "finra-breadth-corp-all-adv",  unit: "ct", daily: true, breadth: true },
+  { id: "br-corp-all-dec",  label: "Breadth — Corp All Declines",    par: "finra-breadth-corp-all-dec",  unit: "ct", daily: true, breadth: true },
+  { id: "br-corp-all-hi52", label: "Breadth — Corp All 52wk Highs",  par: "finra-breadth-corp-all-hi52", unit: "ct", daily: true, breadth: true },
+  { id: "br-corp-all-lo52", label: "Breadth — Corp All 52wk Lows",   par: "finra-breadth-corp-all-lo52", unit: "ct", daily: true, breadth: true },
+  { id: "br-agcy-all-adv",  label: "Breadth — Agency All Advances",  par: "finra-breadth-agency-all-adv",  unit: "ct", daily: true, breadth: true },
+  { id: "br-agcy-all-dec",  label: "Breadth — Agency All Declines",  par: "finra-breadth-agency-all-dec",  unit: "ct", daily: true, breadth: true },
+  { id: "br-agcy-all-hi52", label: "Breadth — Agency All 52wk Highs", par: "finra-breadth-agency-all-hi52", unit: "ct", daily: true, breadth: true },
+  { id: "br-agcy-all-lo52", label: "Breadth — Agency All 52wk Lows", par: "finra-breadth-agency-all-lo52", unit: "ct", daily: true, breadth: true },
+  { id: "br-144a-all-adv",  label: "Breadth — 144A All Advances",    par: "finra-breadth-144a-all-adv",  unit: "ct", daily: true, breadth: true },
+  { id: "br-144a-all-dec",  label: "Breadth — 144A All Declines",    par: "finra-breadth-144a-all-dec",  unit: "ct", daily: true, breadth: true },
+  { id: "br-144a-all-hi52", label: "Breadth — 144A All 52wk Highs",  par: "finra-breadth-144a-all-hi52", unit: "ct", daily: true, breadth: true },
+  { id: "br-144a-all-lo52", label: "Breadth — 144A All 52wk Lows",   par: "finra-breadth-144a-all-lo52", unit: "ct", daily: true, breadth: true },
+  // Market sentiment (FINRA, daily since Jan 2018). Net flow = dealer sells −
+  // dealer buys ($M par); + = customers net buying (risk-on). Dealer buys/
+  // sells are $M par customer flow.
+  { id: "se-corp-all-flow",  label: "Sentiment — Corp All Net Flow",   par: "finra-sent-corp-all-netflow",  unit: "$M", daily: true, sent: true },
+  { id: "se-corp-ig-flow",   label: "Sentiment — Corp IG Net Flow",    par: "finra-sent-corp-ig-netflow",   unit: "$M", daily: true, sent: true },
+  { id: "se-corp-hy-flow",   label: "Sentiment — Corp HY Net Flow",    par: "finra-sent-corp-hy-netflow",   unit: "$M", daily: true, sent: true },
+  { id: "se-agcy-all-flow",  label: "Sentiment — Agency All Net Flow", par: "finra-sent-agency-all-netflow", unit: "$M", daily: true, sent: true },
+  { id: "se-144a-all-flow",  label: "Sentiment — 144A All Net Flow",   par: "finra-sent-144a-all-netflow",  unit: "$M", daily: true, sent: true },
+  { id: "se-144a-ig-flow",   label: "Sentiment — 144A IG Net Flow",    par: "finra-sent-144a-ig-netflow",   unit: "$M", daily: true, sent: true },
+  { id: "se-144a-hy-flow",   label: "Sentiment — 144A HY Net Flow",    par: "finra-sent-144a-hy-netflow",   unit: "$M", daily: true, sent: true },
+  { id: "se-corp-all-buy",   label: "Sentiment — Corp All Dealer Buys",  par: "finra-sent-corp-all-dbuy-vol",  unit: "$M", daily: true, sent: true },
+  { id: "se-corp-all-sell",  label: "Sentiment — Corp All Dealer Sells", par: "finra-sent-corp-all-dsell-vol", unit: "$M", daily: true, sent: true },
+  { id: "se-agcy-all-buy",   label: "Sentiment — Agency All Dealer Buys",  par: "finra-sent-agency-all-dbuy-vol",  unit: "$M", daily: true, sent: true },
+  { id: "se-agcy-all-sell",  label: "Sentiment — Agency All Dealer Sells", par: "finra-sent-agency-all-dsell-vol", unit: "$M", daily: true, sent: true },
+  { id: "se-144a-all-buy",   label: "Sentiment — 144A All Dealer Buys",  par: "finra-sent-144a-all-dbuy-vol",  unit: "$M", daily: true, sent: true },
+  { id: "se-144a-all-sell",  label: "Sentiment — 144A All Dealer Sells", par: "finra-sent-144a-all-dsell-vol", unit: "$M", daily: true, sent: true },
+  // Short interest top-25 (Reg SHO daily, 2Y backfilled). par = short volume
+  // series, trades = total volume series (for ratio). Metric toggle: ADV/PAR
+  // → short volume (shares); ADT/TRADES → short ratio (short/total).
+  // Tickers rotate; these cover the persistent top names — missing data shows "—".
+  { id: "sit-msft",  label: "Short — MSFT",  par: "regsho-top-MSFT-shortvol",  trades: "regsho-top-MSFT-totalvol",  unit: "sh", daily: true, siTop: true },
+  { id: "sit-nvda",  label: "Short — NVDA",  par: "regsho-top-NVDA-shortvol",  trades: "regsho-top-NVDA-totalvol",  unit: "sh", daily: true, siTop: true },
+  { id: "sit-aapl",  label: "Short — AAPL",  par: "regsho-top-AAPL-shortvol",  trades: "regsho-top-AAPL-totalvol",  unit: "sh", daily: true, siTop: true },
+  { id: "sit-amzn",  label: "Short — AMZN",  par: "regsho-top-AMZN-shortvol",  trades: "regsho-top-AMZN-totalvol",  unit: "sh", daily: true, siTop: true },
+  { id: "sit-googl", label: "Short — GOOGL", par: "regsho-top-GOOGL-shortvol", trades: "regsho-top-GOOGL-totalvol", unit: "sh", daily: true, siTop: true },
+  { id: "sit-meta",  label: "Short — META",  par: "regsho-top-META-shortvol",  trades: "regsho-top-META-totalvol",  unit: "sh", daily: true, siTop: true },
+  { id: "sit-tsla",  label: "Short — TSLA",  par: "regsho-top-TSLA-shortvol",  trades: "regsho-top-TSLA-totalvol",  unit: "sh", daily: true, siTop: true },
+  { id: "sit-amd",   label: "Short — AMD",   par: "regsho-top-AMD-shortvol",   trades: "regsho-top-AMD-totalvol",   unit: "sh", daily: true, siTop: true },
+  { id: "sit-nflx",  label: "Short — NFLX",  par: "regsho-top-NFLX-shortvol",  trades: "regsho-top-NFLX-totalvol",  unit: "sh", daily: true, siTop: true },
+  { id: "sit-jpm",   label: "Short — JPM",   par: "regsho-top-JPM-shortvol",   trades: "regsho-top-JPM-totalvol",   unit: "sh", daily: true, siTop: true },
+  { id: "sit-bac",   label: "Short — BAC",   par: "regsho-top-BAC-shortvol",   trades: "regsho-top-BAC-totalvol",   unit: "sh", daily: true, siTop: true },
+  { id: "sit-xom",   label: "Short — XOM",   par: "regsho-top-XOM-shortvol",   trades: "regsho-top-XOM-totalvol",   unit: "sh", daily: true, siTop: true },
+  { id: "sit-wmt",   label: "Short — WMT",   par: "regsho-top-WMT-shortvol",   trades: "regsho-top-WMT-totalvol",   unit: "sh", daily: true, siTop: true },
+  { id: "sit-jnj",   label: "Short — JNJ",   par: "regsho-top-JNJ-shortvol",   trades: "regsho-top-JNJ-totalvol",   unit: "sh", daily: true, siTop: true },
+  { id: "sit-v",     label: "Short — V",     par: "regsho-top-V-shortvol",     trades: "regsho-top-V-totalvol",     unit: "sh", daily: true, siTop: true },
+  { id: "sit-unh",   label: "Short — UNH",   par: "regsho-top-UNH-shortvol",   trades: "regsho-top-UNH-totalvol",   unit: "sh", daily: true, siTop: true },
+  { id: "sit-hd",    label: "Short — HD",    par: "regsho-top-HD-shortvol",    trades: "regsho-top-HD-totalvol",    unit: "sh", daily: true, siTop: true },
+  { id: "sit-dis",   label: "Short — DIS",   par: "regsho-top-DIS-shortvol",   trades: "regsho-top-DIS-totalvol",   unit: "sh", daily: true, siTop: true },
+  { id: "sit-intc",  label: "Short — INTC",  par: "regsho-top-INTC-shortvol",  trades: "regsho-top-INTC-totalvol",  unit: "sh", daily: true, siTop: true },
+  { id: "sit-crm",   label: "Short — CRM",   par: "regsho-top-CRM-shortvol",   trades: "regsho-top-CRM-totalvol",   unit: "sh", daily: true, siTop: true },
+  { id: "sit-abbv",  label: "Short — ABBV",  par: "regsho-top-ABBV-shortvol",  trades: "regsho-top-ABBV-totalvol",  unit: "sh", daily: true, siTop: true },
+  { id: "sit-ko",    label: "Short — KO",    par: "regsho-top-KO-shortvol",    trades: "regsho-top-KO-totalvol",    unit: "sh", daily: true, siTop: true },
+  { id: "sit-pep",   label: "Short — PEP",   par: "regsho-top-PEP-shortvol",   trades: "regsho-top-PEP-totalvol",   unit: "sh", daily: true, siTop: true },
+  { id: "sit-ma",    label: "Short — MA",    par: "regsho-top-MA-shortvol",    trades: "regsho-top-MA-totalvol",    unit: "sh", daily: true, siTop: true },
+  { id: "sit-pg",    label: "Short — PG",    par: "regsho-top-PG-shortvol",    trades: "regsho-top-PG-totalvol",    unit: "sh", daily: true, siTop: true },
 ];
 // Components summed into the synthetic TOTAL row: Treasury Total + all 10
 // TRACE products. Treasury breakdown rows (bills/coupons/TIPS/FRNs/
@@ -411,7 +478,11 @@ const metricColTitle = () => {
 };
 // Formatter for the "current value" column by metric (raw SI rows use shares).
 const fmtCurFor = (p) => {
-  if (p.unit === "sh") return fmtSh;
+  if (p.unit === "sh" && !p._ratioMode) return fmtSh;
+  if (p._ratioMode) return (v) => v == null || !isFinite(v) ? "—" : `${(v * 100).toFixed(1)}%`;
+  if (p.unit === "ct") return fmtN;
+  if (p.unit === "$M") return (v) => v == null || !isFinite(v) ? "—" : `$${fmtN(v)}M`;
+  if (p.unit === "px") return (v) => v == null || !isFinite(v) ? "—" : v.toFixed(2);
   return state.metric === "adt" || state.metric === "trades" ? fmtN : fmtB;
 };
 
@@ -447,7 +518,48 @@ async function loadData() {
     ]);
     return { p, par: par.points, tr: tr ? tr.points : null };
   });
-  return Promise.all(jobs);
+  const results = await Promise.all(jobs);
+  // Most-active CUSIPs: build synthetic products from corp panel bond_hist.
+  // Top-10 by latest volume across all lists.
+  if (state.corpData) {
+    const cusips = extractTopCusips(state.corpData, 10);
+    for (const c of cusips) {
+      results.push({ p: c.product, par: c.pricePoints, tr: null, cusipHist: c });
+    }
+  }
+  return results;
+}
+
+// Extract top-N CUSIPs by volume from corp panel lists + bond_hist.
+function extractTopCusips(corpData, n) {
+  const lists = corpData.lists ?? {};
+  const hist = corpData.bond_hist ?? {};
+  const seen = new Map();
+  for (const [, l] of Object.entries(lists)) {
+    for (const b of (l.bonds ?? [])) {
+      const cusip = b.symbol;
+      if (!cusip || seen.has(cusip)) continue;
+      const h = hist[cusip];
+      if (!h || !h.d || h.d.length < 2) continue;
+      seen.set(cusip, {
+        cusip,
+        issuer: b.issuer ?? b.name ?? cusip,
+        coupon: b.coupon,
+        pricePoints: h.d.map((d, i) => [d, h.p[i]]).filter(([, v]) => v != null),
+        yieldPoints: h.d.map((d, i) => [d, h.y[i]]).filter(([, v]) => v != null),
+      });
+      if (seen.size >= n * 2) break; // collect extra, sort by volume below
+    }
+  }
+  // Sort by latest price point recency + take top n (volume rank from lists order)
+  return [...seen.values()].slice(0, n).map((c) => ({
+    ...c,
+    product: {
+      id: `cusip-${c.cusip}`, label: `Bond — ${c.cusip}`,
+      unit: "px", daily: true, cusip: true,
+      issuer: c.issuer, coupon: c.coupon,
+    },
+  }));
 }
 
 function buildRows(data, metric, range) {
@@ -457,6 +569,32 @@ function buildRows(data, metric, range) {
       const vals = par.map(([d, v]) => ({ d, v }))
         .sort((a, b) => (a.d < b.d ? -1 : 1));
       return { p, stats: rowStatsLevel(vals), out: null };
+    }
+    if (p.cusip) {
+      // Most-active CUSIP: price history from bond_hist (in-memory).
+      // Shows clean price with full daily deltas.
+      const vals = par.map(([d, v]) => ({ d, v }))
+        .sort((a, b) => (a.d < b.d ? -1 : 1));
+      if (!vals.length) return { p, stats: null, out: null };
+      return { p, stats: rowStatsDaily(vals, range), out: null };
+    }
+    if (p.siTop) {
+      // Short interest top tickers: ADV/PAR → short volume (shares);
+      // ADT/TRADES → short ratio (short vol / total vol).
+      const sv = par.map(([d, v]) => ({ d, v })).sort((a, b) => (a.d < b.d ? -1 : 1));
+      let vals = sv;
+      if (isCount && tr) {
+        const tvByDate = new Map(tr.map(([d, v]) => [d, v]));
+        vals = sv.map((s) => {
+          const tv = tvByDate.get(s.d);
+          return tv ? { d: s.d, v: s.v / tv } : null;
+        }).filter(Boolean);
+        p._ratioMode = true;
+      } else {
+        p._ratioMode = false;
+      }
+      if (!vals.length) return { p, stats: null, out: null };
+      return { p, stats: rowStatsDaily(vals, range), out: null };
     }
     const src = isCount ? tr : par;
     if (!src) return { p, stats: null, out: OUTSTANDING[p.id] || null };
@@ -618,10 +756,12 @@ function renderTable() {
   }
 }
 
-export function renderTraceGrid() {
+export function renderTraceGrid(corpData) {
   const wrap = document.getElementById("trace-grid-wrap");
   if (!wrap || wrap.dataset.init) return;
   wrap.dataset.init = "1";
+  // Store corp panel data for most-active CUSIP rows (top-10 by volume).
+  if (corpData) state.corpData = corpData;
   const reqId = ++state.reqId;
   const metricBtns = METRICS.map((mt) =>
     `<button data-m="${mt.id}" class="${mt.id === state.metric ? "on" : ""}" title="${mt.title}">${mt.label}</button>`).join("");

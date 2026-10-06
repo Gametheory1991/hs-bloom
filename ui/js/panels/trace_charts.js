@@ -54,6 +54,28 @@ const PRODUCTS = [
   { id: "si-amzn", label: "Short Interest — AMZN", par: "short-AMZN", trades: null, unit: "shares" },
   { id: "si-googl", label: "Short Interest — GOOGL", par: "short-GOOGL", trades: null, unit: "shares" },
   { id: "si-meta", label: "Short Interest — META", par: "short-META", trades: null, unit: "shares" },
+  // Market breadth (FINRA, daily)
+  { id: "br-corp-all-spr", label: "Breadth — Corp All A/D Spread", par: "finra-breadth-corp-all-adspread", trades: null, unit: "ct", daily: true },
+  { id: "br-corp-ig-spr", label: "Breadth — Corp IG A/D Spread", par: "finra-breadth-corp-ig-adspread", trades: null, unit: "ct", daily: true },
+  { id: "br-corp-hy-spr", label: "Breadth — Corp HY A/D Spread", par: "finra-breadth-corp-hy-adspread", trades: null, unit: "ct", daily: true },
+  { id: "br-agcy-all-spr", label: "Breadth — Agency All A/D Spread", par: "finra-breadth-agency-all-adspread", trades: null, unit: "ct", daily: true },
+  { id: "br-144a-all-spr", label: "Breadth — 144A All A/D Spread", par: "finra-breadth-144a-all-adspread", trades: null, unit: "ct", daily: true },
+  { id: "br-144a-ig-spr", label: "Breadth — 144A IG A/D Spread", par: "finra-breadth-144a-ig-adspread", trades: null, unit: "ct", daily: true },
+  { id: "br-144a-hy-spr", label: "Breadth — 144A HY A/D Spread", par: "finra-breadth-144a-hy-adspread", trades: null, unit: "ct", daily: true },
+  // Market sentiment (FINRA, daily)
+  { id: "se-corp-all-flow", label: "Sentiment — Corp All Net Flow", par: "finra-sent-corp-all-netflow", trades: null, unit: "$M", daily: true },
+  { id: "se-corp-ig-flow", label: "Sentiment — Corp IG Net Flow", par: "finra-sent-corp-ig-netflow", trades: null, unit: "$M", daily: true },
+  { id: "se-corp-hy-flow", label: "Sentiment — Corp HY Net Flow", par: "finra-sent-corp-hy-netflow", trades: null, unit: "$M", daily: true },
+  { id: "se-agcy-all-flow", label: "Sentiment — Agency All Net Flow", par: "finra-sent-agency-all-netflow", trades: null, unit: "$M", daily: true },
+  { id: "se-144a-all-flow", label: "Sentiment — 144A All Net Flow", par: "finra-sent-144a-all-netflow", trades: null, unit: "$M", daily: true },
+  { id: "se-144a-ig-flow", label: "Sentiment — 144A IG Net Flow", par: "finra-sent-144a-ig-netflow", trades: null, unit: "$M", daily: true },
+  { id: "se-144a-hy-flow", label: "Sentiment — 144A HY Net Flow", par: "finra-sent-144a-hy-netflow", trades: null, unit: "$M", daily: true },
+  // Short interest top tickers (Reg SHO daily; ADT/TRADES → short ratio)
+  { id: "sit-msft", label: "Short — MSFT", par: "regsho-top-MSFT-shortvol", trades: "regsho-top-MSFT-totalvol", unit: "sh", daily: true, siTop: true },
+  { id: "sit-nvda", label: "Short — NVDA", par: "regsho-top-NVDA-shortvol", trades: "regsho-top-NVDA-totalvol", unit: "sh", daily: true, siTop: true },
+  { id: "sit-aapl", label: "Short — AAPL", par: "regsho-top-AAPL-shortvol", trades: "regsho-top-AAPL-totalvol", unit: "sh", daily: true, siTop: true },
+  { id: "sit-amzn", label: "Short — AMZN", par: "regsho-top-AMZN-shortvol", trades: "regsho-top-AMZN-totalvol", unit: "sh", daily: true, siTop: true },
+  { id: "sit-tsla", label: "Short — TSLA", par: "regsho-top-TSLA-shortvol", trades: "regsho-top-TSLA-totalvol", unit: "sh", daily: true, siTop: true },
 ];
 
 // Components summed into the synthetic TOTAL chart product (same set as the grid).
@@ -235,6 +257,25 @@ async function loadMain() {
   if (p.raw) { // short interest: biweekly levels, metric toggle n/a
     const s = await getSeries(p.par, "max");
     return { id: p.id, unit: "shares", name: `${p.label} — short shares`, points: filterRange(s.points) };
+  }
+  if (p.siTop) {
+    // Short interest top tickers: ADV/PAR → short volume; ADT/TRADES → short ratio.
+    const isCount = state.metric === "adt" || state.metric === "trades";
+    const [sv, tv] = await Promise.all([
+      getSeries(p.par, "max"),
+      p.trades ? getSeries(p.trades, "max").catch(() => null) : Promise.resolve(null),
+    ]);
+    let pts = sv.points;
+    let unit = "sh", name = `${p.label} — short volume (sh)`;
+    if (isCount && tv) {
+      const tvByDate = new Map(tv.points.map(([d, v]) => [d, v]));
+      pts = sv.points.map(([d, v]) => {
+        const t = tvByDate.get(d);
+        return t ? [d, v / t] : null;
+      }).filter(Boolean);
+      unit = "ratio"; name = `${p.label} — short ratio`;
+    }
+    return { id: p.id, unit, name, points: filterRange(pts) };
   }
   const s = await getSeries(currentSeriesId(), "max");
   const vals = toMetric(p, s.points, state.metric).map(({ d, v }) => [d, v]);

@@ -465,7 +465,7 @@ export function renderFinra(p) {
     marginSection(f.margin) +
     traceSection(f.trace_treasury, f.trace_monthly);
   renderTraceCharts();
-  renderTraceGrid();
+  renderTraceGrid(f.corp);
   renderBreadthSentiment().catch(() => {});
   renderOasIndexes().catch(() => {});
   const chartBtn = document.getElementById("trace-view-chart");

@@ -91,6 +91,15 @@ def create_app(store: Store, cfg: Config) -> FastAPI:
         elif series_id in cb_names:
             points = store.points(f"cb:{series_id[:-2]}")  # USCB -> cb:US
             name, unit = cb_names[series_id], "%"
+        elif series_id.startswith("regsho-top-") and (
+                series_id.endswith("-shortvol") or series_id.endswith("-totalvol")):
+            # Dynamic per-ticker Reg SHO history (backfilled 2Y, 518 days).
+            # Tickers rotate, so these are resolved dynamically instead of
+            # via config. Not in cycle_by_id by design.
+            points = store.points(f"cycle:{series_id}")
+            sym = series_id[len("regsho-top-"):].rsplit("-", 1)[0]
+            kind = "short volume" if series_id.endswith("-shortvol") else "total volume"
+            name, unit = f"{sym} {kind}", "sh"
         else:
             raise HTTPException(status_code=404, detail=f"unknown series: {series_id}")
         if range != "max":
