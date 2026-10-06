@@ -40,7 +40,7 @@ def test_register_jobs_creates_all_jobs_with_config_cadences(tmp_path):
         "finra_short", "finra_margin", "tsv_capex", "tsv_graph", "tsv_watch", "newsletter",
         "worldbank", "usaspending", "coingecko", "openfigi", "finnhub",
         "polymarket", "kalshi", "pred_edge", "finra_breadth", "finra_corp", "finra_regsho",
-        "finra_capped", "bank_capex", "bank_graph",
+        "finra_capped", "finra_ids_star", "ticker_stats", "bank_capex", "bank_graph",
         "tech_capex", "tech_graph", "vendor_capex", "vendor_graph",
         "etf_capex", "etf_graph", "crypto_capex", "crypto_graph",
     }
@@ -84,4 +84,4 @@ def test_main_builds_app(tmp_path, monkeypatch):
 
     app, scheduler = build()
     assert app.title == "os-bloom collector"
-    assert len(scheduler.get_jobs()) == 61  # +1 finra_breadth, +1 finra_corp, +1 finra_regsho, +1 finra_capped, +2 bank universe, +4 tech/vendor universes, +2 etf universe, +2 crypto universe
+    assert len(scheduler.get_jobs()) == 63  # +1 finra_breadth, +1 finra_corp, +1 finra_regsho, +1 finra_capped, +1 finra_ids_star, +1 ticker_stats, +2 bank universe, +4 tech/vendor universes, +2 etf universe, +2 crypto universe

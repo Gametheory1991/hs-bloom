@@ -41,8 +41,9 @@ import json
 import logging
 from datetime import date, timedelta
 
-from collector.http import GetText, PostText
+from collector.http import GetText, PostJson, PostText
 from collector.store import Store
+from collector.ticker_master import resolve_tickers
 
 import re
 
@@ -221,6 +222,7 @@ async def _threshold_count(post_text: PostText, trade_date: str) -> list[dict]:
 
 async def fetch_finra_regsho(store: Store, get_text: GetText,
                              post_text: PostText,
+                             post_json: PostJson | None = None,
                              today: date | None = None) -> str:
     """Daily: latest Reg SHO short-volume day (+ bounded backfill) and the
     OTC threshold list. Threshold failures degrade gracefully."""
@@ -287,11 +289,20 @@ async def fetch_finra_regsho(store: Store, get_text: GetText,
             out[f"ratio_chg_{tag}"] = (round((ratio - rref) / rref, 4)
                                        if rref else None)
         return out
+    # Company names + GICS sectors for the top-50: dynamic ticker master
+    # (cache-first; unknown tickers resolve via Finnhub/OpenFIGI and persist
+    # in the ticker_master doc). Names ride along in the snapshot so the
+    # frontend never has to guess.
+    master = await resolve_tickers(
+        store, [sym for sym, _ in top50],
+        get_text=get_text, post_json=post_json)
     store.put_doc("regsho_daily", {
         "as_of": day.isoformat(),
         "markets": {suffix: {"label": label, **aggs[suffix]}
                     for prefix, suffix, label in MARKETS if suffix in aggs},
         "top50": [{**{"symbol": sym,
+                   "name": (master.get(sym) or {}).get("name"),
+                   "sector": (master.get(sym) or {}).get("sector", "Other"),
                    "short_volume": round(v["short"], 1),
                    "exempt_volume": round(v["exempt"], 1),
                    "total_volume": round(v["total"], 1),

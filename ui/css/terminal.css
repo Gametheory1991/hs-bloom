@@ -486,3 +486,18 @@ table.bs-deltas td:first-child { text-align: left; }
 .koi-k { font-size: 9px; color: var(--muted); letter-spacing: 1px; }
 .koi-v { font-size: 17px; font-weight: 700; }
 .koi-mom { font-size: 10px; }
+
+/* Speculator-style per-ticker stats (top-shorted table) */
+.na {
+  display: inline-block; padding: 0 6px; border-radius: 3px;
+  background: #fef3c7; color: #92400e; font-size: 11px; font-weight: 700;
+}
+.rsbar {
+  display: inline-block; width: 44px; height: 8px; border-radius: 4px;
+  background: var(--line); vertical-align: middle; overflow: hidden;
+}
+.rsfill { display: block; height: 100%; border-radius: 4px; background: var(--amber); }
+td.sma { white-space: nowrap; letter-spacing: 2px; }
+svg.spark { display: block; }
+svg.spark polyline.up { color: var(--up); }
+svg.spark polyline.down { color: var(--down); }

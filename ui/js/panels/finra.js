@@ -96,29 +96,96 @@ const TICKER_META = {
   AMT: ["American Tower", "Real Estate"], PLD: ["Prologis", "Real Estate"],
   SPY: ["S&P 500 ETF", "ETF"], QQQ: ["Nasdaq 100 ETF", "ETF"], IWM: ["Russell 2000 ETF", "ETF"],
   TLT: ["20Y+ Treasury ETF", "ETF"], HYG: ["HY Bond ETF", "ETF"], LQD: ["IG Bond ETF", "ETF"],
+  // resolved 2026-10-05 for the then-current top-shorted list (SEC + Yahoo);
+  // the backend ticker master now resolves new names dynamically and these
+  // stay as the offline fallback.
+  FNGR: ["FingerMotion", "Technology"], FLUX: ["Flux Power", "Industrials"],
+  QTEX: ["QTREX Quantum", "Technology"], AMOD: ["Alpha Modus", "Technology"],
+  SDEV: ["Stablecoin Development", "Financials"], NIVF: ["NewGenIvf Group", "Healthcare"],
+  AAL: ["American Airlines", "Industrials"], SCKT: ["Socket Mobile", "Technology"],
+  SPCX: ["Space Exploration Technologies", "Industrials"], NU: ["Nu Holdings", "Financials"],
+  SCNX: ["Scienture Holdings", "Healthcare"], NVD: ["2x Short NVDA ETF", "ETF"],
+  BITO: ["ProShares Bitcoin ETF", "ETF"], SOXS: ["Semiconductor Bear 3X", "ETF"],
+  DDC: ["DDC Enterprise", "Consumer Staples"], MSTZ: ["2X Inverse MSTR ETF", "ETF"],
+  RWM: ["Short Russell 2000", "ETF"], CYCU: ["Cycurion", "Technology"],
+  ONDS: ["Ondas Holdings", "Technology"], PLUG: ["Plug Power", "Industrials"],
+  CTVA: ["Corteva", "Materials"],
 };
-const tickerMeta = (sym) => TICKER_META[sym] ?? ["—", "Other"];
+const tickerMeta = (t) => {
+  // Backend-resolved names (dynamic ticker master) take precedence; the
+  // static map above is the offline fallback.
+  if (t && typeof t === "object" && t.name) return [t.name, t.sector ?? "Other"];
+  const sym = typeof t === "string" ? t : t?.symbol;
+  return TICKER_META[sym] ?? ["—", "Other"];
+};
 const chg = (x) => x == null ? "—" :
   `<span class="${x >= 0 ? "up" : "down"}">${x >= 0 ? "+" : ""}${(x * 100).toFixed(1)}%</span>`;
 
-function regshoSection(r) {
+// ---- Speculator-style per-ticker stats (Finnhub-backed; see ticker_stats
+// fetcher). Rendered into the top-shorted table next to the short data. ----
+const pxFmt = (x) => x == null ? "—" :
+  "$" + x.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+// Finnhub marketCapitalization is in $M.
+const mcapFmt = (x) => {
+  if (x == null) return "—";
+  if (x >= 1e6) return "$" + (x / 1e6).toFixed(2) + "T";
+  if (x >= 1e3) return "$" + (x / 1e3).toFixed(1) + "B";
+  return "$" + x.toFixed(0) + "M";
+};
+const peFmt = (x) => x == null ? `<span class="na">n/a</span>` : x.toFixed(1);
+const spark1y = (pts) => {
+  if (!pts || pts.length < 2) return `<span class="muted">—</span>`;
+  const w = 110, h = 28;
+  const lo = Math.min(...pts), hi = Math.max(...pts), rng = hi - lo || 1;
+  const str = pts.map((v, i) =>
+    `${(i / (pts.length - 1) * w).toFixed(1)},${(h - 2 - ((v - lo) / rng) * (h - 4)).toFixed(1)}`
+  ).join(" ");
+  const cls = pts[pts.length - 1] >= pts[0] ? "up" : "down";
+  return `<svg width="${w}" height="${h}" class="spark"><polyline points="${str}" fill="none" stroke="currentColor" class="${cls}" stroke-width="1.5"/></svg>`;
+};
+const smaTri = (price, sma, label) => {
+  if (price == null || sma == null) return `<span class="muted" title="${label}: n/a">—</span>`;
+  return price >= sma
+    ? `<span class="up" title="${label} ${sma.toFixed(2)} — price above">▲</span>`
+    : `<span class="down" title="${label} ${sma.toFixed(2)} — price below">▼</span>`;
+};
+const rsBar = (rank) => {
+  if (rank == null) return `<span class="muted">—</span>`;
+  return `<span class="rsbar" title="1M return percentile rank within this table"><span class="rsfill" style="width:${rank}%"></span></span> <span class="num">${rank}</span>`;
+};
+
+function regshoSection(r, ts) {
   if (!r) return `<h3>SHORT VOLUME — REG SHO DAILY</h3><p class="muted">No Reg SHO data yet.</p>`;
   const mkts = r.markets ?? {};
   const rows = Object.entries(mkts).map(([k, m]) =>
     `<tr><td>${m.label ?? k}</td><td>${big(m.short)}</td><td>${big(m.total)}</td>` +
     `<td>${pct1(m.ratio)}</td></tr>`).join("");
   const top50 = r.top50 ?? [];
+  const tstats = (ts && ts.tickers) || {};
+  const statsAsOf = ts && ts.as_of;
   // % of sector short: ticker short vol / sector short vol within this top-50 set.
   const sectorTot = {};
   for (const t of top50) {
-    const [, sec] = tickerMeta(t.symbol);
+    const [, sec] = tickerMeta(t);
     sectorTot[sec] = (sectorTot[sec] ?? 0) + (t.short_volume ?? 0);
   }
   const top = top50.map((t) => {
-    const [name, sec] = tickerMeta(t.symbol);
+    const [name, sec] = tickerMeta(t);
     const secPct = sectorTot[sec] ? t.short_volume / sectorTot[sec] : null;
+    const s = tstats[t.symbol] || {};
     const vc = (k) => `<td class="num">${chg(t[k])}</td>`;
+    const sma = ["sma20", "sma50", "sma200"].map((k, i) =>
+      smaTri(s.price, s[k], ["20SMA", "50SMA", "200SMA"][i])).join(" ");
     return `<tr><td><b>${t.symbol}</b></td><td>${name}</td>` +
+    `<td class="num">${pxFmt(s.price)}</td>` +
+    `<td class="num">${chg(s.pct_1d)}</td>` +
+    `<td class="num">${mcapFmt(s.mcap)}</td>` +
+    `<td class="num">${peFmt(s.pe)}</td>` +
+    `<td class="num">${chg(s.ytd)}</td>` +
+    `<td>${spark1y(s.spark)}</td>` +
+    `<td class="num">${s.off_high52 == null ? "—" : pct1(s.off_high52)}</td>` +
+    `<td class="num">${rsBar(s.rs_1m)}</td>` +
+    `<td class="num sma">${sma}</td>` +
     `<td class="num">${big(t.short_volume)}</td>` +
     `<td class="num">${pct1(t.short_ratio)}</td>` +
     vc("short_chg_1d") + vc("short_chg_1w") + vc("short_chg_1m") + vc("short_chg_1q") + vc("short_chg_1y") +
@@ -128,14 +195,20 @@ function regshoSection(r) {
   return `<h3>SHORT VOLUME — REG SHO DAILY <span class="muted">as of ${r.as_of ?? "—"}</span></h3>
     <table><tr><th>Market</th><th>Short vol</th><th>Total vol</th><th>Short ratio</th></tr>${rows}</table>
     <h3>TOP SHORTED TICKERS <span class="muted">${top50.length} names · 1D/1W/1M/1Q/1Y % changes</span></h3>
-    <div class="table-scroll"><table class="topshorted"><tr><th>Symbol</th><th>Name</th><th>Short vol</th>` +
+    <div class="table-scroll"><table class="topshorted"><tr><th>Symbol</th><th>Name</th>` +
+    `<th colspan="9">Price action <span class="muted">${statsAsOf ? "as of " + statsAsOf : "stats pending"}</span></th>` +
+    `<th>Short vol</th>` +
     `<th>Short ratio</th><th colspan="5">%Chg short vol — 1D | 1W | 1M | 1Q | 1Y</th>` +
     `<th colspan="5">%Chg short ratio — 1D | 1W | 1M | 1Q | 1Y</th>` +
-    `<th>% of sector short</th></tr><tr><td colspan="4"></td>` +
+    `<th>% of sector short</th></tr><tr><td colspan="2"></td>` +
+    `<th>Price</th><th>%1D</th><th>Mkt cap</th><th>P/E</th><th>%YTD</th><th>1Y</th><th>Δ52wH</th><th>RS 1M</th><th>20/50/200</th>` +
+    `<td colspan="2"></td>` +
     `<th>1D</th><th>1W</th><th>1M</th><th>1Q</th><th>1Y</th>` +
     `<th>1D</th><th>1W</th><th>1M</th><th>1Q</th><th>1Y</th><td></td></tr>${top}</table></div>
     <p class="muted">% of sector short = ticker short volume ÷ its GICS sector's total short volume within this top-50 — ` +
     `high values mean shorting is concentrated in the name, not spread across the sector. ` +
+    `RS 1M = percentile rank of the 21-day return within this table (0-99). ` +
+    `Δ52wH = % off the 52-week high. ` +
     `Longer-horizon deltas build from daily history going forward (full 1Y after a year of pulls).</p>`;
 }
 
@@ -363,7 +436,7 @@ export function renderFinra(p) {
     <div id="trace-chart-wrap"></div>
     <div id="trace-grid-wrap" hidden></div>` +
     starSection(f.star) +
-    regshoSection(f.regsho) +
+    regshoSection(f.regsho, f.ticker_stats) +
     thresholdSection(f.threshold) +
     shortInterestSection(f.short_interest) +
     breadthSection(f.breadth) +

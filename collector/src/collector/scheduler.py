@@ -57,6 +57,7 @@ from collector.fetchers.finra_capped import fetch_finra_capped
 from collector.fetchers.finra_margin import fetch_finra_margin
 from collector.fetchers.finra_short import fetch_finra_short
 from collector.fetchers.finra_regsho import fetch_finra_regsho
+from collector.fetchers.ticker_stats import fetch_ticker_stats
 from collector.fetchers.finra_ids_star import fetch_finra_ids_star
 from collector.fetchers.ice_star import fetch_ice_star
 from collector.fetchers.refs_history import fetch_refs_history
@@ -337,8 +338,14 @@ def register_jobs(
         # FINRA Reg SHO daily short volume + OTC threshold list (both
         # keyless; threshold via the public FINRA Query API). Daily.
         # Starts after the other FINRA jobs.
-        "finra_regsho": (cfg.cadences.get("finra_regsho", 86400), partial(fetch_finra_regsho, store, get_text, pt),
+        "finra_regsho": (cfg.cadences.get("finra_regsho", 86400), partial(fetch_finra_regsho, store, get_text, pt, post_json),
                  start + timedelta(seconds=7500)),
+        # Per-ticker speculator stats (price, %1D, mcap, P/E, %YTD, 1Y
+        # sparkline, off-52w-high, RS rank, SMAs) for the top-shorted table.
+        # Finnhub-keyed; reads the fresh top-50 from regsho_daily, so it runs
+        # right after finra_regsho. Daily.
+        "ticker_stats": (cfg.cadences.get("ticker_stats", 86400), partial(fetch_ticker_stats, store, get_text),
+                 start + timedelta(seconds=7650)),
         # FINRA capped volume report — monthly corporate/agency capped trade
         # volume (keyless CSV, 12 rolling months, published 1st business day).
         # Starts after the other FINRA jobs.

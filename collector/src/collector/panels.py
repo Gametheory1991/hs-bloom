@@ -510,6 +510,7 @@ def _finra_panel(store: Store) -> dict:
         return doc.payload, doc.updated_at, doc.source
 
     regsho, regsho_upd, regsho_src = _d("regsho_daily")
+    tstats, tstats_upd, tstats_src = _d("ticker_stats")
     thresh, thresh_upd, thresh_src = _d("regsho_threshold")
     short, short_upd, short_src = _d("finra_short")
     breadth, breadth_upd, breadth_src = _d("finra_breadth")
@@ -551,6 +552,11 @@ def _finra_panel(store: Store) -> dict:
                     "tickers": regsho.get("tickers", {}),
                     "updated_at": regsho_upd, "source": regsho_src}
                    if regsho else None),
+        "ticker_stats": ({"as_of": tstats.get("as_of"),
+                          "count": tstats.get("count", 0),
+                          "tickers": tstats.get("tickers", {}),
+                          "updated_at": tstats_upd, "source": tstats_src}
+                         if tstats else None),
         "threshold": ({"as_of": thresh.get("as_of"), "count": thresh.get("count", 0),
                        "securities": (thresh.get("securities") or [])[:50],
                        "updated_at": thresh_upd, "source": thresh_src}

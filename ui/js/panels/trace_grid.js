@@ -8,6 +8,7 @@
 // the 10 TRACE products, then FINRA short-interest levels with MoM/YoY deltas.
 import { getSeries } from "../api.js";
 import { setTraceChartProduct } from "./trace_charts.js";
+import { OUTSTANDING, totalOutstanding, OUTSTANDING_NOTE } from "./outstanding.js";
 
 const PRODUCTS = [
   { id: "total", label: "TOTAL (Treasury + TRACE)", synthetic: true },
@@ -167,9 +168,13 @@ export function finishStats(vals, cur, refs) {
   const zs = sd > 0 ? vs.map((v) => (v - avg) / sd) : vs.map(() => 0);
   const rank = vs.filter((v) => v <= cur.v).length;
   const rc = (r) => (r && r.v ? (cur.v - r.v) / r.v : null);
+  // 52w hi/lo: last 12 monthly points of the 3Y window.
+  const w52 = vals.slice(-12).map((v) => v.v);
   return {
     cur, lo, hi, avg, sd, z, zlo: Math.min(...zs), zhi: Math.max(...zs),
     win, n: vs.length, asof: cur.d,
+    hi52: w52.length ? Math.max(...w52) : null,
+    lo52: w52.length ? Math.min(...w52) : null,
     d1: rc(refs.d1), w1: rc(refs.w1), m1: rc(refs.m1), q1: rc(refs.q1), y1: rc(refs.y1),
     d3: avg ? (cur.v - avg) / avg : null,
     pct: (100 * rank) / vs.length,
@@ -251,6 +256,8 @@ const state = { metric: "adv", sortKey: null, sortDir: 1, rows: [], asof: null, 
 const COLS = [
   { key: "label", title: "Product", num: false },
   { key: "cur",   title: "ADV $B/d", num: true },
+  { key: "out",   title: "Outst $T", num: true, tip: "Par outstanding — hover each row's value for source/as-of" },
+  { key: "turn",  title: "Turnov ann.%", num: true, tip: "ADV × 252 ÷ outstanding (annualized %). ADV view only." },
   { key: "d1", title: "1D %", num: true, heat: true, tip: "1-day % change (n/a for monthly data)" },
   { key: "w1", title: "1W %", num: true, heat: true, tip: "1-week % change (n/a for monthly data)" },
   { key: "m1", title: "1M %", num: true, heat: true, tip: "1-month % change" },
@@ -259,10 +266,12 @@ const COLS = [
   { key: "d3",    title: "Δ 3Y avg %", num: true, heat: true },
   { key: "rngpct", title: "Range %ile", num: false, tip: "Dotted 3Y range: blue dot = now (percentile), ◆ = 50th pct" },
   { key: "rngz", title: "Range z", num: false, tip: "Dotted 3Y range: blue dot = now (z-score), ◆ = mean (z=0)" },
-  { key: "lo",    title: "Low", num: true },
-  { key: "hi",    title: "High", num: true },
-  { key: "avg",   title: "Avg", num: true },
-  { key: "pct",   title: "%ile", num: true },
+  { key: "hi52",  title: "52w Hi", num: true, tip: "Highest monthly ADV/ADT in the last 12 months" },
+  { key: "lo52",  title: "52w Lo", num: true, tip: "Lowest monthly ADV/ADT in the last 12 months" },
+  { key: "lo",    title: "Low", num: true, tip: "3Y window low" },
+  { key: "hi",    title: "High", num: true, tip: "3Y window high" },
+  { key: "avg",   title: "Avg", num: true, tip: "3Y window average" },
+  { key: "pct",   title: "RS", num: true, tip: "Relative-strength rank: percentile of current value vs 3Y history (0-100)" },
   { key: "z",     title: "z", num: true, tip: "Current z-score vs 3Y window" },
   { key: "trend", title: "Trend (3Y)", num: false },
 ];
@@ -283,17 +292,27 @@ function buildRows(data, metric) {
     if (p.raw) {
       const vals = par.map(([d, v]) => ({ d, v }))
         .sort((a, b) => (a.d < b.d ? -1 : 1));
-      return { p, stats: rowStatsLevel(vals) };
+      return { p, stats: rowStatsLevel(vals), out: null };
     }
     const src = metric === "adt" ? tr : par;
-    if (!src) return { p, stats: null };
+    if (!src) return { p, stats: null, out: OUTSTANDING[p.id] || null };
     const vals = (metric === "adt" ? toAdt(p, src) : toAdv(p, src))
       .sort((a, b) => (a.d < b.d ? -1 : 1));
-    return { p, stats: rowStats(vals) };
+    return { p, stats: rowStats(vals), out: OUTSTANDING[p.id] || null };
   });
   const tot = PRODUCTS.find((p) => p.synthetic);
-  rows.unshift({ p: tot, stats: rowStats(totalVals(data, metric)) });
+  const totOut = totalOutstanding(TOTAL_PARTS.map((p) => p.id));
+  rows.unshift({
+    p: tot,
+    stats: rowStats(totalVals(data, metric)),
+    out: { amt: totOut.amt, asof: "mixed", src: `sum of component floats (${totOut.parts.length} products; agency-MBS float counted once)` },
+  });
   return rows;
+}
+
+function turnVal(r) { // annualized turnover % = ADV × 252 ÷ outstanding; ADV view only
+  if (state.metric !== "adv" || !r.stats || !r.out || r.out.amt == null) return null;
+  return (r.stats.cur.v * 252 / r.out.amt) * 100;
 }
 
 function sortRows(rows) {
@@ -306,6 +325,8 @@ function sortRows(rows) {
     if (!r.stats) return -Infinity;
     switch (k) {
       case "cur": return r.stats.cur.v;
+      case "out": return r.out?.amt ?? -Infinity;
+      case "turn": return turnVal(r) ?? -Infinity;
       case "d1": return r.stats.d1 ?? -Infinity;
       case "w1": return r.stats.w1 ?? -Infinity;
       case "m1": return r.stats.m1 ?? -Infinity;
@@ -314,6 +335,8 @@ function sortRows(rows) {
       case "d3": return r.stats.d3 ?? -Infinity;
       case "pct": return r.stats.pct;
       case "z": return r.stats.z ?? -Infinity;
+      case "hi52": return r.stats.hi52 ?? -Infinity;
+      case "lo52": return r.stats.lo52 ?? -Infinity;
       case "lo": return r.stats.lo; case "hi": return r.stats.hi; case "avg": return r.stats.avg;
       default: return -Infinity;
     }
@@ -333,13 +356,23 @@ function renderTable() {
     const tip = c.tip ? ` title="${c.tip}"` : ` title="Sort by ${title}"`;
     return `<th data-sort="${c.key}" class="${c.num ? "num" : ""}"${tip}>${title}${arrow}</th>`;
   }).join("");
-  const rows = sortRows(state.rows).map(({ p, stats: s }) => {
+  const rows = sortRows(state.rows).map((r) => {
+    const { p, stats: s } = r;
     const fmt = fmtFor(p);
     const cls = p.synthetic ? ` class="total-row"` : "";
-    if (!s) return `<tr${cls}><td><b>${p.label}</b></td><td colspan="15" class="muted">no ${isAdt ? "trade-count" : "par"} data</td></tr>`;
+    if (!s) return `<tr${cls}><td><b>${p.label}</b></td><td colspan="19" class="muted">no ${isAdt ? "trade-count" : "par"} data</td></tr>`;
+    const o = r.out;
+    const outCell = o && o.amt != null
+      ? `<td class="num" title="${o.src}${o.asof ? ` (as of ${o.asof})` : ""}">$${(o.amt / 1000).toFixed(1)}T</td>`
+      : `<td class="num muted" title="${o ? o.src : "n/a"}">—</td>`;
+    const tv = turnVal(r);
+    const turnCell = tv == null
+      ? `<td class="num muted"${isAdt ? ` title="Turnover is par-based (ADV view only)"` : ""}>—</td>`
+      : `<td class="num" title="ADV × 252 ÷ outstanding (annualized)">${tv >= 100 ? tv.toFixed(0) : tv.toFixed(1)}%</td>`;
     return `<tr data-pid="${p.id}" title="Click to view ${p.label} chart"${cls}>` +
       `<td><b>${p.label}</b></td>` +
       `<td class="num">${fmt(s.cur.v)}</td>` +
+      outCell + turnCell +
       `<td class="num"${heat(s.d1)}>${pct1(s.d1)}</td>` +
       `<td class="num"${heat(s.w1)}>${pct1(s.w1)}</td>` +
       `<td class="num"${heat(s.m1)}>${pct1(s.m1)}</td>` +
@@ -348,6 +381,8 @@ function renderTable() {
       `<td class="num"${heat(s.d3)}>${pct1(s.d3)}</td>` +
       `<td>${rangePlotDotted(s, "pct")}</td>` +
       `<td>${rangePlotDotted(s, "z")}</td>` +
+      `<td class="num">${fmt(s.hi52)}</td>` +
+      `<td class="num">${fmt(s.lo52)}</td>` +
       `<td class="num">${fmt(s.lo)}</td>` +
       `<td class="num">${fmt(s.hi)}</td>` +
       `<td class="num">${fmt(s.avg)}</td>` +
@@ -372,7 +407,7 @@ function renderTable() {
   const asofEl = wrap.querySelector("#trace-grid-asof");
   if (asofEl && state.asof) asofEl.textContent =
     `as of ${mlabel(state.asof)} · ${unit} · 3Y window (● = now, ◆ = avg/50th pct) · Treasury history from Feb 2023 · ` +
-    `1D/1W n/a on monthly rows · ADT total sums products with trade-count data`;
+    `1D/1W n/a on monthly rows · ADT total sums products with trade-count data · ${OUTSTANDING_NOTE}`;
 }
 
 export function renderTraceGrid() {
@@ -389,7 +424,7 @@ export function renderTraceGrid() {
     </div>
     <table class="trace-grid"><thead><tr>${
       COLS.map((c) => `<th data-sort="${c.key}" class="${c.num ? "num" : ""}">${c.key === "cur" ? "ADV $B/d" : c.title}</th>`).join("")
-    }</tr></thead><tbody><tr><td colspan="16" class="muted">Loading TRACE history…</td></tr></tbody></table>`;
+    }</tr></thead><tbody><tr><td colspan="20" class="muted">Loading TRACE history…</td></tr></tbody></table>`;
   wrap.querySelectorAll("#trace-grid-metric button").forEach((b) =>
     b.addEventListener("click", async () => {
       if (state.metric === b.dataset.m) return;
@@ -408,7 +443,7 @@ export function renderTraceGrid() {
   }).catch((err) => {
     if (reqId !== state.reqId) return;
     wrap.querySelector("tbody").innerHTML =
-      `<tr><td colspan="16" class="muted">Failed to load grid — ${err.message}</td></tr>`;
+      `<tr><td colspan="20" class="muted">Failed to load grid — ${err.message}</td></tr>`;
   });
 
   async function refresh() {
