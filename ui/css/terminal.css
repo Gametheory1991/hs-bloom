@@ -1,11 +1,13 @@
 :root {
   --bg: #f8f9fa; --panel: #ffffff; --fg: #1a1a1a; --amber: #2563eb;
   --up: #16a34a; --down: #dc2626; --muted: #6b7280; --line: #e5e7eb;
+  --blue: #2563eb; --ink: #1a1a1a; --cyan: #0891b2;
 }
 * { box-sizing: border-box; margin: 0; }
 body {
   background: var(--bg); color: var(--fg);
   font: 13px/1.45 "SF Mono", Menlo, Consolas, monospace;
+  overflow-x: hidden; overflow-x: clip;
   height: 100vh; display: flex; flex-direction: column;
 }
 header {
@@ -13,6 +15,16 @@ header {
   flex-wrap: wrap; padding: 8px 14px; border-bottom: 1px solid var(--line);
 }
 .brand { color: var(--amber); letter-spacing: 3px; font-weight: 700; }
+/* Signal identity: pulsing live dot next to the wordmark (see index.html .sigdot). */
+.sigdot {
+  display: inline-block; width: 9px; height: 9px; border-radius: 50%;
+  background: var(--blue); margin-right: 8px; vertical-align: 1px;
+  animation: sigpulse 2s ease-in-out infinite;
+}
+@keyframes sigpulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.45); }
+  50% { box-shadow: 0 0 0 6px rgba(37, 99, 235, 0); }
+}
 .muted { color: var(--muted); font-size: 11px; }
 .banner { color: #ffffff; background: var(--amber); padding: 1px 8px; margin-left: auto; }
 .header-btn {
@@ -56,6 +68,7 @@ header {
 .col-left { display: grid; grid-template-rows: 3fr 2fr; gap: 8px; min-height: 0; }
 .panel {
   background: var(--panel); border: 1px solid var(--line);
+  border-radius: 12px; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
   display: flex; flex-direction: column; min-height: 0;
 }
 .panel-title {
@@ -104,25 +117,50 @@ tr.macro-divider td { color: var(--amber); letter-spacing: 2px; font-size: 10px;
 }
 .overlay-head button:hover { color: var(--amber); }
 
-/* Bloomberg PORT-style workspace tabs: beveled buttons on a dark strip,
-   active tab raised (light top/left, dark bottom/right) and merged into
-   the content below by overlapping the strip's bottom border. */
-.tab-row {
-  display: flex; gap: 3px; align-items: flex-end;
-  padding: 4px 8px 0; background: #eef1f4; border-bottom: 1px solid #c9d1d9;
+/* Signal identity — hub navigation (Phase 1 IA, ui/js/tabs.js renders
+   data-hub-link buttons into nav.hub-row). Six pill buttons; active hub filled blue. */
+.hub-row {
+  display: flex; gap: 6px; align-items: center;
+  padding: 8px 14px 6px; background: var(--bg);
+  overflow-x: auto; scrollbar-width: thin;
 }
-.tab-row a {
-  color: #4b5563; text-decoration: none; font-size: 11px; letter-spacing: 2px;
-  padding: 2px 18px; background: linear-gradient(#ffffff, #e8ecf0);
-  border: 1px solid #c9d1d9;
-  border-top-color: #ffffff; border-left-color: #f0f3f6; border-bottom: none;
+.hub-row::-webkit-scrollbar { height: 6px; }
+.hub-row::-webkit-scrollbar-thumb { background: var(--line); border-radius: 3px; }
+.hub-row button {
+  flex: none; white-space: nowrap; cursor: pointer; font: inherit;
+  font-size: 11px; letter-spacing: 2px; font-weight: 600;
+  color: #475569; background: #f1f5f9;
+  border: 1px solid #cbd5e1; border-radius: 999px;
+  padding: 6px 16px;
 }
-.tab-row a.active {
-  color: var(--amber); font-weight: 700;
-  background: linear-gradient(#ffffff, #f0f4f8);
-  border-top-color: #ffffff; border-left-color: #e5e7eb;
-  padding-bottom: 3px; margin-bottom: -1px;
+.hub-row button:hover { border-color: var(--blue); color: var(--blue); }
+.hub-row button.active {
+  background: var(--blue); border-color: var(--blue); color: #ffffff;
+  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.35);
 }
+.hub-row button:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+
+/* Signal identity — subtab navigation (tabs.js injects data-sub-link buttons
+   into nav#sub-row). Underline style; active subtab gets a blue underline. */
+.sub-row {
+  display: flex; gap: 2px; align-items: center;
+  padding: 2px 14px 0; background: var(--panel);
+  border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+  overflow-x: auto; scrollbar-width: thin;
+}
+.sub-row::-webkit-scrollbar { height: 6px; }
+.sub-row::-webkit-scrollbar-thumb { background: var(--line); border-radius: 3px; }
+.sub-row button {
+  flex: none; white-space: nowrap; cursor: pointer; font: inherit;
+  font-size: 11px; letter-spacing: 1px; color: var(--muted);
+  background: none; border: none; border-bottom: 2px solid transparent;
+  padding: 7px 10px 5px;
+}
+.sub-row button:hover { color: var(--fg); }
+.sub-row button.active {
+  color: var(--blue); border-bottom-color: var(--blue); font-weight: 700;
+}
+.sub-row button:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; }
 .grid-defi { grid-template-columns: 5fr 4fr; }
 .grid-cycle { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); align-content: start; }
 .grid-map { grid-template-columns: 1fr; align-content: start; }
@@ -169,8 +207,8 @@ path.map-country:hover { stroke: var(--amber); stroke-width: 1.6; }
 @media (max-width: 1000px) {
   .grid { grid-template-columns: 1fr; grid-auto-rows: minmax(240px, auto); overflow-y: auto; }
   body { height: auto; }
-  .tab-row { overflow-x: auto; scrollbar-width: thin; }
-  .tab-row a { white-space: nowrap; }
+  .hub-row, .sub-row { overflow-x: auto; scrollbar-width: thin; }
+  .hub-row button, .sub-row button { white-space: nowrap; }
   .header-btn, .banner { margin-left: 0; }
 }
 
@@ -287,7 +325,7 @@ path.map-country:hover { stroke: var(--amber); stroke-width: 1.6; }
 .radar-cells { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
 .radar-cell {
   background: var(--bg); border: 1px solid var(--line); border-left: 3px solid var(--muted);
-  padding: 6px 8px; text-align: left; font: inherit; color: var(--fg); cursor: pointer;
+  border-radius: 8px; padding: 6px 8px; text-align: left; font: inherit; color: var(--fg); cursor: pointer;
 }
 .radar-cell.color-green { border-left-color: #2fb56b; }
 .radar-cell.color-yellow { border-left-color: #e3b008; }
@@ -309,7 +347,7 @@ path.map-country:hover { stroke: var(--amber); stroke-width: 1.6; }
 
 /* HYPER tab */
 .hyper-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px; margin-bottom: 12px; }
-.hyper-card { background: var(--bg); border: 1px solid var(--line); padding: 8px 10px; }
+.hyper-card { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
 .hyper-card-head { display: flex; gap: 6px; align-items: baseline; font-size: 12px; }
 .hyper-card-price { font-size: 16px; font-weight: 700; margin: 4px 0; }
 .hyper-spark { width: 110px; height: 28px; display: block; margin-top: 4px; }
@@ -360,7 +398,7 @@ path.map-country:hover { stroke: var(--amber); stroke-width: 1.6; }
 .ai-chip.on { border-color: var(--amber); color: var(--amber); }
 .ai-vlabel { color: var(--amber); font-size: 10px; letter-spacing: 2px; margin: 10px 0 4px; text-transform: uppercase; }
 .ai-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
-.ai-card { border: 1px solid var(--line); padding: 7px 9px; background: var(--bg); cursor: pointer; }
+.ai-card { border: 1px solid var(--line); border-radius: 8px; padding: 7px 9px; background: var(--bg); cursor: pointer; }
 .ai-card-head { display: flex; gap: 6px; align-items: baseline; font-size: 12px; }
 .ai-dot-red { width: 8px; height: 8px; border-radius: 50%; background: #e05252; margin-left: auto; flex: none; }
 .ai-card-fin { font-size: 11px; margin: 3px 0; display: flex; gap: 8px; }
@@ -481,7 +519,7 @@ table.bs-deltas td:first-child { text-align: left; }
 /* KOI scorecard (MKT tab): compact FINRA/TRACE Y/Y cards */
 .koi-sub { font-size: 10px; letter-spacing: 1px; margin: 2px 0 6px; }
 .koi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
-.koi-card { background: var(--bg); border: 1px solid var(--line); padding: 8px 10px; cursor: pointer; }
+.koi-card { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; cursor: pointer; }
 .koi-card:hover { border-color: var(--amber); }
 .koi-name { font-size: 10px; letter-spacing: 1px; color: var(--muted); }
 .koi-yoy { display: flex; gap: 14px; margin: 4px 0 2px; }
