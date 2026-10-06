@@ -25,6 +25,18 @@
     <button type="button" data-hub-link="desk">DESK</button>
   </nav>
   <nav class="sub-row" id="sub-row" aria-label="subtabs"></nav>
+  <script>
+  // Early hub-button handler: main.js is a deferred module, so on cold start
+  // the buttons render before its click handlers attach. This inline script
+  // runs immediately and uses delegation, so hub clicks work from first paint.
+  // tabs.js initTabs() re-attaches its own handlers later (idempotent).
+  document.addEventListener("click", function (e) {
+    var b = e.target && e.target.closest ? e.target.closest("[data-hub-link]") : null;
+    if (!b) return;
+    var target = "#/" + b.getAttribute("data-hub-link");
+    if (location.hash !== target) location.hash = target;
+  });
+  </script>
   <div id="health-strip" class="health-strip" title="per-feed health: green ok · amber recovered · red failing"></div>
 
   <!-- ============ PULSE — the 60-second conference view ============ -->
