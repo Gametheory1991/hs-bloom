@@ -59,6 +59,7 @@ from collector.fetchers.finra_short import fetch_finra_short
 from collector.fetchers.finra_regsho import fetch_finra_regsho
 from collector.fetchers.ticker_stats import fetch_ticker_stats
 from collector.fetchers.finra_ids_star import fetch_finra_ids_star
+from collector.fetchers.finra_factbook import fetch_finra_factbook, fetch_finra_factbook_annual
 from collector.fetchers.ice_star import fetch_ice_star
 from collector.fetchers.refs_history import fetch_refs_history
 from collector.fetchers.trace_monthly import fetch_trace_monthly
@@ -356,6 +357,16 @@ def register_jobs(
         # Starts after the other FINRA jobs.
         "finra_ids_star": (cfg.cadences.get("finra_ids_star", 86400), partial(fetch_finra_ids_star, store, get_bytes),
                  start + timedelta(seconds=8100)),
+        # FINRA TRACE Fact Book — quarterly workbooks (corporate/agency/
+        # securitized XLSX, keyless; 12-quarter backfill on first run).
+        # Starts after the other FINRA jobs.
+        "finra_factbook": (cfg.cadences.get("finra_factbook", 30 * 86400), partial(fetch_finra_factbook, store, get_text, get_bytes),
+                 start + timedelta(seconds=8250)),
+        # FINRA TRACE Fact Book — annual Transaction/Issue/Participant
+        # Information workbooks (time-of-day intervals, annual top lists,
+        # dealer concentration, issues outstanding). Yearly refresh.
+        "finra_factbook_annual": (cfg.cadences.get("finra_factbook_annual", 365 * 86400), partial(fetch_finra_factbook_annual, store, get_text, get_bytes),
+                 start + timedelta(seconds=8550)),
         "newsletter": (cfg.cadences["insights"], partial(deliver_newsletter, store, smtp_cfg), start + timedelta(seconds=5)),
     }
     # Boot catch-up (see _catchup_first_runs): overdue staggered jobs run
