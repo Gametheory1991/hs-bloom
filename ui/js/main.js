@@ -37,6 +37,7 @@ import { renderInsights } from "./panels/insights.js";
 import { initNotifications, notifyInsights } from "./notifications.js";
 import { initChat } from "./chat.js";
 import { initTabs, HUBS } from "./tabs.js";
+import { renderDebtCube } from "./panels/debtcube.js";
 
 const POLL_MS = 60_000;
 const STALE_MINUTES = { equity: 20, bonds: 130, macro: 390, auctions: 2880, news: 40, defi: 35, midnight: 35, refs: 35, insights: 70, riskmap: 2880, xcorr: 2880, gse: 86400, vol: 2880, movers: 10080, radar: 2880, hyper: 10080, tsv: 10080, usaspending: 20160, finnhub: 2880, worldbank: 20160, coingecko: 2880, predict: 120, finra: 2880, shortinterest: 2880, factbook: 43200 };  // ~2x cadence
@@ -132,6 +133,7 @@ async function tick() {
     renderFiscalEcon(p.usaspending ?? { monthly: [], top_recipients: [], top_agencies: [], updated_at: null });
     renderEarningsProfit(p.finnhub ?? { earnings: [], insider: [], key_configured: false, updated_at: null });
     renderFigiLookup();
+    renderDebtCube(); // QUANT tab debt-cube slicer (own fetch; mounts data-batch11 section)
     renderRiskMap(p.riskmap ?? { countries: [], asof: null, updated_at: null, source: null });
     renderXcorr(p.xcorr ?? { labels: [], matrix_60d: [], pairs: [], rvol: [] },
                 p.gse ?? { series: [] });
