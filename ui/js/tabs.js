@@ -15,8 +15,8 @@ export const HUBS = [
   { id: "positioning", label: "POSITIONING",
     subs: [["positions", "Positions"], ["flows", "13F Flows"], ["shorts", "Short Interest"],
            ["predict", "Predict"]] },
-  { id: "structure", label: "STRUCTURE",
-    subs: [["trace", "TRACE Volume"], ["maps", "Maps"], ["desks", "Desks"]] },
+  { id: "structure", label: "FLOW",
+    subs: [["trace", "TRACE Volume"], ["factbook", "Fact Book"], ["maps", "Maps"], ["desks", "Desks"]] },
   { id: "desk", label: "DESK",
     subs: [["alerts", "Alerts"], ["briefcheck", "Brief Check"], ["analyst", "Analyst"]] },
 ];
