@@ -14,6 +14,7 @@ RUN pip install --no-cache-dir /app/collector
 
 COPY config.yaml /app/config.yaml
 COPY ui /app/ui
+COPY backfill_data /app/backfill_data
 
 ENV CONFIG_PATH=/app/config.yaml
 ENV DB_PATH=/tmp/bloom.db

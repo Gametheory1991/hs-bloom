@@ -11,6 +11,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from collector.api import create_app
+from collector.backfill_loader import maybe_load_backfill
 from collector.config import load_config
 from collector.http import get_bytes, get_text, post_json
 from collector.newsletter import load_smtp_cfg
@@ -23,6 +24,15 @@ log = logging.getLogger(__name__)
 def build() -> tuple[FastAPI, AsyncIOScheduler]:
     cfg = load_config(os.environ.get("CONFIG_PATH", "../config.yaml"))
     store = Store(cfg.db_path)
+    # One-time backfill of historical FINRA datasets (idempotent, marker-guarded)
+    try:
+        backfill_dir = Path(__file__).resolve().parents[3] / "backfill_data"
+        # In Docker: /app/backfill_data
+        if not backfill_dir.is_dir():
+            backfill_dir = Path("/app/backfill_data")
+        maybe_load_backfill(store, backfill_dir)
+    except Exception as e:
+        log.warning("backfill startup load failed (non-fatal): %s", e)
     if not os.environ.get("FRED_API_KEY"):
         log.warning("FRED_API_KEY not set; FRED-backed macro series and the US bond yield will fail")
     app = create_app(store, cfg)
