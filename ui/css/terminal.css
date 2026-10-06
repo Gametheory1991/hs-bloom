@@ -486,6 +486,14 @@ table.bs-deltas td:first-child { text-align: left; }
 .koi-k { font-size: 9px; color: var(--muted); letter-spacing: 1px; }
 .koi-v { font-size: 17px; font-weight: 700; }
 .koi-mom { font-size: 10px; }
+/* TOTAL (Treasury + TRACE) headline KPI on the KOI scorecard */
+.koi-total { background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--blue); padding: 8px 12px; margin-bottom: 8px; }
+.koi-total-head { font-size: 11px; font-weight: 700; letter-spacing: 1px; margin-bottom: 6px; }
+.koi-total-grid { display: flex; gap: 28px; flex-wrap: wrap; }
+/* Mini button + date inputs for custom range pickers */
+.mini-btn { font-size: 11px; padding: 3px 10px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 3px; cursor: pointer; }
+.mini-btn:hover { border-color: var(--blue); }
+.trace-controls input[type="date"], .trace-grid-controls input[type="date"] { font-size: 11px; padding: 3px 6px; border: 1px solid var(--line); border-radius: 3px; background: var(--panel); color: var(--ink); }
 
 /* Speculator-style per-ticker stats (top-shorted table) */
 .na {

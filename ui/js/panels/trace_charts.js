@@ -2,29 +2,29 @@
 // Inline uPlot chart (not the modal) with product/metric/range/overlay selectors.
 // Mounted by renderFinra() into #trace-charts-root.
 import { getSeries, getRecessions } from "../api.js";
-import { toAdv, toAdt } from "./trace_grid.js";
+import { toMetric, METRICS, RANGES, rangeById, metricById } from "./trace_grid.js";
 
 // TRACE monthly products. `trades` is null where FINRA only publishes par.
 // NOTE: /api/series takes bare ids (no cycle: prefix) — the backend prepends it.
 const PRODUCTS = [
-  { id: "total", label: "TOTAL (Treasury + TRACE)", synthetic: true, trades: "adt" },
-  { id: "ust", label: "Treasury Total", par: "trace-ust-par", trades: "trace-ust-trades" },
-  { id: "ust-bills", label: "Treasury — Bills", par: "trace-ust-bills-par", trades: null },
-  { id: "ust-coupons", label: "Treasury — Nom Coupons", par: "trace-ust-coupons-par", trades: null },
-  { id: "ust-tips", label: "Treasury — TIPS", par: "trace-ust-tips-par", trades: null },
-  { id: "ust-frns", label: "Treasury — FRNs", par: "trace-ust-frns-par", trades: null },
-  { id: "tba", label: "TBA", par: "trace-tba-par", trades: null },
-  { id: "corp", label: "Corporate", par: "trace-corp-par", trades: "trace-corp-trades" },
-  { id: "mbs", label: "MBS (Spec Pools)", par: "trace-mbs-par", trades: null },
-  { id: "cmo", label: "CMO", par: "trace-cmo-par", trades: null },
-  { id: "absx", label: "ABSX (CLO/CMBS)", par: "trace-absx-par", trades: null },
-  { id: "agcy", label: "Agency", par: "trace-agcy-par", trades: null },
-  { id: "conv", label: "Convertibles", par: "trace-conv-par", trades: "trace-conv-trades" },
-  { id: "abs", label: "ABS", par: "trace-abs-par", trades: null },
-  { id: "eln", label: "ELN", par: "trace-eln-par", trades: "trace-eln-trades" },
-  { id: "chrc", label: "Church Plans", par: "trace-chrc-par", trades: "trace-chrc-trades" },
-  { id: "onrun", label: "Treasury On-the-Run", par: "trace-ust-onrun-par", trades: null },
-  { id: "offrun", label: "Treasury Off-the-Run", par: "trace-ust-offrun-par", trades: null },
+  { id: "total", label: "TOTAL (Treasury + TRACE)", synthetic: true },
+  { id: "ust", label: "Treasury Total", par: "trace-ust-par", trades: "trace-ust-trades", monthly: false },
+  { id: "ust-bills", label: "Treasury — Bills", par: "trace-ust-bills-par", trades: null, monthly: false },
+  { id: "ust-coupons", label: "Treasury — Nom Coupons", par: "trace-ust-coupons-par", trades: null, monthly: false },
+  { id: "ust-tips", label: "Treasury — TIPS", par: "trace-ust-tips-par", trades: null, monthly: false },
+  { id: "ust-frns", label: "Treasury — FRNs", par: "trace-ust-frns-par", trades: null, monthly: false },
+  { id: "tba", label: "TBA", par: "trace-tba-par", trades: null, monthly: true },
+  { id: "corp", label: "Corporate", par: "trace-corp-par", trades: "trace-corp-trades", monthly: true },
+  { id: "mbs", label: "MBS (Spec Pools)", par: "trace-mbs-par", trades: null, monthly: true },
+  { id: "cmo", label: "CMO", par: "trace-cmo-par", trades: null, monthly: true },
+  { id: "absx", label: "ABSX (CLO/CMBS)", par: "trace-absx-par", trades: null, monthly: true },
+  { id: "agcy", label: "Agency", par: "trace-agcy-par", trades: null, monthly: true },
+  { id: "conv", label: "Convertibles", par: "trace-conv-par", trades: "trace-conv-trades", monthly: true },
+  { id: "abs", label: "ABS", par: "trace-abs-par", trades: null, monthly: true },
+  { id: "eln", label: "ELN", par: "trace-eln-par", trades: "trace-eln-trades", monthly: true },
+  { id: "chrc", label: "Church Plans", par: "trace-chrc-par", trades: "trace-chrc-trades", monthly: true },
+  { id: "onrun", label: "Treasury On-the-Run", par: "trace-ust-onrun-par", trades: null, monthly: false },
+  { id: "offrun", label: "Treasury Off-the-Run", par: "trace-ust-offrun-par", trades: null, monthly: false },
   { id: "si-total", label: "Short Interest — Total", par: "finra-short-total", trades: null, unit: "shares" },
   { id: "si-msft", label: "Short Interest — MSFT", par: "short-MSFT", trades: null, unit: "shares" },
   { id: "si-nvda", label: "Short Interest — NVDA", par: "short-NVDA", trades: null, unit: "shares" },
@@ -49,14 +49,15 @@ const TOTAL_PARTS = [
   { par: "trace-chrc-par", trades: "trace-chrc-trades", monthly: true },
 ];
 
-// Synthetic TOTAL series: monthly ADV ($B/day) / ADT (trades/day) summed over
-// Treasury + all 10 TRACE products, by calendar month.
-async function totalSeries(metric, range) {
+// Synthetic TOTAL series: monthly values summed over Treasury + all 10
+// TRACE products, by calendar month, normalized to the selected metric.
+async function totalSeries(metric) {
+  const isCount = metric === "adt" || metric === "trades";
   const all = (await Promise.all(TOTAL_PARTS.map(async (c) => {
-    const sid = metric === "trades" ? c.trades : c.par;
+    const sid = isCount ? c.trades : c.par;
     if (!sid) return null;
-    const s = await getSeries(sid, range);
-    return metric === "trades" ? toAdt(c, s.points) : toAdv(c, s.points);
+    const s = await getSeries(sid, "max");
+    return toMetric(c, s.points, metric);
   }))).filter(Boolean);
   const sums = new Map(); // "YYYY-MM" -> {d, v}
   for (const vals of all)
@@ -67,9 +68,10 @@ async function totalSeries(metric, range) {
       else sums.set(key, { d, v });
     }
   const rows = [...sums.values()].sort((a, b) => (a.d < b.d ? -1 : 1));
+  const mu = metricById(metric);
   return {
-    id: "total", unit: metric === "trades" ? "trades/d" : "$B/d",
-    name: metric === "trades" ? "TOTAL ADT — Treasury + TRACE" : "TOTAL ADV ($B/d) — Treasury + TRACE",
+    id: "total", unit: mu.unit,
+    name: `TOTAL ${mu.label} — Treasury + TRACE (${mu.unit})`,
     points: rows.map(({ d, v }) => [d, v]),
   };
 }
@@ -88,14 +90,7 @@ const OVERLAYS = [
   { id: "vvix", label: "VVIX" },
 ];
 
-const RANGES = [
-  { id: "1y", label: "1Y" },
-  { id: "5y", label: "5Y" },
-  { id: "10y", label: "10Y" },
-  { id: "max", label: "Max" },
-];
-
-const state = { product: "tba", metric: "par", range: "5y", overlay: "", plot: null, reqId: 0 };
+const state = { product: "total", metric: "adv", range: "3y", customStart: null, customEnd: null, overlay: "", plot: null, reqId: 0 };
 let recessionsPromise = null;
 
 function loadRecessions() {
@@ -145,20 +140,41 @@ function destroyPlot() {
 
 function currentSeriesId() {
   const p = PRODUCTS.find((x) => x.id === state.product);
-  return state.metric === "trades" && p.trades ? p.trades : p.par;
+  const isCount = state.metric === "adt" || state.metric === "trades";
+  return (isCount && p.trades ? p.trades : p.par);
 }
 
 function currentTitle() {
   const p = PRODUCTS.find((x) => x.id === state.product);
-  if (p.synthetic) return state.metric === "trades" ? `${p.label} — ADT` : `${p.label} — ADV ($B/day)`;
-  const m = state.metric === "trades" && p.trades ? "Trades" : p.unit === "shares" ? "Short shares" : "Par volume ($)";
-  return `${p.label} — ${m}`;
+  if (p.raw) return `${p.label} — short shares (biweekly)`;
+  const mu = metricById(state.metric);
+  return `${p.label} — ${mu.label} (${mu.unit})`;
+}
+
+// Filter [d, v] points to the selected range (client-side; we fetch "max").
+function filterRange(points) {
+  if (state.range === "custom" && state.customStart && state.customEnd)
+    return points.filter(([d]) => d >= state.customStart && d <= state.customEnd);
+  if (state.range === "max") return points;
+  const r = rangeById(state.range);
+  if (!r || !isFinite(r.months)) return points;
+  return points.slice(-r.months);
 }
 
 async function loadMain() {
   const p = PRODUCTS.find((x) => x.id === state.product);
-  if (p.synthetic) return totalSeries(state.metric, state.range);
-  return getSeries(currentSeriesId(), state.range);
+  if (p.synthetic) {
+    const s = await totalSeries(state.metric);
+    return { ...s, points: filterRange(s.points) };
+  }
+  if (p.raw) { // short interest: biweekly levels, metric toggle n/a
+    const s = await getSeries(p.par, "max");
+    return { id: p.id, unit: "shares", name: `${p.label} — short shares`, points: filterRange(s.points) };
+  }
+  const s = await getSeries(currentSeriesId(), "max");
+  const vals = toMetric(p, s.points, state.metric).map(({ d, v }) => [d, v]);
+  const mu = metricById(state.metric);
+  return { id: p.id, unit: mu.unit, name: `${p.label} — ${mu.label} (${mu.unit})`, points: filterRange(vals) };
 }
 
 async function drawChart() {
@@ -166,16 +182,16 @@ async function drawChart() {
   const chartDiv = document.getElementById("trace-chart");
   const statusDiv = document.getElementById("trace-chart-status");
   if (!chartDiv) return;
-  const sid = currentSeriesId();
   const p = PRODUCTS.find((x) => x.id === state.product);
   statusDiv.textContent = "Loading…";
   try {
-    const [series, second, bands] = await Promise.all([
+    const [series, secondRaw, bands] = await Promise.all([
       loadMain(),
-      state.overlay ? getSeries(state.overlay, state.range) : Promise.resolve(null),
+      state.overlay ? getSeries(state.overlay, "max") : Promise.resolve(null),
       loadRecessions(),
     ]);
     if (reqId !== state.reqId) return; // superseded
+    const second = secondRaw ? { ...secondRaw, points: filterRange(secondRaw.points) } : null;
     destroyPlot();
     chartDiv.innerHTML = "";
     const axisStyle = { stroke: "#6b7280", grid: { stroke: "#e5e7eb" } };
@@ -186,24 +202,24 @@ async function drawChart() {
       axes: [axisStyle, { ...axisStyle }],
       hooks: { drawClear: [bandsHook(bands)] },
     };
+    const rangeLbl = state.range === "custom"
+      ? `${state.customStart}→${state.customEnd}` : (rangeById(state.range)?.label || state.range);
     let data;
     if (second) {
       opts.series.push({ label: second.name, stroke: "#0891b2", width: 1.2, scale: "y2", spanGaps: true });
       opts.axes.push({ ...axisStyle, scale: "y2", side: 1, grid: { show: false } });
       data = mergeSeries(series, second);
-      statusDiv.textContent = `${series.points.length} pts · overlay: ${second.name} (${second.points.length} pts)`;
+      statusDiv.textContent = `${series.points.length} pts (${rangeLbl}) · overlay: ${second.name} (${second.points.length} pts)`;
     } else {
       data = [
         series.points.map(([d]) => Date.parse(d) / 1000),
         series.points.map(([, v]) => v),
       ];
       const note = p.synthetic
-        ? (state.metric === "trades"
-            ? `${series.points.length} monthly ADT points — Treasury + TRACE products with trade-count data`
-            : `${series.points.length} monthly ADV points — Treasury + all 10 TRACE products`)
-        : p.unit === "shares"
-          ? `${series.points.length} biweekly settlement points (shares)`
-          : `${series.points.length} monthly points`;
+        ? `${series.points.length} monthly ${metricById(state.metric).label} points (${rangeLbl}) — Treasury + TRACE products${(state.metric === "adt" || state.metric === "trades") ? " with trade-count data" : ""}`
+        : p.raw
+          ? `${series.points.length} biweekly settlement points (${rangeLbl}, shares)`
+          : `${series.points.length} monthly points (${rangeLbl})`;
       statusDiv.textContent = note;
     }
     state.plot = new uPlot(opts, data, chartDiv);
@@ -217,24 +233,28 @@ async function drawChart() {
 
 function syncControls() {
   const prodSel = document.getElementById("trace-prod");
-  const metricPar = document.getElementById("trace-metric-par");
-  const metricTr = document.getElementById("trace-metric-tr");
   const ovSel = document.getElementById("trace-overlay");
   if (prodSel) prodSel.value = state.product;
   if (ovSel) ovSel.value = state.overlay;
-  // metric toggle: disable trades button when product has no trades series
   const p = PRODUCTS.find((x) => x.id === state.product);
-  if (metricPar) metricPar.textContent = p.synthetic ? "ADV" : "Par $";
-  if (metricTr) {
-    metricTr.textContent = p.synthetic ? "ADT" : "Trades";
-    metricTr.disabled = !p.trades;
-    metricTr.title = p.trades ? "" : "Trade counts not published for this product";
-    if (!p.trades && state.metric === "trades") state.metric = "par";
+  const isCount = state.metric === "adt" || state.metric === "trades";
+  // Metric buttons: ADT/TRADES need trade-count data; SI rows are levels-only.
+  document.querySelectorAll("#trace-metric button").forEach((b) => {
+    const mid = b.dataset.metric;
+    const needTrades = mid === "adt" || mid === "trades";
+    const ok = p.raw ? false : !needTrades || !!p.trades || p.synthetic;
+    b.disabled = !ok;
+    b.title = p.raw ? "Metric n/a — biweekly share levels"
+      : ok ? metricById(mid).title : "Trade counts not published for this product";
+    b.classList.toggle("on", state.metric === mid);
+  });
+  if (p.raw && state.metric !== "adv") {
+    // SI rows ignore the metric toggle (levels only) — keep "adv" selected visually.
   }
-  if (metricPar) metricPar.classList.toggle("on", state.metric === "par");
-  if (metricTr) metricTr.classList.toggle("on", state.metric === "trades");
   document.querySelectorAll("#trace-range button").forEach((b) =>
     b.classList.toggle("on", b.dataset.range === state.range));
+  const customBox = document.getElementById("trace-range-custom");
+  if (customBox) customBox.style.display = state.range === "custom" ? "" : "none";
 }
 
 // Programmatic product selection (used by the grid's row click).
@@ -252,6 +272,8 @@ export function renderTraceCharts() {
 
   const prodOpts = PRODUCTS.map((p) => `<option value="${p.id}">${p.label}</option>`).join("");
   const ovOpts = OVERLAYS.map((o) => `<option value="${o.id}">${o.label}</option>`).join("");
+  const metricBtns = METRICS.map((m) =>
+    `<button data-metric="${m.id}" title="${m.title}">${m.label}</button>`).join("");
   const rangeBtns = RANGES.map((r) => `<button data-range="${r.id}">${r.label}</button>`).join("");
 
   root.innerHTML = `
@@ -259,10 +281,13 @@ export function renderTraceCharts() {
       <label>Product
         <select id="trace-prod">${prodOpts}</select>
       </label>
-      <span class="seg">
-        <button id="trace-metric-par">Par $</button><button id="trace-metric-tr">Trades</button>
-      </span>
+      <span class="seg" id="trace-metric">${metricBtns}</span>
       <span class="seg" id="trace-range">${rangeBtns}</span>
+      <span id="trace-range-custom" class="muted" style="display:none">
+        <input type="date" id="trace-chart-start" aria-label="Start date"> →
+        <input type="date" id="trace-chart-end" aria-label="End date">
+        <button id="trace-chart-apply" class="mini-btn">Apply</button>
+      </span>
       <label>Overlay
         <select id="trace-overlay">${ovOpts}</select>
       </label>
@@ -275,18 +300,13 @@ export function renderTraceCharts() {
     syncControls();
     drawChart();
   });
-  document.getElementById("trace-metric-par").addEventListener("click", () => {
-    state.metric = "par";
-    syncControls();
-    drawChart();
-  });
-  document.getElementById("trace-metric-tr").addEventListener("click", () => {
-    if (state.metric !== "trades") {
-      state.metric = "trades";
+  root.querySelectorAll("#trace-metric button").forEach((b) =>
+    b.addEventListener("click", () => {
+      if (b.disabled || state.metric === b.dataset.metric) return;
+      state.metric = b.dataset.metric;
       syncControls();
       drawChart();
-    }
-  });
+    }));
   document.getElementById("trace-overlay").addEventListener("change", (e) => {
     state.overlay = e.target.value;
     drawChart();
@@ -295,8 +315,18 @@ export function renderTraceCharts() {
     b.addEventListener("click", () => {
       state.range = b.dataset.range;
       syncControls();
-      drawChart();
+      if (state.range !== "custom") drawChart();
     }));
+  document.getElementById("trace-chart-apply").addEventListener("click", () => {
+    const s = document.getElementById("trace-chart-start").value;
+    const e = document.getElementById("trace-chart-end").value;
+    if (!s || !e || s > e) return;
+    state.customStart = s;
+    state.customEnd = e;
+    state.range = "custom";
+    syncControls();
+    drawChart();
+  });
 
   syncControls();
   drawChart();

@@ -1,12 +1,16 @@
-// KOI SCORECARD — FINRA/TRACE Key Operating Indicators on the MKT tab.
+// KOI SCORECARD — FINRA/TRACE Key Operating Indicators on the STRUCTURE tab.
 // Primary view: Sep Y/Y (ADV + ADT) per product, sorted by ADV Y/Y desc.
 // MoM shown secondary. Click a card for the full chart.
 //
-// Verified snapshot (Sep 2026 vs Sep 2025 for Y/Y, vs Aug 2026 for M/M).
-// Refresh each month when the new TRACE report lands (see the
-// monthly-trace-treasury-update cron); a future version can compute these
-// live from /api/series once cycle:trace-*-trades exists for all products.
+// TOTAL (Treasury + TRACE) KPI is computed LIVE from /api/series via the
+// grid's normalization (toMetric/totalVals/rowStats) — Harry's standing
+// rule: always lead with the combined overall.
+// Product cards remain a verified static snapshot (Sep 2026 vs Sep 2025 for
+// Y/Y, vs Aug 2026 for M/M). Refresh each month when the new TRACE report
+// lands (see the monthly-trace-treasury-update cron).
 import { openChart } from "../chart.js";
+import { getSeries } from "../api.js";
+import { toMetric, totalVals, rowStats, rangeById, TOTAL_PARTS } from "./trace_grid.js";
 
 const ASOF_LABEL = "Sep 2026";
 const YOY_LABEL = "Sep 2025";
@@ -31,6 +35,60 @@ const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
 
 const fmtP = (x) => (x == null ? "—" : `${x > 0 ? "+" : ""}${x.toFixed(1)}%`);
 const cls = (x) => (x == null || x === 0 ? "flat" : x > 0 ? "up" : "down");
+const fmtB = (v) => v == null || !isFinite(v) ? "—" : `$${v >= 1000 ? (v / 1000).toFixed(2) + "T" : v.toFixed(0) + "B"}/d`;
+const fmtT = (v) => v == null || !isFinite(v) ? "—" : `${Math.round(v).toLocaleString("en-US")}/d`;
+
+// Component series ids for the TOTAL KPI (mirrors trace_grid.js PRODUCTS).
+const TOTAL_SERIES = [
+  { par: "trace-ust-par", trades: "trace-ust-trades", monthly: false },
+  { par: "trace-tba-par", trades: null, monthly: true },
+  { par: "trace-corp-par", trades: "trace-corp-trades", monthly: true },
+  { par: "trace-eln-par", trades: "trace-eln-trades", monthly: true },
+  { par: "trace-conv-par", trades: "trace-conv-trades", monthly: true },
+  { par: "trace-agcy-par", trades: null, monthly: true },
+  { par: "trace-abs-par", trades: null, monthly: true },
+  { par: "trace-absx-par", trades: null, monthly: true },
+  { par: "trace-cmo-par", trades: null, monthly: true },
+  { par: "trace-mbs-par", trades: null, monthly: true },
+  { par: "trace-chrc-par", trades: "trace-chrc-trades", monthly: true },
+];
+
+async function totalKpi() {
+  // Fetch par + trades for every component, normalize, sum by month.
+  const jobs = TOTAL_SERIES.map(async (c) => {
+    const [par, tr] = await Promise.all([
+      getSeries(c.par, "max").catch(() => null),
+      c.trades ? getSeries(c.trades, "max").catch(() => null) : Promise.resolve(null),
+    ]);
+    if (!par) return null;
+    // Match to the grid's TOTAL_PARTS entry by series id (for toMetric's `monthly` flag).
+    const gp = TOTAL_PARTS.find((g) => g.par === c.par);
+    if (!gp) return null;
+    return { p: gp, par: par.points, tr: tr ? tr.points : null };
+  });
+  const data = (await Promise.all(jobs)).filter(Boolean);
+  const advVals = totalVals(data, "adv");
+  const adtVals = totalVals(data, "adt");
+  const adv = rowStats(advVals, rangeById("3y"));
+  const adt = rowStats(adtVals, rangeById("3y"));
+  return { adv, adt };
+}
+
+function totalCard(t) {
+  if (!t || !t.adv) return `<div class="koi-total muted">TOTAL KPI loading…</div>`;
+  const a = t.adv, d = t.adt;
+  const asof = a.asof ? a.asof.slice(0, 7) : "";
+  const yoyLbl = a.asof ? `${+a.asof.slice(0, 4) - 1}${a.asof.slice(4, 7)}` : "";
+  return `<div class="koi-total">
+    <div class="koi-total-head">TOTAL (TREASURY + TRACE) <span class="muted">· ${esc(asof)} vs ${esc(yoyLbl)} · live</span></div>
+    <div class="koi-total-grid">
+      <div class="koi-metric"><span class="koi-k">ADV</span><span class="koi-v">${fmtB(a.cur.v)}</span></div>
+      <div class="koi-metric"><span class="koi-k">ADV Y/Y</span><span class="koi-v ${cls(a.y1)}">${fmtP(a.y1 == null ? null : a.y1 * 100)}</span></div>
+      <div class="koi-metric"><span class="koi-k">ADT</span><span class="koi-v">${d ? fmtT(d.cur.v) : "—"}</span></div>
+      <div class="koi-metric"><span class="koi-k">ADT Y/Y</span><span class="koi-v ${cls(d?.y1)}">${fmtP(d?.y1 == null ? null : d.y1 * 100)}</span></div>
+    </div>
+  </div>`;
+}
 
 export function renderKoi() {
   const body = document.querySelector("#panel-koi .panel-body");
@@ -46,10 +104,19 @@ export function renderKoi() {
       <div class="koi-mom muted">M/M&nbsp; ADV ${fmtP(r.advMom)} · ADT ${fmtP(r.adtMom)}</div>
     </div>`).join("");
   body.innerHTML = `<div class="koi-sub muted">${ASOF_LABEL} vs ${YOY_LABEL} · ADV + ADT · sorted by ADV Y/Y · M/M vs ${MOM_LABEL}</div>` +
+    `<div id="koi-total-slot">${totalCard(null)}</div>` +
     `<div class="koi-grid">${cards}</div>`;
   body.querySelectorAll(".koi-card").forEach((el) => {
     el.addEventListener("click", () => openChart(el.dataset.series, `TRACE — ${el.dataset.name}`));
   });
   const footEl = document.querySelector("#panel-koi .panel-foot");
-  if (footEl) footEl.textContent = `DATA: FINRA · ${ASOF_LABEL}`;
+  if (footEl) footEl.textContent = `DATA: FINRA · ${ASOF_LABEL} (product cards) · TOTAL live from /api/series`;
+  // Fill the TOTAL KPI asynchronously (doesn't block the static cards).
+  totalKpi().then((t) => {
+    const slot = body.querySelector("#koi-total-slot");
+    if (slot) slot.innerHTML = totalCard(t);
+  }).catch(() => {
+    const slot = body.querySelector("#koi-total-slot");
+    if (slot) slot.innerHTML = `<div class="koi-total muted">TOTAL KPI unavailable</div>`;
+  });
 }

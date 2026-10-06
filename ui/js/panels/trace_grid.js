@@ -40,8 +40,12 @@ const PRODUCTS = [
   { id: "si-googl", label: "Short Int — GOOGL", par: "short-GOOGL", unit: "sh", raw: true },
   { id: "si-meta",  label: "Short Int — META",  par: "short-META",  unit: "sh", raw: true },
 ];
-// Components summed into the synthetic TOTAL row (Treasury + all 10 products).
-const TOTAL_PARTS = PRODUCTS.filter((p) => !p.synthetic && !p.raw);
+// Components summed into the synthetic TOTAL row: Treasury Total + all 10
+// TRACE products. Treasury breakdown rows (bills/coupons/TIPS/FRNs/
+// on-the-run/off-the-run) are EXCLUDED — they sum to the Treasury Total,
+// so including them would double-count Treasury.
+export const TOTAL_PARTS = PRODUCTS.filter((p) =>
+  !p.synthetic && !p.raw && !p.id.startsWith("ust-")); // ust- bills/coupons/tips/frns/onrun/offrun excluded
 
 // ---- NYSE trading-day calendar ----
 const ONE_OFF_CLOSURES = new Set(["2018-12-05"]); // G.H.W. Bush national day of mourning
@@ -129,20 +133,93 @@ export function toAdt(p, points) {
     return { d, v: v / tradingDays(y, m) };
   });
 }
+// Monthly PAR totals ($B/month). Treasury rows are already $bn monthly
+// totals; monthly TRACE products are $M monthly -> $B.
+export function toPar(p, points) {
+  if (!p.monthly) return points.filter(([d]) => isMonthEnd(d)).map(([d, v]) => ({ d, v }));
+  return points.map(([d, v]) => ({ d, v: v / 1000 }));
+}
+// Monthly TRADE totals (raw counts). Treasury rows use month-end points.
+export function toTrades(p, points) {
+  const src = p.monthly ? points : points.filter(([d]) => isMonthEnd(d));
+  return src.map(([d, v]) => ({ d, v }));
+}
+// Normalize raw points to one of the four selectable metrics.
+export function toMetric(p, points, metric) {
+  switch (metric) {
+    case "adt": return toAdt(p, points);
+    case "par": return toPar(p, points);
+    case "trades": return toTrades(p, points);
+    default: return toAdv(p, points);
+  }
+}
+export const METRICS = [
+  { id: "adv", label: "ADV", unit: "$B/d", title: "Average daily par volume" },
+  { id: "adt", label: "ADT", unit: "trades/d", title: "Average daily trade count" },
+  { id: "par", label: "PAR", unit: "$B/mo", title: "Total par volume for the month" },
+  { id: "trades", label: "TRADES", unit: "trades/mo", title: "Total trade count for the month" },
+];
+export const metricById = (id) => METRICS.find((m) => m.id === id) || METRICS[0];
+
+// Range definitions: trailing windows in months, plus custom date range.
+// Stats (percentile/z/avg) are computed over the selected window (min 12
+// points); the window label is shown on the range columns.
+export const RANGES = [
+  { id: "1m", label: "1M", months: 1 },
+  { id: "3m", label: "3M", months: 3 },
+  { id: "6m", label: "6M", months: 6 },
+  { id: "1y", label: "1Y", months: 12 },
+  { id: "3y", label: "3Y", months: 36 },
+  { id: "5y", label: "5Y", months: 60 },
+  { id: "max", label: "MAX", months: Infinity },
+  { id: "custom", label: "Custom", months: null },
+];
+export const rangeById = (id) => RANGES.find((r) => r.id === id) || RANGES[4];
 const DAY_MS = 864e5;
 const dayDiff = (a, b) => Math.round((Date.parse(b) - Date.parse(a)) / DAY_MS);
 // Harry's universal horizon standard (2026-10-05): every % change comparison
 // shows 1D/1W/1M/1Q/1Y. Monthly/biweekly rows can't support 1D/1W — those
 // cells render "—" (see rowStats/rowStatsLevel).
-export function rowStats(vals) { // vals sorted asc by d — monthly ADV/ADT series
+//
+// Range handling: `range` = { months } trailing window, or { start, end }
+// custom dates. `full` is the complete monthly series (for % changes vs
+// history); `win` is the window slice used for percentile/z/avg/sparkline.
+// Stats need >= 12 points to be meaningful — shorter windows fall back to
+// the trailing 3Y and the fallback is flagged.
+export function rowStats(vals, range) { // vals sorted asc by d — monthly ADV/ADT/PAR/TRADES series
   const n = vals.length;
   if (!n) return null;
-  const cur = vals[n - 1];
-  const back = (k) => (n > k ? vals[n - 1 - k] : null);
+  const { win, winLabel, fellBack } = windowSlice(vals, range);
+  if (!win.length) return null;
+  const cur = win[win.length - 1];
+  // % changes are vs full history (not window-truncated) so 1Y works on any range.
+  const idx = vals.findIndex((v) => v.d === cur.d);
+  const back = (k) => (idx >= k ? vals[idx - k] : null);
   const ym = cur.d.slice(0, 7);
   const yoyKey = `${+ym.slice(0, 4) - 1}${ym.slice(4)}`;
   const yoyPt = vals.find((v) => v.d.slice(0, 7) === yoyKey);
-  return finishStats(vals, cur, { d1: null, w1: null, m1: back(1), q1: back(3), y1: yoyPt });
+  return finishStats(win, cur, { d1: null, w1: null, m1: back(1), q1: back(3), y1: yoyPt }, winLabel, fellBack);
+}
+// Slice vals to the selected range. Returns the window slice plus a label
+// and whether we fell back to 3Y (window too short for meaningful stats).
+export function windowSlice(vals, range) {
+  if (!range || range.id === "max") return { win: vals, winLabel: "full history", fellBack: false };
+  let win;
+  if (range.id === "custom" && range.start && range.end) {
+    win = vals.filter((v) => v.d >= range.start && v.d <= range.end);
+  } else {
+    const months = range.months || 36;
+    win = vals.slice(-months);
+  }
+  if (win.length >= 12) {
+    const lbl = range.id === "custom" ? `${win[0].d.slice(0, 7)}→${win[win.length - 1].d.slice(0, 7)}` : range.label;
+    return { win, winLabel: lbl, fellBack: false };
+  }
+  // Too short — fall back to trailing 3Y for stats, keep window's endpoint as "now".
+  const fb = vals.slice(-36);
+  const anchor = win.length ? win[win.length - 1] : fb[fb.length - 1];
+  const fbWin = fb.filter((v) => v.d <= anchor.d);
+  return { win: fbWin.length >= 12 ? fbWin : fb, winLabel: "3Y", fellBack: true };
 }
 export function rowStatsLevel(vals) { // vals sorted asc — raw level series (biweekly short interest)
   const n = vals.length;
@@ -158,8 +235,8 @@ export function rowStatsLevel(vals) { // vals sorted asc — raw level series (b
   };
   return finishStats(vals, cur, { d1: null, w1: null, m1: refBack(30), q1: refBack(91), y1: refBack(365) });
 }
-export function finishStats(vals, cur, refs) {
-  const win = vals.slice(-36);
+export function finishStats(vals, cur, refs, winLabel = "3Y", fellBack = false) {
+  const win = vals; // vals IS the window slice here (caller slices via windowSlice)
   const vs = win.map((v) => v.v);
   const lo = Math.min(...vs), hi = Math.max(...vs);
   const avg = vs.reduce((a, b) => a + b, 0) / vs.length;
@@ -172,7 +249,7 @@ export function finishStats(vals, cur, refs) {
   const w52 = vals.slice(-12).map((v) => v.v);
   return {
     cur, lo, hi, avg, sd, z, zlo: Math.min(...zs), zhi: Math.max(...zs),
-    win, n: vs.length, asof: cur.d,
+    win, n: vs.length, asof: cur.d, winLabel, fellBack,
     hi52: w52.length ? Math.max(...w52) : null,
     lo52: w52.length ? Math.min(...w52) : null,
     d1: rc(refs.d1), w1: rc(refs.w1), m1: rc(refs.m1), q1: rc(refs.q1), y1: rc(refs.y1),
@@ -180,16 +257,20 @@ export function finishStats(vals, cur, refs) {
     pct: (100 * rank) / vs.length,
   };
 }
-// Synthetic TOTAL: sum monthly ADV (or ADT) of Treasury + all 10 TRACE
-// products by calendar month. ADT only sums products with trade-count data
-// (tba/agcy/abs/absx/cmo/mbs publish no trade counts).
-function totalVals(data, metric) {
+// Synthetic TOTAL: sum monthly values (ADV/ADT/PAR/TRADES) of the given
+// `parts` (default: grid TOTAL_PARTS = Treasury + all 10 TRACE products;
+// note the grid's breakdown rows are NOT in the default set to avoid
+// double-counting Treasury) by calendar month. ADT/TRADES only sum
+// products with trade-count data (tba/agcy/abs/absx/cmo/mbs publish none).
+// Exported for the KOI scorecard's TOTAL KPI.
+export function totalVals(data, metric, parts = TOTAL_PARTS) {
   const sums = new Map(); // "YYYY-MM" -> {d, v}
+  const isCount = metric === "adt" || metric === "trades";
   for (const { p, par, tr } of data) {
-    if (TOTAL_PARTS.indexOf(p) < 0) continue;
-    const src = metric === "adt" ? tr : par;
+    if (parts.indexOf(p) < 0) continue;
+    const src = isCount ? tr : par;
     if (!src) continue;
-    const vals = metric === "adt" ? toAdt(p, src) : toAdv(p, src);
+    const vals = toMetric(p, src, metric);
     for (const { d, v } of vals) {
       const key = d.slice(0, 7);
       const e = sums.get(key);
@@ -251,7 +332,19 @@ function sparkline(win) {
 }
 
 // ---- grid ----
-const state = { metric: "adv", sortKey: null, sortDir: 1, rows: [], asof: null, reqId: 0 };
+const state = { metric: "adv", range: rangeById("3y"), customStart: null, customEnd: null, sortKey: null, sortDir: 1, rows: [], asof: null, reqId: 0 };
+
+const metricColTitle = () => {
+  const m = metricById(state.metric);
+  return state.metric === "adv" ? "ADV $B/d"
+    : state.metric === "adt" ? "ADT"
+    : state.metric === "par" ? "PAR $B/mo" : "TRADES/mo";
+};
+// Formatter for the "current value" column by metric (raw SI rows use shares).
+const fmtCurFor = (p) => {
+  if (p.unit === "sh") return fmtSh;
+  return state.metric === "adt" || state.metric === "trades" ? fmtN : fmtB;
+};
 
 const COLS = [
   { key: "label", title: "Product", num: false },
@@ -266,8 +359,8 @@ const COLS = [
   { key: "d3",    title: "Δ 3Y avg %", num: true, heat: true },
   { key: "rngpct", title: "Range %ile", num: false, tip: "Dotted 3Y range: blue dot = now (percentile), ◆ = 50th pct" },
   { key: "rngz", title: "Range z", num: false, tip: "Dotted 3Y range: blue dot = now (z-score), ◆ = mean (z=0)" },
-  { key: "hi52",  title: "52w Hi", num: true, tip: "Highest monthly ADV/ADT in the last 12 months" },
-  { key: "lo52",  title: "52w Lo", num: true, tip: "Lowest monthly ADV/ADT in the last 12 months" },
+  { key: "hi52",  title: "52w Hi", num: true, tip: "Highest monthly value in the last 12 months" },
+  { key: "lo52",  title: "52w Lo", num: true, tip: "Lowest monthly value in the last 12 months" },
   { key: "lo",    title: "Low", num: true, tip: "3Y window low" },
   { key: "hi",    title: "High", num: true, tip: "3Y window high" },
   { key: "avg",   title: "Avg", num: true, tip: "3Y window average" },
@@ -287,24 +380,25 @@ async function loadData() {
   return Promise.all(jobs);
 }
 
-function buildRows(data, metric) {
+function buildRows(data, metric, range) {
+  const isCount = metric === "adt" || metric === "trades";
   const rows = data.map(({ p, par, tr }) => {
     if (p.raw) {
       const vals = par.map(([d, v]) => ({ d, v }))
         .sort((a, b) => (a.d < b.d ? -1 : 1));
       return { p, stats: rowStatsLevel(vals), out: null };
     }
-    const src = metric === "adt" ? tr : par;
+    const src = isCount ? tr : par;
     if (!src) return { p, stats: null, out: OUTSTANDING[p.id] || null };
-    const vals = (metric === "adt" ? toAdt(p, src) : toAdv(p, src))
+    const vals = toMetric(p, src, metric)
       .sort((a, b) => (a.d < b.d ? -1 : 1));
-    return { p, stats: rowStats(vals), out: OUTSTANDING[p.id] || null };
+    return { p, stats: rowStats(vals, range), out: OUTSTANDING[p.id] || null };
   });
   const tot = PRODUCTS.find((p) => p.synthetic);
   const totOut = totalOutstanding(TOTAL_PARTS.map((p) => p.id));
   rows.unshift({
     p: tot,
-    stats: rowStats(totalVals(data, metric)),
+    stats: rowStats(totalVals(data, metric), range),
     out: { amt: totOut.amt, asof: "mixed", src: `sum of component floats (${totOut.parts.length} products; agency-MBS float counted once)` },
   });
   return rows;
@@ -347,20 +441,25 @@ function sortRows(rows) {
 function renderTable() {
   const wrap = document.getElementById("trace-grid-wrap");
   if (!wrap) return;
-  const isAdt = state.metric === "adt";
-  const unit = isAdt ? "trades/d" : "$B/d";
-  const fmtFor = (p) => p.unit === "sh" ? fmtSh : (isAdt ? fmtN : fmtB);
+  const m = metricById(state.metric);
+  const isCount = state.metric === "adt" || state.metric === "trades";
+  const unit = m.unit;
   const head = COLS.map((c) => {
-    const title = c.key === "cur" ? (isAdt ? "ADT" : "ADV $B/d") : c.title;
+    let title = c.title;
+    if (c.key === "cur") title = metricColTitle();
+    if (c.key === "rngpct") title = `Range %ile (${state.rows[0]?.stats?.winLabel || "3Y"})`;
+    if (c.key === "rngz") title = `Range z (${state.rows[0]?.stats?.winLabel || "3Y"})`;
+    if (c.key === "trend") title = `Trend (${state.rows[0]?.stats?.winLabel || "3Y"})`;
+    if (c.key === "d3") title = `Δ ${state.rows[0]?.stats?.winLabel || "3Y"} avg %`;
     const arrow = state.sortKey === c.key ? (state.sortDir === 1 ? " ▲" : " ▼") : "";
     const tip = c.tip ? ` title="${c.tip}"` : ` title="Sort by ${title}"`;
     return `<th data-sort="${c.key}" class="${c.num ? "num" : ""}"${tip}>${title}${arrow}</th>`;
   }).join("");
   const rows = sortRows(state.rows).map((r) => {
     const { p, stats: s } = r;
-    const fmt = fmtFor(p);
+    const fmt = fmtCurFor(p);
     const cls = p.synthetic ? ` class="total-row"` : "";
-    if (!s) return `<tr${cls}><td><b>${p.label}</b></td><td colspan="19" class="muted">no ${isAdt ? "trade-count" : "par"} data</td></tr>`;
+    if (!s) return `<tr${cls}><td><b>${p.label}</b></td><td colspan="19" class="muted">no ${isCount ? "trade-count" : "par"} data</td></tr>`;
     const o = r.out;
     const outCell = o && o.amt != null
       ? `<td class="num" title="${o.src}${o.asof ? ` (as of ${o.asof})` : ""}">$${(o.amt / 1000).toFixed(1)}T</td>`
@@ -405,9 +504,14 @@ function renderTable() {
       document.getElementById("trace-chart-wrap")?.scrollIntoView({ behavior: "smooth", block: "start" });
     }));
   const asofEl = wrap.querySelector("#trace-grid-asof");
-  if (asofEl && state.asof) asofEl.textContent =
-    `as of ${mlabel(state.asof)} · ${unit} · 3Y window (● = now, ◆ = avg/50th pct) · Treasury history from Feb 2023 · ` +
-    `1D/1W n/a on monthly rows · ADT total sums products with trade-count data · ${OUTSTANDING_NOTE}`;
+  if (asofEl && state.asof) {
+    const s0 = state.rows[0]?.stats;
+    const winNote = s0 ? (s0.fellBack ? `stats over trailing 3Y (window <12 pts)` : `stats over ${s0.winLabel} window`) : "";
+    asofEl.textContent =
+      `as of ${mlabel(state.asof)} · ${m.label} (${unit}) · ${winNote} (● = now, ◆ = avg/50th pct) · ` +
+      `Treasury history from Feb 2023 · 1D/1W n/a on monthly rows · ` +
+      `${isCount ? "ADT/TRADES sum products with trade-count data" : ""} · ${OUTSTANDING_NOTE}`;
+  }
 }
 
 export function renderTraceGrid() {
@@ -415,15 +519,23 @@ export function renderTraceGrid() {
   if (!wrap || wrap.dataset.init) return;
   wrap.dataset.init = "1";
   const reqId = ++state.reqId;
+  const metricBtns = METRICS.map((mt) =>
+    `<button data-m="${mt.id}" class="${mt.id === state.metric ? "on" : ""}" title="${mt.title}">${mt.label}</button>`).join("");
+  const rangeBtns = RANGES.map((r) =>
+    `<button data-r="${r.id}" class="${r.id === state.range.id ? "on" : ""}">${r.label}</button>`).join("");
   wrap.innerHTML = `
     <div class="trace-controls">
-      <span class="seg" id="trace-grid-metric">
-        <button data-m="adv" class="on">ADV</button><button data-m="adt">ADT</button>
+      <span class="seg" id="trace-grid-metric">${metricBtns}</span>
+      <span class="seg" id="trace-grid-range">${rangeBtns}</span>
+      <span id="trace-grid-custom" class="muted" style="display:none">
+        <input type="date" id="trace-custom-start" aria-label="Start date"> →
+        <input type="date" id="trace-custom-end" aria-label="End date">
+        <button id="trace-custom-apply" class="mini-btn">Apply</button>
       </span>
       <span class="muted" id="trace-grid-asof">Loading…</span>
     </div>
     <table class="trace-grid"><thead><tr>${
-      COLS.map((c) => `<th data-sort="${c.key}" class="${c.num ? "num" : ""}">${c.key === "cur" ? "ADV $B/d" : c.title}</th>`).join("")
+      COLS.map((c) => `<th data-sort="${c.key}" class="${c.num ? "num" : ""}">${c.key === "cur" ? metricColTitle() : c.title}</th>`).join("")
     }</tr></thead><tbody><tr><td colspan="20" class="muted">Loading TRACE history…</td></tr></tbody></table>`;
   wrap.querySelectorAll("#trace-grid-metric button").forEach((b) =>
     b.addEventListener("click", async () => {
@@ -432,11 +544,27 @@ export function renderTraceGrid() {
       wrap.querySelectorAll("#trace-grid-metric button").forEach((x) => x.classList.toggle("on", x === b));
       await refresh();
     }));
+  const customBox = wrap.querySelector("#trace-grid-custom");
+  wrap.querySelectorAll("#trace-grid-range button").forEach((b) =>
+    b.addEventListener("click", async () => {
+      const r = rangeById(b.dataset.r);
+      state.range = r;
+      wrap.querySelectorAll("#trace-grid-range button").forEach((x) => x.classList.toggle("on", x === b));
+      customBox.style.display = r.id === "custom" ? "" : "none";
+      if (r.id !== "custom") await refresh();
+    }));
+  wrap.querySelector("#trace-custom-apply").addEventListener("click", async () => {
+    const s = wrap.querySelector("#trace-custom-start").value;
+    const e = wrap.querySelector("#trace-custom-end").value;
+    if (!s || !e || s > e) return;
+    state.range = { id: "custom", label: "Custom", months: null, start: s, end: e };
+    await refresh();
+  });
   loadData().then((data) => {
     if (reqId !== state.reqId) return;
     wrap.dataset.raw = "1";
     wrap._rawData = data;
-    const advRows = buildRows(data, "adv");
+    const advRows = buildRows(data, "adv", state.range);
     const mo = advRows.map((r) => r.stats?.asof).filter(Boolean).sort().pop();
     state.asof = mo || null;
     refresh();
@@ -449,10 +577,8 @@ export function renderTraceGrid() {
   async function refresh() {
     const data = wrap._rawData;
     if (!data) return;
-    state.rows = buildRows(data, state.metric);
-    // update the ADV/ADT header label
-    const th = wrap.querySelector('th[data-sort="cur"]');
-    if (th) th.textContent = state.metric === "adt" ? "ADT" : "ADV $B/d";
+    state.rows = buildRows(data, state.metric, state.range.id === "custom"
+      ? state.range : state.range);
     renderTable();
   }
   wrap._refresh = refresh;
