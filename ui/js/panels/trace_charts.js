@@ -2,7 +2,7 @@
 // Inline uPlot chart (not the modal) with product/metric/range/overlay selectors.
 // Mounted by renderFinra() into #trace-charts-root.
 import { getSeries, getRecessions } from "../api.js";
-import { toMetric, METRICS, RANGES, rangeById, metricById } from "./trace_grid.js";
+import { toMetric, METRICS, RANGES, rangeById, metricById, capTotalVals } from "./trace_grid.js";
 
 // TRACE monthly products. `trades` is null where FINRA only publishes par.
 // NOTE: /api/series takes bare ids (no cycle: prefix) — the backend prepends it.
@@ -76,6 +76,15 @@ const PRODUCTS = [
   { id: "sit-aapl", label: "Short — AAPL", par: "regsho-top-AAPL-shortvol", trades: "regsho-top-AAPL-totalvol", unit: "sh", daily: true, siTop: true },
   { id: "sit-amzn", label: "Short — AMZN", par: "regsho-top-AMZN-shortvol", trades: "regsho-top-AMZN-totalvol", unit: "sh", daily: true, siTop: true },
   { id: "sit-tsla", label: "Short — TSLA", par: "regsho-top-TSLA-shortvol", trades: "regsho-top-TSLA-totalvol", unit: "sh", daily: true, siTop: true },
+  // Capped volume report (FINRA, monthly). Total capped par by grade;
+  // ADT/TRADES shows avg capped trade size ($000s, nodiv). 144A grades
+  // publish total par only.
+  { id: "cap-total", label: "Capped — Total", synthetic: true, capped: true },
+  { id: "cap-ig", label: "Capped — Investment Grade", par: "finra-cap-ig-total", trades: "finra-cap-ig-avgsize", monthly: true, capped: true, parScale: 1e9, nodivTrades: true },
+  { id: "cap-hy", label: "Capped — High Yield", par: "finra-cap-hy-total", trades: "finra-cap-hy-avgsize", monthly: true, capped: true, parScale: 1e9, nodivTrades: true },
+  { id: "cap-agcy", label: "Capped — Agency", par: "finra-cap-agcy-total", trades: "finra-cap-agcy-avgsize", monthly: true, capped: true, parScale: 1e9, nodivTrades: true },
+  { id: "cap-144a-ig", label: "Capped — 144A IG", par: "finra-cap-144a-ig-total", trades: null, monthly: true, capped: true, parScale: 1e9 },
+  { id: "cap-144a-hy", label: "Capped — 144A HY", par: "finra-cap-144a-hy-total", trades: null, monthly: true, capped: true, parScale: 1e9 },
 ];
 
 // Components summed into the synthetic TOTAL chart product (same set as the grid).
@@ -159,6 +168,44 @@ async function starTotalSeries(metric) {
   };
 }
 
+// Capped Total components: the 5 grades (monthly). Not part of the main
+// TOTAL — capped volume is large-trade activity already in TRACE volumes.
+const CAP_TOTAL_PARTS = [
+  { id: "cap-ig", par: "finra-cap-ig-total", trades: "finra-cap-ig-avgsize", monthly: true, capped: true, parScale: 1e9, nodivTrades: true },
+  { id: "cap-hy", par: "finra-cap-hy-total", trades: "finra-cap-hy-avgsize", monthly: true, capped: true, parScale: 1e9, nodivTrades: true },
+  { id: "cap-agcy", par: "finra-cap-agcy-total", trades: "finra-cap-agcy-avgsize", monthly: true, capped: true, parScale: 1e9, nodivTrades: true },
+  { id: "cap-144a-ig", par: "finra-cap-144a-ig-total", trades: null, monthly: true, capped: true, parScale: 1e9 },
+  { id: "cap-144a-hy", par: "finra-cap-144a-hy-total", trades: null, monthly: true, capped: true, parScale: 1e9 },
+];
+
+// Synthetic Capped Total series. ADV/PAR: sum of grades' total par by month.
+// ADT/TRADES: par-weighted avg capped trade size (reuses capTotalVals from
+// the grid so chart and grid always agree).
+async function capTotalSeries(metric) {
+  const isCount = metric === "adt" || metric === "trades";
+  const data = await Promise.all(CAP_TOTAL_PARTS.map(async (c) => {
+    const [par, tr] = await Promise.all([
+      getSeries(c.par, "max"),
+      c.trades ? getSeries(c.trades, "max").catch(() => null) : Promise.resolve(null),
+    ]);
+    return { p: c, par: par.points, tr: tr ? tr.points : null };
+  }));
+  const rows = capTotalVals(data, metric, CAP_TOTAL_PARTS);
+  if (isCount) {
+    return {
+      id: "cap-total", unit: "$000s",
+      name: "Capped — Total — Avg capped trade size ($000s, par-weighted)",
+      points: (rows || []).map(({ d, v }) => [d, v]),
+    };
+  }
+  const mu = metricById(metric);
+  return {
+    id: "cap-total", unit: mu.unit,
+    name: `Capped — Total ${mu.label} — capped par (${mu.unit})`,
+    points: (rows || []).map(({ d, v }) => [d, v]),
+  };
+}
+
 const OVERLAYS = [
   { id: "", label: "No overlay" },
   { id: "us10y", label: "US 10Y Yield (FRED)" },
@@ -230,6 +277,8 @@ function currentSeriesId() {
 function currentTitle() {
   const p = PRODUCTS.find((x) => x.id === state.product);
   if (p.raw) return `${p.label} — short shares (biweekly)`;
+  if (p.capped && (state.metric === "adt" || state.metric === "trades"))
+    return `${p.label} — Avg capped trade size ($000s)`;
   const mu = metricById(state.metric);
   return `${p.label} — ${mu.label} (${mu.unit})`;
 }
@@ -248,6 +297,10 @@ async function loadMain() {
   const p = PRODUCTS.find((x) => x.id === state.product);
   if (p.id === "star-total") {
     const s = await starTotalSeries(state.metric);
+    return { ...s, points: filterRange(s.points) };
+  }
+  if (p.id === "cap-total") {
+    const s = await capTotalSeries(state.metric);
     return { ...s, points: filterRange(s.points) };
   }
   if (p.synthetic) {
@@ -280,7 +333,10 @@ async function loadMain() {
   const s = await getSeries(currentSeriesId(), "max");
   const vals = toMetric(p, s.points, state.metric).map(({ d, v }) => [d, v]);
   const mu = metricById(state.metric);
-  return { id: p.id, unit: mu.unit, name: `${p.label} — ${mu.label} (${mu.unit})`, points: filterRange(vals) };
+  const name = (p.capped && (state.metric === "adt" || state.metric === "trades"))
+    ? `${p.label} — Avg capped trade size ($000s)`
+    : `${p.label} — ${mu.label} (${mu.unit})`;
+  return { id: p.id, unit: mu.unit, name, points: filterRange(vals) };
 }
 
 async function drawChart() {

@@ -384,11 +384,15 @@ const GRADE_LABELS = { ig: "Investment Grade", hy: "High Yield", agcy: "Agency",
 function cappedSection(c) {
   if (!c) return `<h3>CAPPED VOLUME REPORT</h3><p class="muted">No capped-volume data yet — September pull pending.</p>`;
   const grades = c.grades ?? {};
+  const tot = Object.values(grades).reduce((a, g) => a + (g.total || 0), 0);
   const rows = Object.entries(grades).map(([slug, g]) =>
     `<tr><td>${GRADE_LABELS[slug] ?? slug}</td>` +
     `<td>${g.avgsize == null ? "—" : "$" + Number(g.avgsize).toLocaleString("en-US", { maximumFractionDigits: 0 }) + "k"}</td>` +
     `<td>${usdM(g.total)}</td></tr>`).join("");
   return `<h3>CAPPED VOLUME — MONTHLY <span class="muted">${c.as_of ?? "—"} · ${c.months ?? 0} months</span></h3>
+    <p>Total capped par <b>${usdM(tot)}</b> across ${Object.keys(grades).length} grades.
+    Full breakdown with deltas (1D/1W/1M/1Q/1Y/3Y/Custom), range sparklines and charts
+    is in the TRACE volumes grid above — filter to the Capped rows.</p>
     ${rows ? `<table data-sortable><tr><th>Grade</th><th>Avg capped size</th><th>Total par</th></tr>${rows}</table>`
            : `<p class="muted">No grade rows — September pull pending.</p>`}`;
 }

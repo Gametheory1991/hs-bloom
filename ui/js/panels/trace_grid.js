@@ -54,6 +54,16 @@ const PRODUCTS = [
   { id: "star-clo",      label: "STAR — CLO Total",       par: "star-clo-par",      trades: "star-clo-trades",     monthly: false, daily: true, star: true },
   { id: "star-clo-ig",   label: "STAR — CLO IG",          par: "star-clo-ig-par",   trades: null,                  monthly: false, daily: true, star: true },
   { id: "star-clo-hy",   label: "STAR — CLO HY",          par: "star-clo-nonig-par", trades: null,                 monthly: false, daily: true, star: true },
+  // Capped volume report (FINRA, monthly). Total capped par by grade.
+  // The ADT/TRADES metric toggle shows avg capped trade size ($000s) via
+  // nodivTrades (already per-trade — no trading-day division). 144A grades
+  // publish total par only (no avg size). Monthly — 1D/1W show "—".
+  { id: "cap-total", label: "Capped — Total", synthetic: true, capped: true },
+  { id: "cap-ig",      label: "Capped — Investment Grade", par: "finra-cap-ig-total",      trades: "finra-cap-ig-avgsize",      monthly: true, capped: true, parScale: 1e9, nodivTrades: true },
+  { id: "cap-hy",      label: "Capped — High Yield",       par: "finra-cap-hy-total",      trades: "finra-cap-hy-avgsize",      monthly: true, capped: true, parScale: 1e9, nodivTrades: true },
+  { id: "cap-agcy",    label: "Capped — Agency",           par: "finra-cap-agcy-total",    trades: "finra-cap-agcy-avgsize",    monthly: true, capped: true, parScale: 1e9, nodivTrades: true },
+  { id: "cap-144a-ig", label: "Capped — 144A IG",          par: "finra-cap-144a-ig-total", trades: null,                         monthly: true, capped: true, parScale: 1e9 },
+  { id: "cap-144a-hy", label: "Capped — 144A HY",          par: "finra-cap-144a-hy-total", trades: null,                         monthly: true, capped: true, parScale: 1e9 },
   // Short interest: biweekly settlement levels (shares), not rates — no
   // trading-day division; deltas are true MoM (vs ~30d prior point) and
   // YoY (vs ~365d prior point) since adjacent points are 2 weeks apart.
@@ -133,14 +143,20 @@ const PRODUCTS = [
   { id: "sit-pg",    label: "Short — PG",    par: "regsho-top-PG-shortvol",    trades: "regsho-top-PG-totalvol",    unit: "sh", daily: true, siTop: true },
 ];
 // Components summed into the synthetic TOTAL row: Treasury Total + all 10
-// TRACE products. Treasury breakdown rows (bills/coupons/TIPS/FRNs/
-// on-the-run/off-the-run) are EXCLUDED — bills+coupons+TIPS+FRNs sum to the
-// Treasury Total, so including any breakdown would double-count Treasury.
-// Note: on-the-run + off-the-run cover coupons + TIPS only (bills and FRNs
-// have no on/off-the-run split in the FINRA file), so they do NOT sum to
-// the Treasury Total — verified Sep-26: on+off = $23,483.5B vs Total $28,142.0B.
+// TRACE products, by explicit ID. Everything else is EXCLUDED — Treasury
+// breakdowns (bills/coupons/TIPS/FRNs/on-the-run/off-the-run) would
+// double-count Treasury; STAR has its own total; capped volume is a subset
+// of TRACE volume; breadth/sentiment/SI rows are different units entirely
+// (counts, $M flows, shares — never summed into a $B total).
+// Explicit allowlist (not exclusions) so future product additions can't
+// silently corrupt the total.
 export const TOTAL_PARTS = PRODUCTS.filter((p) =>
-  !p.synthetic && !p.raw && !p.star && !p.id.startsWith("ust-")); // ust- bills/coupons/tips/frns/onrun/offrun excluded; star excluded (separate total)
+  ["ust", "tba", "corp", "eln", "conv", "agcy", "abs", "absx", "cmo", "mbs", "chrc"].includes(p.id));
+// Components summed into the synthetic Capped — Total row: the 5 grades.
+// Capped volume is large-trade activity already counted in TRACE corporate/
+// agency volumes — it is NOT part of the main TOTAL (would double-count).
+export const CAP_TOTAL_PARTS = PRODUCTS.filter((p) =>
+  p.capped && !p.synthetic && ["cap-ig", "cap-hy", "cap-agcy", "cap-144a-ig", "cap-144a-hy"].includes(p.id));
 // Components summed into the synthetic STAR — Total row: the 8 top-level
 // STAR categories. Issuer/grade breakdowns (TBA UMBS/FNMA/FHLMC/GNMA,
 // non-agency IG/HY, ABS IG/HY, CLO IG/HY) are EXCLUDED — they sum to their
@@ -218,6 +234,8 @@ const isMonthEnd = (d) => {
 // ---- data shaping ----
 // Monthly ADV ($B/day) from raw points. Treasury rows (monthly:false) use
 // month-end points only (monthly-file values are monthly TOTALS in $bn).
+// parScale overrides the $M->$B divisor for feeds stored in dollars
+// (capped volume: parScale 1e9).
 export function toAdv(p, points) {
   // Daily products (STAR): values are already daily — return as-is.
   if (p.daily) return points.map(([d, v]) => ({ d, v }));
@@ -227,7 +245,7 @@ export function toAdv(p, points) {
   });
   return points.map(([d, v]) => {
     const [y, m] = d.split("-").map(Number);
-    return { d, v: v / tradingDays(y, m) / 1000 }; // $M monthly -> $B/day
+    return { d, v: v / tradingDays(y, m) / (p.parScale || 1000) }; // $M monthly -> $B/day (default)
   });
 }
 export function toAdt(p, points) {
@@ -235,17 +253,18 @@ export function toAdt(p, points) {
   if (p.daily) return points.map(([d, v]) => ({ d, v }));
   const src = p.monthly ? points : points.filter(([d]) => isMonthEnd(d));
   return src.map(([d, v]) => {
+    if (p.nodivTrades) return { d, v }; // already per-trade (capped avg size) — no division
     const [y, m] = d.split("-").map(Number);
     return { d, v: v / tradingDays(y, m) };
   });
 }
 // Monthly PAR totals ($B/month). Treasury rows are already $bn monthly
-// totals; monthly TRACE products are $M monthly -> $B.
+// totals; monthly TRACE products are $M monthly -> $B (parScale overrides).
 // Daily products (STAR): par is already daily $ — return as-is.
 export function toPar(p, points) {
   if (p.daily) return points.map(([d, v]) => ({ d, v }));
   if (!p.monthly) return points.filter(([d]) => isMonthEnd(d)).map(([d, v]) => ({ d, v }));
-  return points.map(([d, v]) => ({ d, v: v / 1000 }));
+  return points.map(([d, v]) => ({ d, v: v / (p.parScale || 1000) }));
 }
 // Monthly TRADE totals (raw counts). Treasury rows use month-end points.
 // Daily products (STAR): trades are already daily counts — return as-is.
@@ -478,6 +497,7 @@ const metricColTitle = () => {
 };
 // Formatter for the "current value" column by metric (raw SI rows use shares).
 const fmtCurFor = (p) => {
+  if (p._avgMode) return (v) => v == null || !isFinite(v) ? "—" : `$${fmtN(v)}k`; // avg capped size ($000s)
   if (p.unit === "sh" && !p._ratioMode) return fmtSh;
   if (p._ratioMode) return (v) => v == null || !isFinite(v) ? "—" : `${(v * 100).toFixed(1)}%`;
   if (p.unit === "ct") return fmtN;
@@ -598,6 +618,8 @@ function buildRows(data, metric, range) {
     }
     const src = isCount ? tr : par;
     if (!src) return { p, stats: null, out: OUTSTANDING[p.id] || null };
+    // Capped rows: ADT/TRADES views show avg capped trade size ($000s).
+    if (p.capped) p._avgMode = isCount; else p._avgMode = false;
     const vals = toMetric(p, src, metric)
       .sort((a, b) => (a.d < b.d ? -1 : 1));
     // Daily products (STAR) use daily stats with true 1D/1W deltas.
@@ -622,6 +644,18 @@ function buildRows(data, metric, range) {
       out: null,
     });
   }
+  // Synthetic Capped Total — sum of 5 grades' total par (monthly). In
+  // ADT/TRADES (avg-size) mode: par-weighted avg capped trade size.
+  const capTot = PRODUCTS.find((p) => p.id === "cap-total");
+  if (capTot) {
+    capTot._avgMode = isCount;
+    const capVals = capTotalVals(data, metric, CAP_TOTAL_PARTS);
+    rows.push({
+      p: capTot,
+      stats: capVals && capVals.length ? rowStats(capVals, range) : null,
+      out: null,
+    });
+  }
   return rows;
 }
 // Sum daily values across STAR parts (no month bucketing — daily granularity).
@@ -640,6 +674,52 @@ export function totalValsDaily(data, metric, parts = STAR_TOTAL_PARTS) {
     }
   }
   const rows = [...byDate.values()].sort((a, b) => (a.d < b.d ? -1 : 1));
+  return rows.length ? rows : null;
+}
+// Capped Total values by month. ADV/PAR: sum of the 5 grades' total par.
+// ADT/TRADES (avg-size mode): par-weighted average capped trade size over
+// the grades that publish avg size (IG/HY/Agency; 144A publishes total only).
+// Exported for the chart's capTotalSeries.
+export function capTotalVals(data, metric, parts = CAP_TOTAL_PARTS) {
+  const isCount = metric === "adt" || metric === "trades";
+  if (!isCount) {
+    const sums = new Map(); // "YYYY-MM" -> {d, v}
+    for (const { p, par } of data) {
+      if (!parts.some((sp) => sp.id === p.id)) continue;
+      const vals = toMetric(p, par, metric);
+      for (const { d, v } of vals) {
+        const key = d.slice(0, 7);
+        const e = sums.get(key);
+        if (e) { e.v += v; if (d > e.d) e.d = d; }
+        else sums.set(key, { d, v });
+      }
+    }
+    const rows = [...sums.values()].sort((a, b) => (a.d < b.d ? -1 : 1));
+    return rows.length ? rows : null;
+  }
+  // Par-weighted avg size: sum(par) / sum(par/avgsize) per month.
+  const parSum = new Map(), wSum = new Map(), dBy = new Map();
+  for (const { p, par, tr } of data) {
+    if (!parts.some((sp) => sp.id === p.id)) continue;
+    if (!par || !tr) continue;
+    const parVals = toMetric(p, par, "par"); // $B/mo
+    const avgVals = toMetric(p, tr, "adt");  // $000s (nodiv)
+    const avgByM = new Map(avgVals.map(({ d, v }) => [d.slice(0, 7), v]));
+    for (const { d, v } of parVals) {
+      const key = d.slice(0, 7);
+      const a = avgByM.get(key);
+      if (a == null || a <= 0) continue;
+      parSum.set(key, (parSum.get(key) || 0) + v);
+      wSum.set(key, (wSum.get(key) || 0) + v / a);
+      if (!dBy.get(key) || d > dBy.get(key)) dBy.set(key, d);
+    }
+  }
+  const rows = [];
+  for (const [key, ps] of parSum) {
+    const w = wSum.get(key);
+    if (w > 0) rows.push({ d: dBy.get(key), v: ps / w });
+  }
+  rows.sort((a, b) => (a.d < b.d ? -1 : 1));
   return rows.length ? rows : null;
 }
 
@@ -706,7 +786,7 @@ function renderTable() {
       : `<td class="num muted" title="${o ? o.src : "n/a"}">—</td>`;
     const tv = turnVal(r);
     const turnCell = tv == null
-      ? `<td class="num muted"${isAdt ? ` title="Turnover is par-based (ADV view only)"` : ""}>—</td>`
+      ? `<td class="num muted"${isCount ? ` title="Turnover is par-based (ADV view only)"` : ""}>—</td>`
       : `<td class="num" title="ADV × 252 ÷ outstanding (annualized)">${tv >= 100 ? tv.toFixed(0) : tv.toFixed(1)}%</td>`;
     return `<tr data-pid="${p.id}" title="Click to view ${p.label} chart"${cls}>` +
       `<td><b>${p.label}</b></td>` +
@@ -752,6 +832,7 @@ function renderTable() {
       `as of ${mlabel(state.asof)} · ${m.label} (${unit}) · ${winNote} (● = now, ◆ = avg/50th pct) · ` +
       `Treasury history from Feb 2023 · 1D/1W n/a on monthly rows · ` +
       `On-the-run + Off-the-run = coupons + TIPS only (excl. bills/FRNs) · ` +
+      `Capped rows: ADT/TRADES show avg capped trade size ($000s); 144A grades publish total par only · ` +
       `${isCount ? "ADT/TRADES sum products with trade-count data" : ""} · ${OUTSTANDING_NOTE}`;
   }
 }
