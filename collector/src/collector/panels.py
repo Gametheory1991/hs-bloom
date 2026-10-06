@@ -659,6 +659,57 @@ def _shortinterest_panel(store: Store) -> dict:
     }
 
 
+def _factbook_panel(store: Store) -> dict:
+    """FINRA TRACE Fact Book — quarterly + annual fixed-income fact books.
+
+    Quarterly average-daily trades/par (ADT/ADV) by product and trade-size
+    bucket, customer buy-sell ratios, and top-traded lists, plus the annual
+    workbooks: time-of-day execution stats, annual top lists, annual ADV/ADT,
+    issues outstanding by rating/issuer/type, and dealer concentration.
+    The UI's quarterly-history chart reads ``hist`` (fb-<prod>-trades/pv
+    cycle series). Every section degrades to None/{} when the fetcher
+    hasn't run yet.
+    """
+    doc = store.doc("finra_factbook")
+    payload = doc.payload if doc and isinstance(doc.payload, dict) else {}
+
+    # ADT/ADV quarterly history from the cycle series the fetcher writes
+    # (extended back to 2021 by the annual job's Graph Data merge).
+    hist: dict = {}
+    for prod in ("ig", "hy", "agency", "abs", "absx", "cmo", "mbs", "tba"):
+        for kind in ("trades", "pv"):
+            key = f"fb-{prod}-{kind}"
+            try:
+                pts = store.points(f"cycle:{key}")
+            except Exception:  # noqa: BLE001 — history is optional
+                pts = {}
+            if pts:
+                hist[key] = [{"d": d.isoformat(), "v": pts[d]}
+                             for d in sorted(pts) if pts[d] is not None]
+
+    return {
+        "as_of": payload.get("as_of"),
+        "quarter_end": payload.get("quarter_end"),
+        "headlines": payload.get("headlines") or {},
+        "top": payload.get("top") or {},
+        "buy_sell_latest": payload.get("buy_sell_latest"),
+        "buckets_latest": payload.get("buckets_latest"),
+        "hist": hist,
+        "annual_top": payload.get("annual_top") or {},
+        "annual_as_of": payload.get("annual_as_of"),
+        "interval": payload.get("interval") or {},
+        "interval_note": payload.get("interval_note"),
+        "annual_adv_adt": payload.get("annual_adv_adt") or {},
+        "issue": payload.get("issue") or {},
+        "issue_mix": payload.get("issue_mix") or {},
+        "issue_note": payload.get("issue_note"),
+        "participant": payload.get("participant") or {},
+        "participant_note": payload.get("participant_note"),
+        "updated_at": doc.updated_at if doc else None,
+        "source": doc.source if doc else "finra",
+    }
+
+
 def _predict_panel(store: Store) -> dict:
     """Prediction markets (batch 12): venue snapshots, cross-venue edge
     estimates, unusual movers, and the calibration leaderboard. Empty
@@ -734,5 +785,6 @@ def build_dashboard(
             "predict": _predict_panel(store),
             "finra": _finra_panel(store),
             "shortinterest": _shortinterest_panel(store),
+            "factbook": _factbook_panel(store),
         },
     }
