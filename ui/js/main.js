@@ -1,5 +1,4 @@
 import { getDashboard, getScorecard } from "./api.js";
-
 import { fmtAge, fmtClock, isStale } from "./fmt.js";
 import { defiFootData, initDefiViewToggle, renderDefi, renderMidnight } from "./panels/defi.js";
 import { renderBonds, renderEquity } from "./panels/equity.js";
@@ -15,7 +14,7 @@ import { renderPulse } from "./panels/pulse.js";
 import { renderHyper } from "./panels/hyper.js";
 import { renderUniverseSelector } from "./panels/ai_flow.js";
 import { renderTsv } from "./panels/tsv.js";
-
+import { renderXcorr } from "./panels/xcorr.js";
 import { renderVol } from "./panels/vol.js";
 import { renderMovers } from "./panels/movers.js";
 import { renderFutures, FUTURES } from "./panels/futures.js";
