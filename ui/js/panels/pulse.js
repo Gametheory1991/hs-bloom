@@ -157,17 +157,26 @@ const fmtTrades = (v) => {
 
 // Monthly rows: 1D/1W are "—" by design (monthly cadence), headline is M/M.
 // fmt: "adv" (default) or "adt" — controls value formatting.
+// Each horizon cell shows nominal (bold) + % (muted).
 function volTileHtml(label, st, fmt = "adv") {
   const m1 = st?.m1;
   const cls = m1 == null ? "flat" : m1 > 0 ? "up" : m1 < 0 ? "down" : "flat";
   const fmtV = fmt === "adt" ? fmtTrades : fmtVol;
-  const hz = [["1D", st?.d1], ["1W", st?.w1], ["1M", st?.m1], ["1Q", st?.q1], ["1Y", st?.y1]]
-    .map(([h, val]) => `<span><b>${h}</b> ${pctFrac(val)}</span>`).join("");
+  const fmtN = fmt === "adt"
+    ? (v) => v == null || !isFinite(v) ? "—" : `${v >= 0 ? "+" : "−"}${Math.abs(v) >= 1e3 ? (Math.abs(v) / 1e3).toFixed(0) + "k" : Math.round(Math.abs(v))}`
+    : (v) => v == null || !isFinite(v) ? "—" : `${v >= 0 ? "+" : "−"}$${Math.abs(v) >= 100 ? Math.abs(v).toFixed(0) : Math.abs(v).toFixed(1)}B/d`;
+  const hzCell2 = (nom, pct) => {
+    if ((nom == null || !isFinite(nom)) && (pct == null || !isFinite(pct))) return "—";
+    const n = fmtN(nom), p = pctFrac(pct);
+    return `${n === "—" ? "" : `<b>${n}</b> `}<span class="muted">${p}</span>`;
+  };
+  const hz = [["1D", st?.d1n, st?.d1], ["1W", st?.w1n, st?.w1], ["1M", st?.m1n, st?.m1], ["1Q", st?.q1n, st?.q1], ["1Y", st?.y1n, st?.y1]]
+    .map(([h, nom, val]) => `<span><b>${h}</b> ${hzCell2(nom, val)}</span>`).join("");
   const z = st?.z;
   const pts = (st?.win ?? []).map(({ d, v }) => [d, v]);
   return `<div class="kpi"><div class="lbl">${esc(label)}</div>` +
     `<div class="val">${fmtV(st?.cur?.v)}</div>` +
-    `<div class="chg ${cls}">${pctFrac(m1)} <span class="note">1M</span></div>` +
+    `<div class="chg ${cls}">${hzCell2(st?.m1n, m1)} <span class="note">1M</span></div>` +
     `${sparkSvg(pts, cls === "up" ? true : cls === "down" ? false : null)}` +
     `<div class="hz">${hz}<span class="zbadge">z ${z == null ? "—" : (z > 0 ? "+" : "") + z.toFixed(1)}</span></div>` +
     `<div class="muted" style="font-size:9px;margin-top:2px">${esc(mlabel(st?.asof))} · monthly</div></div>`;

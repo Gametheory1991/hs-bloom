@@ -79,13 +79,18 @@ function totalCard(t) {
   const a = t.adv, d = t.adt;
   const asof = a.asof ? a.asof.slice(0, 7) : "";
   const yoyLbl = a.asof ? `${+a.asof.slice(0, 4) - 1}${a.asof.slice(4, 7)}` : "";
+  // Nominal Y/Y deltas implied from current value and % ratio.
+  const nomYoy = (st) => st && st.y1 != null ? st.cur.v - st.cur.v / (1 + st.y1) : null;
+  const aNom = nomYoy(a), dNom = nomYoy(d);
+  const aNomTxt = aNom == null ? "—" : `${aNom >= 0 ? "+" : "−"}$${Math.abs(aNom) >= 100 ? Math.abs(aNom).toFixed(0) : Math.abs(aNom).toFixed(1)}B/d`;
+  const dNomTxt = dNom == null ? "—" : `${dNom >= 0 ? "+" : "−"}${Math.abs(dNom) >= 1000 ? (Math.abs(dNom) / 1000).toFixed(1) + "k" : Math.round(Math.abs(dNom))}/d`;
   return `<div class="koi-total">
     <div class="koi-total-head">TOTAL (TREASURY + TRACE) <span class="muted">· ${esc(asof)} vs ${esc(yoyLbl)} · live</span></div>
     <div class="koi-total-grid">
       <div class="koi-metric"><span class="koi-k">ADV</span><span class="koi-v">${fmtB(a.cur.v)}</span></div>
-      <div class="koi-metric"><span class="koi-k">ADV Y/Y</span><span class="koi-v ${cls(a.y1)}">${fmtP(a.y1 == null ? null : a.y1 * 100)}</span></div>
+      <div class="koi-metric"><span class="koi-k">ADV Y/Y</span><span class="koi-v ${cls(a.y1)}">${aNomTxt} <span class="muted">(${fmtP(a.y1 == null ? null : a.y1 * 100)})</span></span></div>
       <div class="koi-metric"><span class="koi-k">ADT</span><span class="koi-v">${d ? fmtT(d.cur.v) : "—"}</span></div>
-      <div class="koi-metric"><span class="koi-k">ADT Y/Y</span><span class="koi-v ${cls(d?.y1)}">${fmtP(d?.y1 == null ? null : d.y1 * 100)}</span></div>
+      <div class="koi-metric"><span class="koi-k">ADT Y/Y</span><span class="koi-v ${cls(d?.y1)}">${dNomTxt} <span class="muted">(${fmtP(d?.y1 == null ? null : d.y1 * 100)})</span></span></div>
     </div>
   </div>`;
 }

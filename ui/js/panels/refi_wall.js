@@ -53,7 +53,7 @@ function statsOf(points) {
   return {
     now,
     asof: last[0],
-    d1: refBack(1), d7: refBack(7), d30: refBack(30), d91: refBack(91), d365: refBack(365),
+    d1: refBack(1), d7: refBack(7), d30: refBack(30), d91: refBack(91), d365: refBack(365), d1095: refBack(1095),
     pct: (below / vs.length) * 100,
     z: (now - mean) / sd,
     zlo: (lo - mean) / sd, zhi: (hi - mean) / sd,
@@ -62,12 +62,16 @@ function statsOf(points) {
 }
 
 const bp = (x) => x == null || !isFinite(x) ? "—" : `${(x * 100).toFixed(0)}`;
+// Nominal (bp) + % change cell for OAS/yield tables.
 const bpDelta = (now, ref) => {
   if (now == null || ref == null || !isFinite(now) || !isFinite(ref)) return `<td class="num muted">—</td>`;
-  const d = (now - ref) * 100;
+  const d = (now - ref) * 100; // bp
+  const pct = ref !== 0 ? d / Math.abs(ref * 100) : null; // % of |ref|
   const cls = d > 0.5 ? "up" : d < -0.5 ? "down" : "";
   const s = d > 0 ? "+" : "";
-  return `<td class="num ${cls}">${s}${d.toFixed(0)}</td>`;
+  const bpTxt = `${s}${d.toFixed(0)}bp`;
+  const pctTxt = pct == null || !isFinite(pct) ? "—" : `(${s}${(pct * 100).toFixed(1)}%)`;
+  return `<td class="num ${cls}"><b>${bpTxt}</b> <span class="muted">${pctTxt}</span></td>`;
 };
 
 // ---- index OAS / yield tables (full universe, ICE BofA via FRED) ----
@@ -97,15 +101,15 @@ async function oasTable(rows, title, note) {
       `<td class="num"><b>${bp(so?.now)}</b><br><span class="muted">${so?.asof ?? "—"}</span></td>` +
       `<td class="num">${yld}</td>` +
       bpDelta(so?.now, so?.d1) + bpDelta(so?.now, so?.d7) + bpDelta(so?.now, so?.d30) +
-      bpDelta(so?.now, so?.d91) + bpDelta(so?.now, so?.d365) +
+      bpDelta(so?.now, so?.d91) + bpDelta(so?.now, so?.d365) + bpDelta(so?.now, so?.d1095) +
       `<td class="num">${so?.pct == null ? "—" : so.pct.toFixed(0)}</td>` +
       `<td>${pctSvg}</td><td>${zSvg}</td></tr>`;
   }).join("");
   return `<h4>${title}</h4><div class="tbl-wrap"><table class="wall-tbl" data-sortable>` +
     `<tr><th>Bucket</th><th>OAS bp<br><span class="muted">as of</span></th><th>YTW</th>` +
-    `<th>1D Δbp</th><th>1W Δbp</th><th>1M Δbp</th><th>1Q Δbp</th><th>1Y Δbp</th>` +
+    `<th>1D Δ</th><th>1W Δ</th><th>1M Δ</th><th>1Q Δ</th><th>1Y Δ</th><th>3Y Δ</th>` +
     `<th>%ile</th><th data-sort="off">Range %ile</th><th data-sort="off">Range z</th></tr>${body}</table></div>` +
-    `<p class="muted">${note}</p>`;
+    `<p class="muted">${note} Δ cells show bp change (bold) + % change (muted).</p>`;
 }
 
 export async function renderOasIndexes() {

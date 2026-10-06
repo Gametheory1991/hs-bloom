@@ -270,7 +270,7 @@ async def fetch_finra_regsho(store: Store, get_text: GetText,
     # (Harry's universal horizon standard, 2026-10-05). Falls back to the
     # watchlist daily short-volume history (252d) where the top-50 series has
     # not accumulated yet; ratio changes need both legs so they stay null.
-    _HORIZONS = (("1d", 1), ("1w", 7), ("1m", 30), ("1q", 91), ("1y", 365))
+    _HORIZONS = (("1d", 1), ("1w", 7), ("1m", 30), ("1q", 91), ("1y", 365), ("3y", 1095))
 
     def _ratio_at(sv: dict, tv: dict, day: date, days: int) -> float | None:
         cands = sorted(d for d in sv

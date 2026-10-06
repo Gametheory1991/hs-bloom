@@ -417,7 +417,8 @@ export function finishStats(vals, cur, refs, winLabel = "3Y", fellBack = false) 
   const z = sd > 0 ? (cur.v - avg) / sd : null;
   const zs = sd > 0 ? vs.map((v) => (v - avg) / sd) : vs.map(() => 0);
   const rank = vs.filter((v) => v <= cur.v).length;
-  const rc = (r) => (r && r.v ? (cur.v - r.v) / r.v : null);
+  const rc = (r) => (r && r.v ? (cur.v - r.v) / r.v : null); // % change (ratio)
+  const rn = (r) => (r && r.v != null ? cur.v - r.v : null); // nominal (absolute) change
   // 52w hi/lo: last 12 monthly points of the 3Y window.
   const w52 = vals.slice(-12).map((v) => v.v);
   return {
@@ -427,7 +428,10 @@ export function finishStats(vals, cur, refs, winLabel = "3Y", fellBack = false) 
     lo52: w52.length ? Math.min(...w52) : null,
     d1: rc(refs.d1), w1: rc(refs.w1), m1: rc(refs.m1), q1: rc(refs.q1), y1: rc(refs.y1),
     y3: rc(refs.y3),
+    d1n: rn(refs.d1), w1n: rn(refs.w1), m1n: rn(refs.m1),
+    q1n: rn(refs.q1), y1n: rn(refs.y1), y3n: rn(refs.y3),
     d3: avg ? (cur.v - avg) / avg : null,
+    d3n: avg != null ? cur.v - avg : null,
     pct: (100 * rank) / vs.length,
   };
 }
@@ -470,6 +474,31 @@ const heat = (x) => {
   const a = Math.min(Math.abs(x) / 0.25, 1) * 0.45;
   return ` style="background:rgba(${x >= 0 ? "22,163,74" : "220,38,38"},${a.toFixed(2)})"`;
 };
+// Nominal (absolute) delta formatter — signed, same units as the value column.
+const fmtNomB = (v) => v == null || !isFinite(v) ? "—" : `${v >= 0 ? "+" : "−"}$${fmtB(Math.abs(v))}`;
+const fmtNomN = (v) => v == null || !isFinite(v) ? "—" : `${v >= 0 ? "+" : "−"}${fmtN(Math.abs(v))}`;
+const fmtNomSh = (v) => v == null || !isFinite(v) ? "—" :
+  `${v >= 0 ? "+" : "−"}${fmtSh(Math.abs(v))}`;
+// Delta cell: nominal (bold) + % (muted parens), e.g. "+$256B (+16.8%)".
+// fmtNom formats the nominal value; pct is the % ratio (0.168 = +16.8%).
+const deltaCell = (nom, pct, fmtNom) => {
+  if ((nom == null || !isFinite(nom)) && (pct == null || !isFinite(pct))) return "—";
+  const n = fmtNom(nom);
+  const p = pct1(pct);
+  if (n === "—") return p;
+  if (p === "—") return n;
+  return `${n} <span class="muted">(${p})</span>`;
+};
+// Pick the nominal formatter matching the row's value formatter.
+const fmtNomFor = (p) => {
+  if (p._avgMode) return (v) => v == null || !isFinite(v) ? "—" : `${v >= 0 ? "+" : "−"}$${fmtN(Math.abs(v))}k`;
+  if (p._ratioMode) return (v) => v == null || !isFinite(v) ? "—" : `${v >= 0 ? "+" : "−"}${(Math.abs(v) * 100).toFixed(1)}pp`;
+  if (p.unit === "sh" && !p._ratioMode) return fmtNomSh;
+  if (p.unit === "ct") return fmtNomN;
+  if (p.unit === "$M") return (v) => v == null || !isFinite(v) ? "—" : `${v >= 0 ? "+" : "−"}$${fmtN(Math.abs(v))}M`;
+  if (p.unit === "px") return (v) => v == null || !isFinite(v) ? "—" : `${v >= 0 ? "+" : "−"}${Math.abs(v).toFixed(2)}`;
+  return state.metric === "adt" || state.metric === "trades" ? fmtNomN : fmtNomB;
+};
 
 // Bloomberg-style dotted range sparkline lives in ../rangeviz.js (shared).
 // (local definition removed 2026-10-05; re-exported here for compatibility)
@@ -511,13 +540,13 @@ const COLS = [
   { key: "cur",   title: "ADV $B/d", num: true },
   { key: "out",   title: "Outst $T", num: true, tip: "Par outstanding — hover each row's value for source/as-of" },
   { key: "turn",  title: "Turnov ann.%", num: true, tip: "ADV × 252 ÷ outstanding (annualized %). ADV view only." },
-  { key: "d1", title: "1D %", num: true, heat: true, tip: "1-day % change (n/a for monthly data)" },
-  { key: "w1", title: "1W %", num: true, heat: true, tip: "1-week % change (n/a for monthly data)" },
-  { key: "m1", title: "1M %", num: true, heat: true, tip: "1-month % change" },
-  { key: "q1", title: "1Q %", num: true, heat: true, tip: "3-month % change" },
-  { key: "y1", title: "1Y %", num: true, heat: true, tip: "12-month % change" },
-  { key: "y3", title: "3Y %", num: true, heat: true, tip: "3-year % change (daily data only)" },
-  { key: "d3",    title: "Δ 3Y avg %", num: true, heat: true },
+  { key: "d1", title: "1D Δ", num: true, heat: true, tip: "1-day change: nominal + % (n/a for monthly data)" },
+  { key: "w1", title: "1W Δ", num: true, heat: true, tip: "1-week change: nominal + % (n/a for monthly data)" },
+  { key: "m1", title: "1M Δ", num: true, heat: true, tip: "1-month change: nominal + %" },
+  { key: "q1", title: "1Q Δ", num: true, heat: true, tip: "3-month change: nominal + %" },
+  { key: "y1", title: "1Y Δ", num: true, heat: true, tip: "12-month change: nominal + %" },
+  { key: "y3", title: "3Y Δ", num: true, heat: true, tip: "3-year change: nominal + % (daily data only)" },
+  { key: "d3",    title: "Δ 3Y avg", num: true, heat: true, tip: "Change vs 3Y average: nominal + %" },
   { key: "rngpct", title: "Range %ile", num: false, tip: "Dotted 3Y range: blue dot = now (percentile), ◆ = 50th pct" },
   { key: "rngz", title: "Range z", num: false, tip: "Dotted 3Y range: blue dot = now (z-score), ◆ = mean (z=0)" },
   { key: "hi52",  title: "52w Hi", num: true, tip: "Highest monthly value in the last 12 months" },
@@ -778,6 +807,7 @@ function renderTable() {
   const rows = sortRows(state.rows).map((r) => {
     const { p, stats: s } = r;
     const fmt = fmtCurFor(p);
+    const fmtNom = fmtNomFor(p);
     const cls = p.synthetic ? ` class="total-row"` : "";
     if (!s) return `<tr${cls}><td><b>${p.label}</b></td><td colspan="19" class="muted">no ${isCount ? "trade-count" : "par"} data</td></tr>`;
     const o = r.out;
@@ -788,17 +818,18 @@ function renderTable() {
     const turnCell = tv == null
       ? `<td class="num muted"${isCount ? ` title="Turnover is par-based (ADV view only)"` : ""}>—</td>`
       : `<td class="num" title="ADV × 252 ÷ outstanding (annualized)">${tv >= 100 ? tv.toFixed(0) : tv.toFixed(1)}%</td>`;
+    const dc = (nom, pct) => `<td class="num"${heat(pct)}>${deltaCell(nom, pct, fmtNom)}</td>`;
     return `<tr data-pid="${p.id}" title="Click to view ${p.label} chart"${cls}>` +
       `<td><b>${p.label}</b></td>` +
       `<td class="num">${fmt(s.cur.v)}</td>` +
       outCell + turnCell +
-      `<td class="num"${heat(s.d1)}>${pct1(s.d1)}</td>` +
-      `<td class="num"${heat(s.w1)}>${pct1(s.w1)}</td>` +
-      `<td class="num"${heat(s.m1)}>${pct1(s.m1)}</td>` +
-      `<td class="num"${heat(s.q1)}>${pct1(s.q1)}</td>` +
-      `<td class="num"${heat(s.y1)}>${pct1(s.y1)}</td>` +
-      `<td class="num"${heat(s.y3)}>${pct1(s.y3)}</td>` +
-      `<td class="num"${heat(s.d3)}>${pct1(s.d3)}</td>` +
+      dc(s.d1n, s.d1) +
+      dc(s.w1n, s.w1) +
+      dc(s.m1n, s.m1) +
+      dc(s.q1n, s.q1) +
+      dc(s.y1n, s.y1) +
+      dc(s.y3n, s.y3) +
+      dc(s.d3n, s.d3) +
       `<td>${rangePlotDotted(s, "pct")}</td>` +
       `<td>${rangePlotDotted(s, "z")}</td>` +
       `<td class="num">${fmt(s.hi52)}</td>` +

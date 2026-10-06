@@ -122,6 +122,27 @@ const tickerMeta = (t) => {
 };
 const chg = (x) => x == null ? "—" :
   `<span class="${x >= 0 ? "up" : "down"}">${x >= 0 ? "+" : ""}${(x * 100).toFixed(1)}%</span>`;
+// Nominal (absolute) change implied by a % ratio: cur - cur/(1+pct).
+const nomFromPct = (cur, pct) =>
+  (cur == null || pct == null || !isFinite(pct) || 1 + pct === 0) ? null : cur - cur / (1 + pct);
+const fmtShNom = (v) => v == null || !isFinite(v) ? "—" :
+  `${v >= 0 ? "+" : "−"}` + (Math.abs(v) >= 1e9 ? (Math.abs(v) / 1e9).toFixed(2) + "B sh" :
+    Math.abs(v) >= 1e6 ? (Math.abs(v) / 1e6).toFixed(1) + "M sh" :
+    Math.abs(v) >= 1e3 ? (Math.abs(v) / 1e3).toFixed(1) + "K sh" :
+    Math.round(Math.abs(v)).toLocaleString("en-US") + " sh");
+// Delta cell for the top-shorted table: nominal (bold) + % (muted).
+// isRatio: nominal shown in percentage points.
+const vcCell = (cur, pct, isRatio) => {
+  if ((pct == null || !isFinite(pct)) && cur == null) return `<td class="num">—</td>`;
+  const nom = nomFromPct(cur, pct);
+  const pHtml = chg(pct);
+  if (nom == null) return `<td class="num">${pHtml}</td>`;
+  const nTxt = isRatio
+    ? `${nom >= 0 ? "+" : "−"}${(Math.abs(nom) * 100).toFixed(1)}pp`
+    : fmtShNom(nom);
+  const cls = nom >= 0 ? "up" : nom < 0 ? "down" : "";
+  return `<td class="num"><span class="${cls}"><b>${nTxt}</b></span> <span class="muted">(${pHtml})</span></td>`;
+};
 
 // ---- Speculator-style per-ticker stats (Finnhub-backed; see ticker_stats
 // fetcher). Rendered into the top-shorted table next to the short data. ----
@@ -175,7 +196,9 @@ function regshoSection(r, ts) {
     const [name, sec] = tickerMeta(t);
     const secPct = sectorTot[sec] ? t.short_volume / sectorTot[sec] : null;
     const s = tstats[t.symbol] || {};
-    const vc = (k) => `<td class="num">${chg(t[k])}</td>`;
+    // Nominal + % deltas: nominal implied from current value and % ratio.
+    const vvc = (k) => vcCell(t.short_volume, t[k], false);
+    const vrc = (k) => vcCell(t.short_ratio, t[k], true);
     const sma = ["sma20", "sma50", "sma200"].map((k, i) =>
       smaTri(s.price, s[k], ["20SMA", "50SMA", "200SMA"][i])).join(" ");
     return `<tr><td><b>${t.symbol}</b></td><td>${name}</td>` +
@@ -190,28 +213,29 @@ function regshoSection(r, ts) {
     `<td class="num sma">${sma}</td>` +
     `<td class="num">${big(t.short_volume)}</td>` +
     `<td class="num">${pct1(t.short_ratio)}</td>` +
-    vc("short_chg_1d") + vc("short_chg_1w") + vc("short_chg_1m") + vc("short_chg_1q") + vc("short_chg_1y") +
-    vc("ratio_chg_1d") + vc("ratio_chg_1w") + vc("ratio_chg_1m") + vc("ratio_chg_1q") + vc("ratio_chg_1y") +
+    vvc("short_chg_1d") + vvc("short_chg_1w") + vvc("short_chg_1m") + vvc("short_chg_1q") + vvc("short_chg_1y") + vvc("short_chg_3y") +
+    vrc("ratio_chg_1d") + vrc("ratio_chg_1w") + vrc("ratio_chg_1m") + vrc("ratio_chg_1q") + vrc("ratio_chg_1y") + vrc("ratio_chg_3y") +
     `<td class="num" title="${sec} sector short vol in top-50">${secPct == null ? "—" : (secPct * 100).toFixed(1) + "%"}</td></tr>`;
   }).join("");
   return `<h3>SHORT VOLUME — REG SHO DAILY <span class="muted">as of ${r.as_of ?? "—"}</span></h3>
     <table data-sortable><tr><th>Market</th><th>Short vol</th><th>Total vol</th><th>Short ratio</th></tr>${rows}</table>
-    <h3>TOP SHORTED TICKERS <span class="muted">${top50.length} names · 1D/1W/1M/1Q/1Y % changes</span></h3>
+    <h3>TOP SHORTED TICKERS <span class="muted">${top50.length} names · nominal + % changes 1D/1W/1M/1Q/1Y/3Y</span></h3>
     <div class="table-scroll"><table class="topshorted" data-sortable><tr><th>Symbol</th><th>Name</th>` +
     `<th colspan="9">Price action <span class="muted">${statsAsOf ? "as of " + statsAsOf : "stats pending"}</span></th>` +
     `<th>Short vol</th>` +
-    `<th>Short ratio</th><th colspan="5">%Chg short vol — 1D | 1W | 1M | 1Q | 1Y</th>` +
-    `<th colspan="5">%Chg short ratio — 1D | 1W | 1M | 1Q | 1Y</th>` +
+    `<th>Short ratio</th><th colspan="6">Δ short vol (nominal + %) — 1D | 1W | 1M | 1Q | 1Y | 3Y</th>` +
+    `<th colspan="6">Δ short ratio (pp + %) — 1D | 1W | 1M | 1Q | 1Y | 3Y</th>` +
     `<th>% of sector short</th></tr><tr><td colspan="2"></td>` +
     `<th>Price</th><th>%1D</th><th>Mkt cap</th><th>P/E</th><th>%YTD</th><th data-sort="off">1Y</th><th>Δ52wH</th><th>RS 1M</th><th data-sort="off">20/50/200</th>` +
     `<td colspan="2"></td>` +
-    `<th>1D</th><th>1W</th><th>1M</th><th>1Q</th><th>1Y</th>` +
-    `<th>1D</th><th>1W</th><th>1M</th><th>1Q</th><th>1Y</th><td></td></tr>${top}</table></div>
-    <p class="muted">% of sector short = ticker short volume ÷ its GICS sector's total short volume within this top-50 — ` +
+    `<th>1D</th><th>1W</th><th>1M</th><th>1Q</th><th>1Y</th><th>3Y</th>` +
+    `<th>1D</th><th>1W</th><th>1M</th><th>1Q</th><th>1Y</th><th>3Y</th><td></td></tr>${top}</table></div>
+    <p class="muted">Δ cells show nominal change (bold) + % change (muted): short-vol nominal in shares, short-ratio nominal in percentage points. ` +
+    `% of sector short = ticker short volume ÷ its GICS sector's total short volume within this top-50 — ` +
     `high values mean shorting is concentrated in the name, not spread across the sector. ` +
     `RS 1M = percentile rank of the 21-day return within this table (0-99). ` +
     `Δ52wH = % off the 52-week high. ` +
-    `Longer-horizon deltas build from daily history going forward (full 1Y after a year of pulls).</p>`;
+    `3Y deltas populate as daily history accumulates (currently ~2Y backfilled).</p>`;
 }
 
 function thresholdSection(t) {
@@ -277,14 +301,21 @@ function bsLineChart(el, defs) {
   }, data, el);
 }
 
-function bsDeltaCell(now, ref, kind) {
+function bsDeltaCell(now, ref, kind, unit) {
   if (now == null || ref == null) return "—";
+  const nom = now - ref;
+  const nomTxt = `${nom >= 0 ? "+" : "−"}${Math.abs(nom).toLocaleString("en-US", { maximumFractionDigits: 1 })}`;
+  // % change vs |ref| (spreads/flows/counts can cross zero — % is magnitude only).
+  const pct = ref !== 0 ? nom / Math.abs(ref) : null;
+  const pctTxt = pct == null || !isFinite(pct) ? "—" : `${pct >= 0 ? "+" : ""}${(pct * 100).toFixed(1)}%`;
+  const cls = nom > 0 ? "up" : nom < 0 ? "down" : "flat";
+  const unitTxt = unit ? ` ${unit}` : "";
   if (kind === "pct") {
-    const c = ref ? (now - ref) / ref : null;
-    return c == null ? "—" : chg(c);
+    // $ volume: nominal $ change + % change.
+    const nomUsd = `${nom >= 0 ? "+" : "−"}$${(Math.abs(nom) / 1e3).toFixed(1)}B`;
+    return `<span class="${cls}"><b>${nomUsd}</b></span> <span class="muted">(${pctTxt})</span>`;
   }
-  const c = now - ref; // spreads/flows/counts: absolute point change
-  return `<span class="${c >= 0 ? "up" : "down"}">${c >= 0 ? "+" : ""}${c.toLocaleString("en-US", { maximumFractionDigits: 1 })}</span>`;
+  return `<span class="${cls}"><b>${nomTxt}${unitTxt}</b></span> <span class="muted">(${pctTxt})</span>`;
 }
 
 async function renderBreadthSentiment() {
@@ -307,24 +338,24 @@ async function renderBreadthSentiment() {
       for (const [d, v] of points) if (Date.parse(d) <= target) ref = v;
       return { now: last[1], ref };
     };
-    // delta table — Harry's universal 1D/1W/1M/1Q/1Y horizon standard
+    // delta table — Harry's universal 1D/1W/1M/1Q/1Y/3Y horizon standard (nominal + %)
     const trows = BS_SERIES.map((s) => {
       const p = pts(s.id);
       const r = (d) => refBack(p, d);
-      const r1 = r(1), r7 = r(7), r30 = r(30), r91 = r(91), r365 = r(365);
+      const r1 = r(1), r7 = r(7), r30 = r(30), r91 = r(91), r365 = r(365), r1095 = r(1095);
       const asof = p.length ? p[p.length - 1][0] : "—";
       const fmtNow = s.kind === "pct"
         ? (r1.now == null ? "—" : "$" + (r1.now / 1e3).toFixed(1) + "B")
         : (r1.now == null ? "—" : r1.now.toLocaleString("en-US", { maximumFractionDigits: 1 }) + " " + s.unit);
-      const dc = (x) => `<td class="num">${bsDeltaCell(x.now, x.ref, s.kind)}</td>`;
+      const dc = (x) => `<td class="num">${bsDeltaCell(x.now, x.ref, s.kind, s.unit)}</td>`;
       const rs = statsFromValues(p.map((pt) => pt[1]));
       return `<tr><td><b>${s.label}</b>${s.note ? `<br><span class="muted">${s.note}</span>` : ""}</td>` +
         `<td class="num">${fmtNow}<br><span class="muted">${asof}</span></td>` +
-        dc(r1) + dc(r7) + dc(r30) + dc(r91) + dc(r365) +
+        dc(r1) + dc(r7) + dc(r30) + dc(r91) + dc(r365) + dc(r1095) +
         `${rangeCells(rs, "full history since Jan 2018")}</tr>`;
     }).join("");
     host.innerHTML =
-      `<table class="bs-deltas" data-sortable><tr><th>Indicator</th><th>Now</th><th>1D</th><th>1W</th><th>1M</th><th>1Q</th><th>1Y</th>${RANGE_TH}</tr>${trows}</table>` +
+      `<table class="bs-deltas" data-sortable><tr><th>Indicator</th><th>Now</th><th>1D Δ</th><th>1W Δ</th><th>1M Δ</th><th>1Q Δ</th><th>1Y Δ</th><th>3Y Δ</th>${RANGE_TH}</tr>${trows}</table>` +
       BS_CHART_DEFS.map((c) => `<h4>${c.title}</h4><div id="${c.el}" class="bs-chart"></div>` +
         (c.foot ? `<p class="muted">${c.foot}</p>` : "")).join("") +
       `<p class="muted">FINRA fixed-income breadth (advances/declines/52wk high-low) and sentiment ` +
