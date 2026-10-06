@@ -584,6 +584,8 @@ def _finra_panel(store: Store) -> dict:
                     if breadth else None),
         "corp": ({"as_of": corp.get("as_of"), "status": corp.get("status"),
                   "lists": corp_lists,
+                  "refi_wall": corp.get("refi_wall"),
+                  "registry_issues": len((corp.get("cusip_registry") or {})),
                   "updated_at": corp_upd, "source": corp_src}
                  if corp else None),
         "capped": ({"as_of": capped.get("as_of"), "grades": capped.get("grades", {}),

@@ -243,3 +243,97 @@ def test_week52_stats():
     last = prices[-1]
     assert stats["d52hi_pct"] == pytest.approx((last - 149.0) / 149.0 * 100)
     assert finra_corp._week52_stats({})["hi52"] is None
+
+
+def _reg_bond(symbol, coupon, maturity, moodys, sp, yld, spread=None, day="2026-10-02"):
+    return {"symbol": symbol, "issuer": "T", "coupon": coupon, "maturity": maturity,
+            "moodys": moodys, "sp": sp, "cat": "ig", "yield": yld, "last": 100.0,
+            "spread_bps": spread}
+
+
+def test_rating_bucket():
+    rb = finra_corp.rating_bucket
+    assert rb("Aaa", "AAA") == "AAA"
+    assert rb("Aa2", None) == "AA"
+    assert rb(None, "A-") == "A"
+    assert rb("Baa3", "BBB-") == "BBB"
+    assert rb("Ba1", None) == "BB"
+    assert rb(None, "B+") == "B"
+    assert rb("Caa2", "CCC") == "CCC"
+    assert rb(None, None) == "NR"
+    assert rb("WR", "NR") == "NR"
+
+
+def test_maturity_bucket_label():
+    mb = finra_corp.maturity_bucket_label
+    assert mb(0.5) == "0-1Y"
+    assert mb(1.0) == "1-2Y"
+    assert mb(4.9) == "3-5Y"
+    assert mb(9.99) == "7-10Y"
+    assert mb(30.0) == "10Y+"
+    assert mb(None) is None
+    assert mb(-1) is None
+
+
+def test_merge_cusip_registry_accumulates():
+    lists = {
+        "2026-10-01": [_reg_bond("C1", 3.0, "2028-01-01", "Baa2", "BBB", 5.0, 120)],
+        "2026-10-02": [_reg_bond("C1", 3.0, "2028-01-01", "Baa2", "BBB", 5.5, 150),
+                       _reg_bond("C2", 6.0, "2027-06-01", "Ba2", "BB", 8.0)],
+    }
+    reg = finra_corp.merge_cusip_registry(None, lists)
+    assert set(reg) == {"C1", "C2"}
+    assert reg["C1"]["yield"] == 5.5  # latest wins
+    assert reg["C1"]["spread_bps"] == 150
+    assert reg["C1"]["last_seen"] == "2026-10-02"
+    # second merge keeps prior entries
+    reg2 = finra_corp.merge_cusip_registry(reg, {"2026-10-03": [_reg_bond("C3", 4.0, "2030-01-01", "A2", "A", 4.5)]})
+    assert set(reg2) == {"C1", "C2", "C3"}
+
+
+def test_merge_cusip_registry_cap():
+    lists = {f"2026-09-{d:02d}": [_reg_bond(f"C{d}", 4.0, "2030-01-01", "A2", "A", 4.5)]
+             for d in range(1, 10)}
+    old_cap = finra_corp.REGISTRY_CAP
+    finra_corp.REGISTRY_CAP = 5
+    try:
+        reg = finra_corp.merge_cusip_registry(None, lists)
+    finally:
+        finra_corp.REGISTRY_CAP = old_cap
+    assert len(reg) == 5
+    assert "C9" in reg  # newest kept
+
+
+def test_build_refi_wall():
+    asof = date(2026, 10, 5)
+    reg = {
+        # BBB 1-2Y: coupon 3%, now yields 6% -> +300bp refi stress
+        "A": {"coupon": 3.0, "maturity": "2028-03-01", "moodys": "Baa2",
+              "sp": "BBB", "yield": 6.0, "spread_bps": 180},
+        # BB 0-1Y: coupon 7%, yields 9% -> +200bp
+        "B": {"coupon": 7.0, "maturity": "2027-02-01", "moodys": "Ba2",
+              "sp": "BB", "yield": 9.0, "spread_bps": 450},
+        # AAA 10Y+: no stress
+        "C": {"coupon": 4.0, "maturity": "2040-01-01", "moodys": "Aaa",
+              "sp": "AAA", "yield": 4.2, "spread_bps": 40},
+    }
+    wall = finra_corp.build_refi_wall(reg, asof)
+    assert wall["issues"] == 3
+    bbb = wall["buckets"]["1-2Y"]["BBB"]
+    assert bbb["n"] == 1
+    assert bbb["avg_coupon"] == 3.0
+    assert bbb["avg_ytw"] == 6.0
+    assert bbb["refi_delta_bps"] == 300
+    bb = wall["buckets"]["0-1Y"]["BB"]
+    assert bb["refi_delta_bps"] == 200
+    aaa = wall["buckets"]["10Y+"]["AAA"]
+    assert aaa["refi_delta_bps"] == 20
+    yrs = {y["year"]: y for y in wall["yearly"]}
+    assert yrs[2027]["hy"] == 1 and yrs[2028]["ig"] == 1
+
+
+def test_build_refi_wall_empty():
+    wall = finra_corp.build_refi_wall({}, date(2026, 10, 5))
+    assert wall["issues"] == 0
+    assert wall["buckets"] == {}
+    assert wall["yearly"] == []

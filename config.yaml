@@ -193,6 +193,18 @@ cycle_series:      # market-cycle series (spec 2026-08-24); exactly one source k
   - { id: eu-hy-oas,    name: "Euro HY OAS",               unit: "%",   fred: BAMLHE00EHYIOAS }
   - { id: bbb-oas,      name: "US BBB OAS",                unit: "%",   fred: BAMLC0A4CBBB }
   - { id: ccc-oas,      name: "US CCC OAS",                unit: "%",   fred: BAMLH0A3HYC }
+  - { id: aaa-oas,      name: "US AAA OAS",                unit: "%",   fred: BAMLC0A1CAAA }
+  - { id: aa-oas,       name: "US AA OAS",                 unit: "%",   fred: BAMLC0A2CAA }
+  - { id: a-oas,        name: "US A OAS",                  unit: "%",   fred: BAMLC0A3CA }
+  - { id: bb-oas,       name: "US BB OAS",                 unit: "%",   fred: BAMLH0A1HYBB }
+  - { id: b-oas,        name: "US B OAS",                  unit: "%",   fred: BAMLH0A2HYB }
+  # ICE BofA US corporate OAS by remaining-maturity bucket (full universe)
+  - { id: corp-13y-oas,   name: "US Corp 1-3Y OAS",         unit: "%",   fred: BAMLC1A0C13Y }
+  - { id: corp-35y-oas,   name: "US Corp 3-5Y OAS",         unit: "%",   fred: BAMLC2A0C35Y }
+  - { id: corp-57y-oas,   name: "US Corp 5-7Y OAS",         unit: "%",   fred: BAMLC3A0C57Y }
+  - { id: corp-710y-oas,  name: "US Corp 7-10Y OAS",        unit: "%",   fred: BAMLC4A0C710Y }
+  - { id: corp-1015y-oas, name: "US Corp 10-15Y OAS",       unit: "%",   fred: BAMLC7A0C1015Y }
+  - { id: corp-15py-oas,  name: "US Corp 15Y+ OAS",         unit: "%",   fred: BAMLC8A0C15PY }
   - { id: nfci,         name: "Chicago Fed NFCI",          unit: idx,   fred: NFCI }
   - { id: bank-lending, name: "Bank loans & leases YoY",   unit: "%",   fred: LOANS, transform: yoy }  # monthly; weekly TOTLL never aligns for the yoy transform
   # ---- PROFIT ---- (S&P EPS workbook is Akamai-403'd; FRED CP carries the cycle)
@@ -419,6 +431,21 @@ cycle_series:      # market-cycle series (spec 2026-08-24); exactly one source k
   # ---- batch 6: ICE BofA effective yields on FRED (daily) ----
   - { id: ig-yield,    name: "US IG effective yield", unit: "%", fred: BAMLC0A0CMEY }
   - { id: hy-yield,    name: "US HY effective yield", unit: "%", fred: BAMLH0A0HYM2EY }
+  # ICE BofA effective yields by rating bucket (refinancing-wall view)
+  - { id: aaa-yield,   name: "US AAA effective yield", unit: "%", fred: BAMLC0A1CAAAEY }
+  - { id: aa-yield,    name: "US AA effective yield",  unit: "%", fred: BAMLC0A2CAAEY }
+  - { id: a-yield,     name: "US A effective yield",   unit: "%", fred: BAMLC0A3CAEY }
+  - { id: bbb-yield,   name: "US BBB effective yield", unit: "%", fred: BAMLC0A4CBBBEY }
+  - { id: bb-yield,    name: "US BB effective yield",  unit: "%", fred: BAMLH0A1HYBBEY }
+  - { id: b-yield,     name: "US B effective yield",   unit: "%", fred: BAMLH0A2HYBEY }
+  - { id: ccc-yield,   name: "US CCC effective yield", unit: "%", fred: BAMLH0A3HYCEY }
+  # ICE BofA effective yields by remaining-maturity bucket (refinancing-wall view)
+  - { id: corp-13y-yield,   name: "US Corp 1-3Y yield",  unit: "%", fred: BAMLC1A0C13YEY }
+  - { id: corp-35y-yield,   name: "US Corp 3-5Y yield",  unit: "%", fred: BAMLC2A0C35YEY }
+  - { id: corp-57y-yield,   name: "US Corp 5-7Y yield",  unit: "%", fred: BAMLC3A0C57YEY }
+  - { id: corp-710y-yield,  name: "US Corp 7-10Y yield", unit: "%", fred: BAMLC4A0C710YEY }
+  - { id: corp-1015y-yield, name: "US Corp 10-15Y yield", unit: "%", fred: BAMLC7A0C1015YEY }
+  - { id: corp-15py-yield,  name: "US Corp 15Y+ yield",  unit: "%", fred: BAMLC8A0C15PYEY }
   # ---- batch 6: FINRA TRACE Treasury (daily; external: dedicated job writes cycle:<id>) ----
   - { id: trace-ust-par,         name: "Treasury TRACE par $bn",       unit: "$bn", external: true }
   - { id: trace-ust-trades,      name: "Treasury TRACE trades",        unit: "k",   external: true }

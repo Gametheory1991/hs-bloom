@@ -510,3 +510,15 @@ table.bond-tbl th:nth-child(2), table.bond-tbl td:nth-child(2),
 table.bond-tbl th:nth-child(3), table.bond-tbl td:nth-child(3),
 table.bond-tbl th:nth-child(6), table.bond-tbl td:nth-child(6) { text-align: left; }
 p.foot { font-size: 11px; }
+
+/* ---- Refinancing wall (2026-10-05) ---- */
+table.wall-tbl { border-collapse: collapse; font-size: 12px; }
+table.wall-tbl th, table.wall-tbl td { padding: 5px 9px; text-align: right; border: 1px solid var(--line); }
+table.wall-tbl th:first-child, table.wall-tbl td:first-child { text-align: left; }
+table.wall-tbl td { min-width: 76px; vertical-align: top; }
+td.risk-hi { background: rgba(220, 38, 38, 0.16); }
+td.risk-mid { background: rgba(245, 166, 35, 0.16); }
+td.risk-lo { background: rgba(22, 163, 74, 0.10); }
+.risk-hi-tag { background: #dc2626; color: #fff; border-radius: 3px; padding: 1px 6px; font-size: 10px; font-weight: bold; }
+.risk-mid-tag { background: #f5a623; color: #fff; border-radius: 3px; padding: 1px 6px; font-size: 10px; font-weight: bold; }
+.risk-lo-tag { background: #16a34a; color: #fff; border-radius: 3px; padding: 1px 6px; font-size: 10px; font-weight: bold; }

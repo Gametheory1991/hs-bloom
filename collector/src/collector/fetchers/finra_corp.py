@@ -195,6 +195,157 @@ def merge_bond_history(prev_hist: dict, lists: dict[str, list[dict]]
     return hist
 
 
+# ---------------------------------------------------------------------------
+# Refinancing wall: per-CUSIP registry + maturity x rating aggregation.
+#
+# The most-active lists are a *sample* of the bond universe (30 issues/day),
+# but accumulated over time the registry grows into a useful panel of
+# tracked issues. The wall is labeled as a sample everywhere it renders.
+# ---------------------------------------------------------------------------
+
+REGISTRY_CAP = 5000  # max CUSIPs kept; evict stalest last_seen first
+
+# (label, min_years_inclusive, max_years_exclusive)
+MAT_BUCKETS = (
+    ("0-1Y", 0.0, 1.0),
+    ("1-2Y", 1.0, 2.0),
+    ("2-3Y", 2.0, 3.0),
+    ("3-5Y", 3.0, 5.0),
+    ("5-7Y", 5.0, 7.0),
+    ("7-10Y", 7.0, 10.0),
+    ("10Y+", 10.0, float("inf")),
+)
+
+# Moody's/S&P prefix -> bucket. First match wins.
+_RATING_MAP = (
+    (("aaa",), "AAA"),
+    (("aa1", "aa2", "aa3", "aa+", "aa", "aa-"), "AA"),
+    (("a1", "a2", "a3", "a+", "a", "a-"), "A"),
+    (("baa1", "baa2", "baa3", "bbb+", "bbb", "bbb-"), "BBB"),
+    (("ba1", "ba2", "ba3", "bb+", "bb", "bb-"), "BB"),
+    (("b1", "b2", "b3", "b+", "b", "b-"), "B"),
+    (("caa", "ca", "c", "ccc", "cc", "d"), "CCC"),
+)
+
+
+def rating_bucket(moodys: str | None, sp: str | None) -> str:
+    """Map Moody's/S&P ratings to wall buckets (AAA..CCC, NR)."""
+    for raw in (moodys or "", sp or ""):
+        r = raw.strip().lower()
+        if not r or r in ("nr", "na", "n/a", "none", "withdrawn", "wr"):
+            continue
+        for prefixes, bucket in _RATING_MAP:
+            if any(r.startswith(p) for p in prefixes):
+                return bucket
+    return "NR"
+
+
+def maturity_bucket_label(years: float | None) -> str | None:
+    if years is None or years < 0:
+        return None
+    for label, lo, hi in MAT_BUCKETS:
+        if lo <= years < hi:
+            return label
+    return None
+
+
+def merge_cusip_registry(prev: dict | None,
+                         lists: dict[str, list[dict]]) -> dict:
+    """Accumulate per-CUSIP attributes across every fetch.
+
+    Registry entry: issuer, coupon, maturity, moodys, sp, cat, yield,
+    price, spread_bps (latest seen), last_seen. Capped at REGISTRY_CAP
+    with stalest-last_seen eviction.
+    """
+    reg: dict[str, dict] = {}
+    if isinstance(prev, dict):
+        for cusip, e in prev.items():
+            if isinstance(e, dict):
+                reg[cusip] = dict(e)
+    for day in sorted(lists):
+        for b in lists[day]:
+            cusip = b.get("symbol")
+            if not cusip:
+                continue
+            e = reg.setdefault(cusip, {})
+            for k in ("issuer", "coupon", "maturity", "moodys", "sp", "cat"):
+                v = b.get(k)
+                if v is not None and v != "":
+                    e[k] = v
+            if isinstance(b.get("yield"), (int, float)):
+                e["yield"] = b["yield"]
+            if isinstance(b.get("last"), (int, float)):
+                e["price"] = b["last"]
+            if isinstance(b.get("spread_bps"), (int, float)):
+                e["spread_bps"] = b["spread_bps"]
+            e["last_seen"] = day
+    if len(reg) > REGISTRY_CAP:
+        ordered = sorted(reg.items(), key=lambda kv: kv[1].get("last_seen", ""))
+        reg = dict(ordered[len(reg) - REGISTRY_CAP:])
+    return reg
+
+
+def build_refi_wall(registry: dict, asof: date) -> dict:
+    """Aggregate the CUSIP registry into the refinancing-wall view.
+
+    Returns {as_of, issues, maturities, ratings, buckets, yearly}.
+    buckets[mat][rating] = {n, avg_coupon, avg_ytw, avg_spread_bps,
+    refi_delta_bps}. yearly = [{year, ig, hy}] issue counts maturing
+    per calendar year.
+    """
+    cells: dict[tuple[str, str], dict[str, list[float]]] = {}
+    yearly: dict[int, dict[str, int]] = {}
+    n_issues = 0
+    for _cusip, e in (registry or {}).items():
+        yrs = _years_to_maturity(str(e.get("maturity") or ""), asof)
+        mb = maturity_bucket_label(yrs)
+        if mb is None:
+            continue
+        rb = rating_bucket(e.get("moodys"), e.get("sp"))
+        coupon = e.get("coupon")
+        ytw = e.get("yield")
+        if not isinstance(coupon, (int, float)) or not isinstance(ytw, (int, float)):
+            continue
+        if not (-10 <= ytw <= 30) or not (0 <= coupon <= 20):
+            continue
+        n_issues += 1
+        cell = cells.setdefault((mb, rb), {"cpn": [], "ytw": [], "spr": []})
+        cell["cpn"].append(coupon)
+        cell["ytw"].append(ytw)
+        spr = e.get("spread_bps")
+        if isinstance(spr, (int, float)):
+            cell["spr"].append(spr)
+        try:
+            my = date.fromisoformat(str(e.get("maturity"))[:10]).year
+        except ValueError:
+            continue
+        if asof.year <= my <= asof.year + 10:
+            y = yearly.setdefault(my, {"ig": 0, "hy": 0})
+            y["hy" if rb in ("BB", "B", "CCC") else "ig"] += 1
+
+    def _avg(xs: list[float]) -> float | None:
+        return sum(xs) / len(xs) if xs else None
+
+    buckets: dict[str, dict[str, dict]] = {}
+    for (mb, rb), c in cells.items():
+        ac, ay = _avg(c["cpn"]), _avg(c["ytw"])
+        buckets.setdefault(mb, {})[rb] = {
+            "n": len(c["cpn"]),
+            "avg_coupon": round(ac, 2) if ac is not None else None,
+            "avg_ytw": round(ay, 2) if ay is not None else None,
+            "avg_spread_bps": round(_avg(c["spr"])) if c["spr"] else None,
+            "refi_delta_bps": (round((ay - ac) * 100)
+                               if ac is not None and ay is not None else None),
+        }
+    return {
+        "as_of": asof.isoformat(),
+        "issues": n_issues,
+        "maturities": [m for m, _, _ in MAT_BUCKETS],
+        "ratings": ["AAA", "AA", "A", "BBB", "BB", "B", "CCC", "NR"],
+        "buckets": buckets,
+        "yearly": [{"year": y, **yearly[y]} for y in sorted(yearly)],
+    }
+
 def corp_series_ids() -> list[str]:
     ids: list[str] = []
     for dslug in DATASETS:
@@ -293,7 +444,8 @@ async def fetch_finra_corp(store: Store,
         payload: dict = {}
         if prev and isinstance(prev.payload, dict):
             payload = {k: v for k, v in prev.payload.items()
-                       if k in ("as_of", "series")}
+                       if k in ("as_of", "series", "bond_hist",
+                                "cusip_registry", "refi_wall")}
         payload["status"] = "error"
         payload["error"] = str(exc)[:300]
         store.put_doc("finra_corp", payload, source=SOURCE)
@@ -331,6 +483,8 @@ async def fetch_finra_corp(store: Store,
         else {}
     bond_hist = merge_bond_history(prev_payload.get("bond_hist") or {},
                                    all_lists)
+    cusip_registry = merge_cusip_registry(prev_payload.get("cusip_registry"),
+                                          all_lists)
     asof_d = date.fromisoformat(as_of)
     for dslug, info in latest_lists.items():
         for i, b in enumerate(info["bonds"]):
@@ -343,6 +497,8 @@ async def fetch_finra_corp(store: Store,
         "status": "ok",
         "lists": latest_lists,
         "bond_hist": bond_hist,
+        "cusip_registry": cusip_registry,
+        "refi_wall": build_refi_wall(cusip_registry, asof_d),
         "series": sorted(series),
     }, source=SOURCE)
     log.info("finra_corp: %d series, as_of %s", stored, as_of)

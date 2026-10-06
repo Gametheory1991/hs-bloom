@@ -9,6 +9,7 @@
 // cycle tab on POS.
 import { renderTraceCharts, setTraceChartProduct } from "./trace_charts.js";
 import { renderTraceGrid } from "./trace_grid.js";
+import { refiWallSection, renderOasIndexes } from "./refi_wall.js";
 import { getSeries } from "../api.js";
 const big = (x) =>
   x == null ? "—" : x.toLocaleString("en-US", { maximumFractionDigits: 0 });
@@ -456,12 +457,14 @@ export function renderFinra(p) {
     shortInterestSection(f.short_interest) +
     breadthSection(f.breadth) +
     corpSection(f.corp) +
+    refiWallSection(f.corp?.refi_wall) +
     cappedSection(f.capped) +
     marginSection(f.margin) +
     traceSection(f.trace_treasury, f.trace_monthly);
   renderTraceCharts();
   renderTraceGrid();
   renderBreadthSentiment().catch(() => {});
+  renderOasIndexes().catch(() => {});
   const chartBtn = document.getElementById("trace-view-chart");
   const gridBtn = document.getElementById("trace-view-grid");
   const chartWrap = document.getElementById("trace-chart-wrap");
