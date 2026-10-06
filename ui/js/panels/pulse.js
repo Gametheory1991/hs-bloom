@@ -125,7 +125,8 @@ async function volumeData() {
   const jobs = TOTAL_PARTS.map(async (p) => {
     const s = await getSeries(p.par, "max").catch(() => null);
     if (!s?.points?.length) return null;
-    return { p, par: s.points };
+    const t = p.trades ? await getSeries(p.trades, "max").catch(() => null) : null;
+    return { p, par: s.points, tr: t?.points?.length ? t.points : null };
   });
   const data = (await Promise.all(jobs)).filter(Boolean);
   if (!data.length) return null;
@@ -133,20 +134,39 @@ async function volumeData() {
   const advTotal = rowStats(totalVals(data, "adv"), r3y);
   const advUst = rowStats(totalVals(data, "adv", TOTAL_PARTS.filter((p) => p.id === "ust")), r3y);
   const advTrace = rowStats(totalVals(data, "adv", TOTAL_PARTS.filter((p) => p.id !== "ust")), r3y);
-  const prods = data.map(({ p, par }) => ({ p, st: rowStats(toMetric(p, par, "adv"), r3y) }));
-  return { advTotal, advUst, advTrace, prods };
+  // ADT: only products with published trade counts (ust/corp/eln/conv/chrc);
+  // totalVals skips products whose `tr` is null.
+  const adtTotal = rowStats(totalVals(data, "adt"), r3y);
+  const adtUst = rowStats(totalVals(data, "adt", TOTAL_PARTS.filter((p) => p.id === "ust")), r3y);
+  const adtTrace = rowStats(totalVals(data, "adt", TOTAL_PARTS.filter((p) => p.id !== "ust")), r3y);
+  const prods = data.map(({ p, par, tr }) => ({
+    p,
+    st: rowStats(toMetric(p, par, "adv"), r3y),
+    stAdt: tr ? rowStats(toMetric(p, tr, "adt"), r3y) : null,
+  }));
+  return { advTotal, advUst, advTrace, adtTotal, adtUst, adtTrace, prods };
 }
 
+// Formatter for trade counts: 674,213 -> "674k/d"
+const fmtTrades = (v) => {
+  if (v == null || !isFinite(v)) return "—";
+  if (v >= 1e6) return `${(v / 1e6).toFixed(2)}M/d`;
+  if (v >= 1e3) return `${(v / 1e3).toFixed(0)}k/d`;
+  return `${Math.round(v)}/d`;
+};
+
 // Monthly rows: 1D/1W are "—" by design (monthly cadence), headline is M/M.
-function volTileHtml(label, st) {
+// fmt: "adv" (default) or "adt" — controls value formatting.
+function volTileHtml(label, st, fmt = "adv") {
   const m1 = st?.m1;
   const cls = m1 == null ? "flat" : m1 > 0 ? "up" : m1 < 0 ? "down" : "flat";
+  const fmtV = fmt === "adt" ? fmtTrades : fmtVol;
   const hz = [["1D", st?.d1], ["1W", st?.w1], ["1M", st?.m1], ["1Q", st?.q1], ["1Y", st?.y1]]
     .map(([h, val]) => `<span><b>${h}</b> ${pctFrac(val)}</span>`).join("");
   const z = st?.z;
   const pts = (st?.win ?? []).map(({ d, v }) => [d, v]);
   return `<div class="kpi"><div class="lbl">${esc(label)}</div>` +
-    `<div class="val">${fmtVol(st?.cur?.v)}</div>` +
+    `<div class="val">${fmtV(st?.cur?.v)}</div>` +
     `<div class="chg ${cls}">${pctFrac(m1)} <span class="note">1M</span></div>` +
     `${sparkSvg(pts, cls === "up" ? true : cls === "down" ? false : null)}` +
     `<div class="hz">${hz}<span class="zbadge">z ${z == null ? "—" : (z > 0 ? "+" : "") + z.toFixed(1)}</span></div>` +
@@ -179,22 +199,29 @@ async function rangeCheckHtml(scoreRows, vol) {
     const z = row?.z_1y ?? null;
     return rangeRow(label, fmtVal(row?.last, fmt), zToPct(z), z);
   }));
-  // TRACE/Treasury monthly ADV rows (3Y window stats, same math as the grid)
+  // TRACE/Treasury monthly ADV + ADT rows (3Y window stats, same math as the grid)
   const vst = (id) => vol?.prods?.find((x) => x.p.id === id)?.st ?? null;
+  const vstAdt = (id) => vol?.prods?.find((x) => x.p.id === id)?.stAdt ?? null;
   const volDefs = [
-    ["TOTAL ADV (TRACE + TSY)", vol?.advTotal],
-    ["Treasury ADV", vol?.advUst],
-    ["TBA ADV", vst("tba")],
-    ["Corporate ADV", vst("corp")],
+    ["TOTAL ADV (TRACE + TSY)", vol?.advTotal, fmtVol],
+    ["TOTAL ADT (TRACE + TSY)", vol?.adtTotal, fmtTrades],
+    ["Treasury ADV", vol?.advUst, fmtVol],
+    ["Treasury ADT", vol?.adtUst, fmtTrades],
+    ["TBA ADV", vst("tba"), fmtVol],
+    ["Corporate ADV", vst("corp"), fmtVol],
+    ["Corporate ADT", vstAdt("corp"), fmtTrades],
   ];
   const volRows = volDefs.filter(([, st]) => st != null)
-    .map(([label, st]) => rangeRow(label, fmtVol(st.cur?.v), st.pct ?? null, st.z ?? null));
+    .map(([label, st, fv]) => rangeRow(label, fv(st.cur?.v), st.pct ?? null, st.z ?? null));
   return `<table data-sortable><tr><th>Series</th><th>Now</th>` +
     `<th data-sort="off">Range · percentile</th><th data-sort="off">Range · z-score</th>` +
     `<th>%ile</th><th>z</th></tr>${rows.join("")}${volRows.join("")}</table>`;
 }
 
 // ---- TALK TRACK: auto-generated 60-second bullets from live data ----
+// Both ADV and ADT matter to Harry — the headline always carries both, and
+// movers/losers are split out per metric. Base sizes are named so small-base
+// % moves (e.g. ELN) can be judged for materiality.
 function volumeBullets(vol) {
   const out = [];
   const t = vol?.advTotal;
@@ -204,12 +231,16 @@ function volumeBullets(vol) {
   const prevPt = win.length >= 2 ? win[win.length - 2] : null;
   const prevM = mlabel(prevPt?.d);
   const vsAvg = t.avg ? (t.cur.v - t.avg) / t.avg : null;
-  // Top contributor: product with the largest MoM delta in the total's direction.
-  const deltas = (vol.prods ?? []).map(({ p, st }) => {
-    if (st?.m1 == null || st?.cur == null) return null;
-    const prev = st.cur.v / (1 + st.m1);
-    return { label: p.label, delta: st.cur.v - prev, m1: st.m1, z: st.z };
+  // Per-product MoM deltas, ADV and ADT.
+  const deltasFor = (key) => (vol.prods ?? []).map(({ p, st, stAdt }) => {
+    const s = key === "adt" ? stAdt : st;
+    if (s?.m1 == null || s?.cur == null) return null;
+    const prev = s.cur.v / (1 + s.m1);
+    return { label: p.label, delta: s.cur.v - prev, m1: s.m1, z: s.z, base: s.cur.v };
   }).filter(Boolean);
+  const deltas = deltasFor("adv");
+  const deltasAdt = deltasFor("adt");
+  // Top contributor: product with the largest MoM delta in the total's direction.
   const totalDelta = prevPt ? t.cur.v - prevPt.v : null;
   let leader = null;
   if (totalDelta != null && deltas.length) {
@@ -217,16 +248,33 @@ function volumeBullets(vol) {
     leader = (sameSign.length ? sameSign : deltas)
       .sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta))[0];
   }
+  // ADT headline (companion to ADV — both metrics always shown together).
+  const ta = vol?.adtTotal;
+  const adtTxt = ta?.cur
+    ? ` ADT ${fmtTrades(ta.cur.v)} (${pctFrac(ta.m1)} vs ${prevM})` : "";
   out.push(`<b>Volume:</b> TOTAL fixed-income ADV ${fmtVol(t.cur.v)} in ${curM} (${pctFrac(t.m1)} vs ${prevM})` +
+    (adtTxt ? `;${adtTxt}` : "") +
     (leader ? ` — led by ${leader.label} (${pctFrac(leader.m1)} MoM)` : "") +
     (vsAvg != null ? `; now ${vsAvg >= 0 ? "+" : ""}${(vsAvg * 100).toFixed(0)}% vs 3Y avg (${fmtVol(t.avg)}).` : "."));
-  // Flags: |1M%| > 20% or |z| > 2
-  const flags = deltas.filter((d) => Math.abs(d.m1) > 0.20 || Math.abs(d.z ?? 0) > 2)
-    .sort((a, b) => Math.abs(b.m1) - Math.abs(a.m1))
-    .map((d) => `${d.label} ${pctFrac(d.m1)} MoM${d.z != null ? `, z ${d.z > 0 ? "+" : ""}${d.z.toFixed(1)}` : ""}`);
-  if (flags.length) {
-    out.push(`<b>Volume flags:</b> ${flags.join(" · ")} — ${flags.length === 1 ? "watch" : "watch these products"} for dealer positioning shifts.`);
-  }
+  // Gainers / losers per metric: top 3 and bottom 3 by MoM %, base size named.
+  const moversBullet = (title, list, fmtBase) => {
+    if (!list.length) return null;
+    const ranked = list.slice().sort((a, b) => b.m1 - a.m1);
+    const gainers = ranked.filter((d) => d.m1 > 0).slice(0, 3);
+    const losers = ranked.filter((d) => d.m1 < 0).slice(-3).reverse();
+    const fmtOne = (d) =>
+      `${d.label} ${pctFrac(d.m1)} MoM (base ${fmtBase(d.base)})` +
+      (d.z != null && Math.abs(d.z) > 2 ? `, z ${d.z > 0 ? "+" : ""}${d.z.toFixed(1)}` : "");
+    const parts = [];
+    if (gainers.length) parts.push(`gainers: ${gainers.map(fmtOne).join(", ")}`);
+    if (losers.length) parts.push(`losers: ${losers.map(fmtOne).join(", ")}`);
+    if (!parts.length) return null;
+    return `<b>${title}:</b> ${parts.join("; ")} — ${curM} vs ${prevM}.`;
+  };
+  const advMovers = moversBullet("ADV movers", deltas, fmtVol);
+  if (advMovers) out.push(advMovers);
+  const adtMovers = moversBullet("ADT movers", deltasAdt, fmtTrades);
+  if (adtMovers) out.push(adtMovers);
   return out;
 }
 
@@ -307,12 +355,15 @@ export async function renderPulse() {
     if (req !== pulseReq) return;
     const asof = new Date().toLocaleString("en-US", { timeZone: "America/New_York" });
     const volTiles = vol ? [
-      ["TOTAL FI ADV", vol.advTotal],
-      ["TREASURY ADV", vol.advUst],
-      ["TRACE ADV (EX-TSY)", vol.advTrace],
-    ].filter(([, st]) => st != null).map(([label, st]) => volTileHtml(label, st)).join("") : "";
+      ["TOTAL FI ADV", vol.advTotal, "adv"],
+      ["TOTAL FI ADT", vol.adtTotal, "adt"],
+      ["TREASURY ADV", vol.advUst, "adv"],
+      ["TREASURY ADT", vol.adtUst, "adt"],
+      ["TRACE ADV (EX-TSY)", vol.advTrace, "adv"],
+      ["TRACE ADT (EX-TSY)", vol.adtTrace, "adt"],
+    ].filter(([, st]) => st != null).map(([label, st, fmt]) => volTileHtml(label, st, fmt)).join("") : "";
     tilesEl.innerHTML = datas.map(tileHtml).join("") + volTiles +
-      `<div class="kpi-foot muted">LIVE · as of ${esc(asof)} ET · 1D/1W/1M/1Q/1Y + 1Y z · volume tiles monthly ADV (3Y stats)</div>`;
+      `<div class="kpi-foot muted">LIVE · as of ${esc(asof)} ET · 1D/1W/1M/1Q/1Y + 1Y z · volume tiles monthly ADV/ADT (3Y stats)</div>`;
   }
 
   // Range check
