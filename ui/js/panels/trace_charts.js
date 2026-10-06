@@ -2,11 +2,17 @@
 // Inline uPlot chart (not the modal) with product/metric/range/overlay selectors.
 // Mounted by renderFinra() into #trace-charts-root.
 import { getSeries, getRecessions } from "../api.js";
+import { toAdv, toAdt } from "./trace_grid.js";
 
 // TRACE monthly products. `trades` is null where FINRA only publishes par.
 // NOTE: /api/series takes bare ids (no cycle: prefix) — the backend prepends it.
 const PRODUCTS = [
+  { id: "total", label: "TOTAL (Treasury + TRACE)", synthetic: true, trades: "adt" },
   { id: "ust", label: "Treasury Total", par: "trace-ust-par", trades: "trace-ust-trades" },
+  { id: "ust-bills", label: "Treasury — Bills", par: "trace-ust-bills-par", trades: null },
+  { id: "ust-coupons", label: "Treasury — Nom Coupons", par: "trace-ust-coupons-par", trades: null },
+  { id: "ust-tips", label: "Treasury — TIPS", par: "trace-ust-tips-par", trades: null },
+  { id: "ust-frns", label: "Treasury — FRNs", par: "trace-ust-frns-par", trades: null },
   { id: "tba", label: "TBA", par: "trace-tba-par", trades: null },
   { id: "corp", label: "Corporate", par: "trace-corp-par", trades: "trace-corp-trades" },
   { id: "mbs", label: "MBS (Spec Pools)", par: "trace-mbs-par", trades: null },
@@ -19,7 +25,54 @@ const PRODUCTS = [
   { id: "chrc", label: "Church Plans", par: "trace-chrc-par", trades: "trace-chrc-trades" },
   { id: "onrun", label: "Treasury On-the-Run", par: "trace-ust-onrun-par", trades: null },
   { id: "offrun", label: "Treasury Off-the-Run", par: "trace-ust-offrun-par", trades: null },
+  { id: "si-total", label: "Short Interest — Total", par: "finra-short-total", trades: null, unit: "shares" },
+  { id: "si-msft", label: "Short Interest — MSFT", par: "short-MSFT", trades: null, unit: "shares" },
+  { id: "si-nvda", label: "Short Interest — NVDA", par: "short-NVDA", trades: null, unit: "shares" },
+  { id: "si-aapl", label: "Short Interest — AAPL", par: "short-AAPL", trades: null, unit: "shares" },
+  { id: "si-amzn", label: "Short Interest — AMZN", par: "short-AMZN", trades: null, unit: "shares" },
+  { id: "si-googl", label: "Short Interest — GOOGL", par: "short-GOOGL", trades: null, unit: "shares" },
+  { id: "si-meta", label: "Short Interest — META", par: "short-META", trades: null, unit: "shares" },
 ];
+
+// Components summed into the synthetic TOTAL chart product (same set as the grid).
+const TOTAL_PARTS = [
+  { par: "trace-ust-par", trades: "trace-ust-trades", monthly: false },
+  { par: "trace-tba-par", trades: null, monthly: true },
+  { par: "trace-corp-par", trades: "trace-corp-trades", monthly: true },
+  { par: "trace-eln-par", trades: "trace-eln-trades", monthly: true },
+  { par: "trace-conv-par", trades: "trace-conv-trades", monthly: true },
+  { par: "trace-agcy-par", trades: null, monthly: true },
+  { par: "trace-abs-par", trades: null, monthly: true },
+  { par: "trace-absx-par", trades: null, monthly: true },
+  { par: "trace-cmo-par", trades: null, monthly: true },
+  { par: "trace-mbs-par", trades: null, monthly: true },
+  { par: "trace-chrc-par", trades: "trace-chrc-trades", monthly: true },
+];
+
+// Synthetic TOTAL series: monthly ADV ($B/day) / ADT (trades/day) summed over
+// Treasury + all 10 TRACE products, by calendar month.
+async function totalSeries(metric, range) {
+  const all = (await Promise.all(TOTAL_PARTS.map(async (c) => {
+    const sid = metric === "trades" ? c.trades : c.par;
+    if (!sid) return null;
+    const s = await getSeries(sid, range);
+    return metric === "trades" ? toAdt(c, s.points) : toAdv(c, s.points);
+  }))).filter(Boolean);
+  const sums = new Map(); // "YYYY-MM" -> {d, v}
+  for (const vals of all)
+    for (const { d, v } of vals) {
+      const key = d.slice(0, 7);
+      const e = sums.get(key);
+      if (e) { e.v += v; if (d > e.d) e.d = d; }
+      else sums.set(key, { d, v });
+    }
+  const rows = [...sums.values()].sort((a, b) => (a.d < b.d ? -1 : 1));
+  return {
+    id: "total", unit: metric === "trades" ? "trades/d" : "$B/d",
+    name: metric === "trades" ? "TOTAL ADT — Treasury + TRACE" : "TOTAL ADV ($B/d) — Treasury + TRACE",
+    points: rows.map(({ d, v }) => [d, v]),
+  };
+}
 
 const OVERLAYS = [
   { id: "", label: "No overlay" },
@@ -97,8 +150,15 @@ function currentSeriesId() {
 
 function currentTitle() {
   const p = PRODUCTS.find((x) => x.id === state.product);
-  const m = state.metric === "trades" && p.trades ? "Trades" : "Par volume ($)";
+  if (p.synthetic) return state.metric === "trades" ? `${p.label} — ADT` : `${p.label} — ADV ($B/day)`;
+  const m = state.metric === "trades" && p.trades ? "Trades" : p.unit === "shares" ? "Short shares" : "Par volume ($)";
   return `${p.label} — ${m}`;
+}
+
+async function loadMain() {
+  const p = PRODUCTS.find((x) => x.id === state.product);
+  if (p.synthetic) return totalSeries(state.metric, state.range);
+  return getSeries(currentSeriesId(), state.range);
 }
 
 async function drawChart() {
@@ -107,10 +167,11 @@ async function drawChart() {
   const statusDiv = document.getElementById("trace-chart-status");
   if (!chartDiv) return;
   const sid = currentSeriesId();
+  const p = PRODUCTS.find((x) => x.id === state.product);
   statusDiv.textContent = "Loading…";
   try {
     const [series, second, bands] = await Promise.all([
-      getSeries(sid, state.range),
+      loadMain(),
       state.overlay ? getSeries(state.overlay, state.range) : Promise.resolve(null),
       loadRecessions(),
     ]);
@@ -136,7 +197,14 @@ async function drawChart() {
         series.points.map(([d]) => Date.parse(d) / 1000),
         series.points.map(([, v]) => v),
       ];
-      statusDiv.textContent = `${series.points.length} monthly points`;
+      const note = p.synthetic
+        ? (state.metric === "trades"
+            ? `${series.points.length} monthly ADT points — Treasury + TRACE products with trade-count data`
+            : `${series.points.length} monthly ADV points — Treasury + all 10 TRACE products`)
+        : p.unit === "shares"
+          ? `${series.points.length} biweekly settlement points (shares)`
+          : `${series.points.length} monthly points`;
+      statusDiv.textContent = note;
     }
     state.plot = new uPlot(opts, data, chartDiv);
   } catch (err) {
@@ -156,7 +224,9 @@ function syncControls() {
   if (ovSel) ovSel.value = state.overlay;
   // metric toggle: disable trades button when product has no trades series
   const p = PRODUCTS.find((x) => x.id === state.product);
+  if (metricPar) metricPar.textContent = p.synthetic ? "ADV" : "Par $";
   if (metricTr) {
+    metricTr.textContent = p.synthetic ? "ADT" : "Trades";
     metricTr.disabled = !p.trades;
     metricTr.title = p.trades ? "" : "Trade counts not published for this product";
     if (!p.trades && state.metric === "trades") state.metric = "par";

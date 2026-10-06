@@ -44,6 +44,8 @@ from datetime import date, timedelta
 from collector.http import GetText, PostText
 from collector.store import Store
 
+import re
+
 log = logging.getLogger(__name__)
 
 SHVOL_URL = "https://cdn.finra.org/equity/regsho/daily/{mkt}shvol{day}.txt"
@@ -174,7 +176,33 @@ def _store_day(store: Store, day: date, per_market: dict[str, list[dict]]) -> di
         if sym in combined:
             store.upsert_points(f"cycle:regsho-short-{sym}",
                                 [(day, combined[sym]["short"])])
+    # Per-ticker daily history for the day's top-50 shorted names — backs the
+    # Top Shorted table's 1D/1W % changes (the snapshot doc alone is one day).
+    for sym, v in sorted(combined.items(), key=lambda kv: kv[1]["short"],
+                         reverse=True)[:50]:
+        safe = re.sub(r"[^A-Z0-9]", "", sym.upper())
+        if not safe:
+            continue
+        store.upsert_points(f"cycle:regsho-top-{safe}-shortvol",
+                            [(day, v["short"])])
+        store.upsert_points(f"cycle:regsho-top-{safe}-totalvol",
+                            [(day, v["total"])])
     return combined
+
+
+def _pct_chg(pts: dict[date, float], day: date, days: int) -> float | None:
+    """% change on `day` vs the nearest prior point at least `days` back."""
+    cur = pts.get(day)
+    if cur is None:
+        return None
+    ref = None
+    for d in sorted(pts):
+        if d < day and (day - d).days >= days:
+            ref = d
+    if ref is None:
+        return None
+    prev = pts[ref]
+    return (cur - prev) / prev if prev else None
 
 
 async def _threshold_count(post_text: PostText, trade_date: str) -> list[dict]:
@@ -230,16 +258,47 @@ async def fetch_finra_regsho(store: Store, get_text: GetText,
             for _p, suffix, _l in MARKETS if suffix in per_market}
     top50 = sorted(combined.items(), key=lambda kv: kv[1]["short"],
                    reverse=True)[:50]
+    # 1D/1W/1M/1Q/1Y % changes per ticker from the stored daily top-50 history
+    # (Harry's universal horizon standard, 2026-10-05). Falls back to the
+    # watchlist daily short-volume history (252d) where the top-50 series has
+    # not accumulated yet; ratio changes need both legs so they stay null.
+    _HORIZONS = (("1d", 1), ("1w", 7), ("1m", 30), ("1q", 91), ("1y", 365))
+
+    def _ratio_at(sv: dict, tv: dict, day: date, days: int) -> float | None:
+        cands = sorted(d for d in sv
+                       if d < day and (day - d).days >= days and d in tv)
+        if not cands:
+            return None
+        s0, t0 = sv[cands[-1]], tv[cands[-1]]
+        return s0 / t0 if t0 else None
+
+    def _ticker_chg(sym: str, ratio: float) -> dict:
+        safe = re.sub(r"[^A-Z0-9]", "", sym.upper())
+        sv = store.points(f"cycle:regsho-top-{safe}-shortvol")
+        tv = store.points(f"cycle:regsho-top-{safe}-totalvol")
+        if not sv:
+            sv = store.points(f"cycle:regsho-short-{safe}")
+        out: dict[str, float | None] = {}
+        for tag, days in _HORIZONS:
+            schg = _pct_chg(sv, day, days)
+            out[f"short_chg_{tag}"] = (round(schg, 4)
+                                       if schg is not None else None)
+            rref = _ratio_at(sv, tv, day, days)
+            out[f"ratio_chg_{tag}"] = (round((ratio - rref) / rref, 4)
+                                       if rref else None)
+        return out
     store.put_doc("regsho_daily", {
         "as_of": day.isoformat(),
         "markets": {suffix: {"label": label, **aggs[suffix]}
                     for prefix, suffix, label in MARKETS if suffix in aggs},
-        "top50": [{"symbol": sym,
+        "top50": [{**{"symbol": sym,
                    "short_volume": round(v["short"], 1),
                    "exempt_volume": round(v["exempt"], 1),
                    "total_volume": round(v["total"], 1),
                    "short_ratio": round(v["short"] / v["total"], 4)
-                   if v["total"] > 0 else 0.0}
+                   if v["total"] > 0 else 0.0},
+                  **_ticker_chg(sym, v["short"] / v["total"]
+                                if v["total"] > 0 else 0.0)}
                   for sym, v in top50],
         "tickers": {sym: round(combined[sym]["short"], 1)
                     for sym in TICKERS if sym in combined},

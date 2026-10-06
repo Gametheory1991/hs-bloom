@@ -460,7 +460,20 @@ table.trace-grid td:first-child, table.trace-grid th:first-child {
 }
 table.trace-grid tbody tr[data-pid] { cursor: pointer; }
 table.trace-grid tbody tr[data-pid]:hover td:first-child { text-decoration: underline; }
+table.trace-grid tbody tr.total-row td { background: rgba(37, 99, 235, 0.07); font-weight: 600; }
 table.trace-grid svg.trng, table.trace-grid svg.tspark { display: block; }
+
+/* Top-shorted tickers: wide table scrolls horizontally */
+.table-scroll { overflow-x: auto; margin: 8px 0 4px; }
+table.topshorted { font-size: 12px; white-space: nowrap; }
+table.topshorted td.num, table.topshorted th { text-align: right; font-variant-numeric: tabular-nums; }
+table.topshorted td:first-child, table.topshorted td:nth-child(2) { text-align: left; }
+
+/* Breadth & sentiment charts */
+.bs-chart { width: 100%; margin: 4px 0 12px; }
+table.bs-deltas { font-size: 12px; margin: 8px 0 12px; }
+table.bs-deltas td.num, table.bs-deltas th { text-align: right; font-variant-numeric: tabular-nums; }
+table.bs-deltas td:first-child { text-align: left; }
 
 /* KOI scorecard (MKT tab): compact FINRA/TRACE Y/Y cards */
 .koi-sub { font-size: 10px; letter-spacing: 1px; margin: 2px 0 6px; }
