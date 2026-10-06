@@ -225,7 +225,7 @@ function regshoSection(r, ts) {
     `<th>Short vol</th>` +
     `<th>Short ratio</th><th colspan="6">Δ short vol (nominal + %) — 1D | 1W | 1M | 1Q | 1Y | 3Y</th>` +
     `<th colspan="6">Δ short ratio (pp + %) — 1D | 1W | 1M | 1Q | 1Y | 3Y</th>` +
-    `<th>% of sector short</th></tr><tr><td colspan="2"></td>` +
+    `<th>% of sector short</th></tr><tr data-sort-row="off"><td colspan="2"></td>` +
     `<th>Price</th><th>%1D</th><th>Mkt cap</th><th>P/E</th><th>%YTD</th><th data-sort="off">1Y</th><th>Δ52wH</th><th>RS 1M</th><th data-sort="off">20/50/200</th>` +
     `<td colspan="2"></td>` +
     `<th>1D</th><th>1W</th><th>1M</th><th>1Q</th><th>1Y</th><th>3Y</th>` +
@@ -498,7 +498,7 @@ function starSection(s) {
   return `<h3>STRUCTURED PRODUCT ACTIVITY — STAR <span class="muted">daily · as of ${s.as_of ?? "—"} · click a row for its trend chart</span></h3>
     <div class="seg" id="star-metric-toggle" role="tablist"><button data-m="vol" class="on">$ Volume</button><button data-m="trades">Trades</button></div>
     <table class="star-table" data-sortable><thead><tr><th>Product</th><th>Latest</th><th>1D Δ</th><th>1W Δ</th><th>1M Δ</th><th>1Q Δ</th><th>1Y Δ</th><th>3Y Δ</th>${RANGE_TH}</tr></thead>
-    <tbody id="star-tbody"><tr><td colspan="10" class="muted">Loading daily history…</td></tr></tbody></table>
+    <tbody id="star-tbody"><tr data-sort-row="off"><td colspan="10" class="muted">Loading daily history…</td></tr></tbody></table>
     <p class="muted">FINRA-ICE Data Services Structured Trading Activity Reports — the public equivalent of the ` +
     `login-walled ICE Vantage structured aggregates. Daily TBA/specified/CMO/CMBS/ABS/CLO activity by issuer and ` +
     `investment grade. Full trend lines in the TRACE chart above and the grid below.</p>`;
@@ -509,7 +509,7 @@ async function fillStarSection() {
   const toggle = document.getElementById("star-metric-toggle");
   let metric = "vol";
   const render = async () => {
-    tbody.innerHTML = `<tr><td colspan="10" class="muted">Loading daily history…</td></tr>`;
+    tbody.innerHTML = `<tr data-sort-row="off"><td colspan="10" class="muted">Loading daily history…</td></tr>`;
     const rows = await Promise.all(STAR_ROWS.map(async ([parId, trId, label, chartId]) => {
       const sid = metric === "vol" ? parId : trId;
       if (!sid) return null;

@@ -64,7 +64,7 @@ function paint(wrap) {
     (!f.holder || c.holder === f.holder));
   const tb = wrap.querySelector("[data-dc-rows]");
   if (!rows.length) {
-    tb.innerHTML = `<tr><td colspan="5" class="muted">No cells for this slice — cube builds on the next scheduler run.</td></tr>`;
+    tb.innerHTML = `<tr data-sort-row="off"><td colspan="5" class="muted">No cells for this slice — cube builds on the next scheduler run.</td></tr>`;
   } else {
     tb.innerHTML = rows.map((c) =>
       `<tr><td class="sym">${esc(c.product.toUpperCase())}</td>` +

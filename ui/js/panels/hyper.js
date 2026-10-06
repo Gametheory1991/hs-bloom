@@ -40,7 +40,7 @@ function fmtUsd(v) {
 
 function issuanceRows(issuances) {
   if (!issuances.length)
-    return `<tr><td colspan="6" class="muted">No debt filings in the last 90 days.</td></tr>`;
+    return `<tr data-sort-row="off"><td colspan="6" class="muted">No debt filings in the last 90 days.</td></tr>`;
   return issuances.slice(0, 12).map((e) => {
     const tranches = (e.tranches || []).slice(0, 4).map((t) =>
       `${t.coupon_pct != null ? t.coupon_pct.toFixed(3) + "%" : "—"}` +
