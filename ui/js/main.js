@@ -3,6 +3,7 @@ import { fmtAge, fmtClock, isStale } from "./fmt.js";
 import { defiFootData, initDefiViewToggle, renderDefi, renderMidnight } from "./panels/defi.js";
 import { renderBonds, renderEquity } from "./panels/equity.js";
 import { renderMacro } from "./panels/macro.js";
+import { renderAuctions } from "./panels/auctions.js";
 import { renderNews } from "./panels/news.js";
 import { renderCycle } from "./panels/cycle.js";
 import { renderEarningsProfit, renderFiscalEcon } from "./panels/fiscal.js";
@@ -32,37 +33,55 @@ import { renderRefs } from "./panels/refs.js";
 import { renderInsights } from "./panels/insights.js";
 import { initNotifications, notifyInsights } from "./notifications.js";
 import { initChat } from "./chat.js";
-import { initTabs } from "./tabs.js";
+import { initTabs, HUBS } from "./tabs.js";
 
 const POLL_MS = 60_000;
-const STALE_MINUTES = { equity: 20, bonds: 130, macro: 390, news: 40, defi: 35, midnight: 35, refs: 35, insights: 70, riskmap: 2880, xcorr: 2880, gse: 86400, vol: 2880, movers: 10080, radar: 2880, hyper: 10080, tsv: 10080, usaspending: 20160, finnhub: 2880, worldbank: 20160, coingecko: 2880, predict: 120, finra: 2880 };  // ~2x cadence
+const STALE_MINUTES = { equity: 20, bonds: 130, macro: 390, auctions: 2880, news: 40, defi: 35, midnight: 35, refs: 35, insights: 70, riskmap: 2880, xcorr: 2880, gse: 86400, vol: 2880, movers: 10080, radar: 2880, hyper: 10080, tsv: 10080, usaspending: 20160, finnhub: 2880, worldbank: 20160, coingecko: 2880, predict: 120, finra: 2880 };  // ~2x cadence
 
 const EMPTY = { rows: [], updated_at: null, source: null };
 
 let lastDash = null; // last successful payload, for the view-toggle re-render (no re-fetch)
 
-// Command-palette index: tabs + panels + series, rebuilt from live payloads
-// (never hardcoded). Series entries deep-link to their tab.
+// Command-palette index: hubs + panels + series, rebuilt from live payloads
+// (never hardcoded). Series entries deep-link to their hub/sub route.
 const PANEL_ENTRIES = [
-  ["MARKET RADAR", "mkt"], ["ALERTS / NEWSLETTER", "mkt"], ["ALERT TUNING", "mkt"],
-  ["BRIEFING × TERMINAL CHECK", "mkt"], ["TOP NEWS", "mkt"],
-  ["FUTURES — FRONT-MONTH", "futures"], ["FLOWS — 13F NET FLOWS", "flows"],
-  ["SCORECARD — 1D/1M/3M/1Y + 1Y Z", "scorecard"], ["CENTRAL — FED WATCH", "central"],
-  ["PREDICT — MARKETS & EDGE", "predict"], ["FINRA — SHORTS · BREADTH · TRACE", "finra"],
+  ["MARKET RADAR", "pulse/snapshot"], ["TOP NEWS", "pulse/snapshot"],
+  ["ALERTS / NEWSLETTER", "pulse/snapshot"], ["ALERT TUNING", "desk/alerts"],
+  ["BRIEFING × TERMINAL CHECK", "desk/briefcheck"],
+  ["MACRO — THIS WEEK", "macro/calendar"], ["CENTRAL — FED WATCH", "macro/central"],
+  ["UST AUCTIONS", "macro/auctions"], ["WORLD BONDS", "macro/bonds"],
+  ["CREDIT — SEGMENTS · UST · STAR · Z-SCORES", "macro/credit"],
+  ["EQTY", "markets/equities"], ["MOVERS — SINGLE-STOCK SIGMA MOVES", "markets/equities"],
+  ["VOL — MACRO VOLATILITY DIGEST", "markets/volcorr"], ["X-CORR — CROSS-ASSET CORRELATION & VOL", "markets/volcorr"],
+  ["FUTURES — FRONT-MONTH", "markets/futures"], ["FLOWS — 13F NET FLOWS", "positioning/flows"],
+  ["SCORECARD — 1D/1M/3M/1Y + 1Y Z", "markets/scorecard"],
+  ["CURATED VAULTS — USDC", "markets/digital"],
+  ["PREDICT — MARKETS & EDGE", "positioning/predict"],
+  ["FINRA — SHORTS · BREADTH · CORPORATE · TRACE", "structure/trace"],
+  ["KOI — FINRA/TRACE Y/Y SCORECARD", "structure/trace"],
+  ["RISK MAP — WORLD", "structure/maps"], ["COVERAGE MAPS — UNIVERSE & MONEY FLOW", "structure/maps"],
+  ["HYPER — HYPERSCALER DESK", "structure/desks"], ["TSV — TOKENIZED SECURITIES VENUE WATCH", "structure/desks"],
 ];
 
 function buildIndex(dash) {
   const idx = [];
-  document.querySelectorAll("[data-tab-link]").forEach((a) =>
-    idx.push({ label: `${a.textContent.trim()} tab`, sub: "tab", hash: `#/${a.dataset.tabLink}` }));
-  for (const [label, tab] of PANEL_ENTRIES)
-    idx.push({ label, sub: "panel", hash: `#/${tab}` });
-  // cycle tabs render inside UI tabs: struct lives on the FINRA tab, ice on POS.
-  const CYCLE_TAB_HASH = { struct: "finra", ice: "pos" };
+  for (const h of HUBS) {
+    idx.push({ label: `${h.label} hub`, sub: "hub", hash: `#/${h.id}` });
+    for (const [sid, slabel] of h.subs)
+      idx.push({ label: slabel, sub: `hub · ${h.label}`, hash: `#/${h.id}/${sid}` });
+  }
+  for (const [label, route] of PANEL_ENTRIES)
+    idx.push({ label, sub: "panel", hash: `#/${route}` });
+  // Cycle tab id -> hub/sub route for series deep-links.
+  const CYCLE_ROUTE = {
+    risk: "positioning/positions", econ: "macro/cycle", credit: "macro/cycle",
+    profit: "macro/cycle", pos: "positioning/positions", quant: "positioning/positions",
+    ice: "positioning/positions", struct: "structure/trace", etf: "markets/etfs",
+  };
   for (const t of dash?.panels?.cycle?.tabs ?? [])
     for (const p of t.panels ?? [])
       for (const r of p.rows ?? [])
-        if (r.name) idx.push({ label: r.name, sub: `series · ${t.id}`, hash: `#/${CYCLE_TAB_HASH[t.id] ?? t.id}` });
+        if (r.name) idx.push({ label: r.name, sub: `series · ${t.id}`, hash: `#/${CYCLE_ROUTE[t.id] ?? "macro/cycle"}` });
   return idx;
 }
 
@@ -71,10 +90,10 @@ async function refreshSearchIndex() {
   try {
     const sc = await getScorecard();
     for (const r of sc.rows ?? [])
-      if (r.name) base.push({ label: r.name, sub: "series · scorecard", hash: "#/scorecard" });
+      if (r.name) base.push({ label: r.name, sub: "series · scorecard", hash: "#/markets/scorecard" });
   } catch { /* scorecard down — tabs/series index still works */ }
   for (const [, sym, label] of FUTURES)
-    base.push({ label: `${sym} — ${label}`, sub: "futures", hash: "#/futures" });
+    base.push({ label: `${sym} — ${label}`, sub: "futures", hash: "#/markets/futures" });
   updateIndex(base);
 }
 
@@ -101,6 +120,7 @@ async function tick() {
     renderEquity(p.equity);
     renderBonds(p.bonds);
     renderMacro(p.macro);
+    renderAuctions(p.auctions ?? EMPTY);
     renderNews(p.news);
     renderDefiPanel(p);
     renderMidnight(p.midnight ?? EMPTY);
@@ -132,6 +152,7 @@ async function tick() {
     foot("equity", "equity", { ...p.equity, source: p.equity.rows[0]?.source });
     foot("bonds", "bonds", p.bonds);
     foot("macro", "macro", p.macro);
+    foot("auctions", "auctions", p.auctions ?? EMPTY);
     foot("news", "news", p.news);
     foot("midnight", "midnight", p.midnight ?? EMPTY);
     foot("refs", "refs", p.refs ?? EMPTY);
