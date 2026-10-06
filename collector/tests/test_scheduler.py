@@ -40,7 +40,8 @@ def test_register_jobs_creates_all_jobs_with_config_cadences(tmp_path):
         "finra_short", "finra_margin", "tsv_capex", "tsv_graph", "tsv_watch", "newsletter",
         "worldbank", "usaspending", "coingecko", "openfigi", "finnhub",
         "polymarket", "kalshi", "pred_edge", "finra_breadth", "finra_corp", "finra_regsho",
-        "finra_capped", "finra_ids_star", "ticker_stats", "bank_capex", "bank_graph",
+        "finra_capped", "finra_ids_star", "finra_factbook", "finra_factbook_annual",
+        "ticker_stats", "bank_capex", "bank_graph",
         "tech_capex", "tech_graph", "vendor_capex", "vendor_graph",
         "etf_capex", "etf_graph", "crypto_capex", "crypto_graph",
     }
