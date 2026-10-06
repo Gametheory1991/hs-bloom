@@ -315,7 +315,8 @@
     </div>
   </div>
   <script src="vendor/uplot/uPlot.iife.min.js"></script>
-  <script src="vendor/xlsx/xlsx.full.min.js"></script>
+  <!-- xlsx.full.min.js lazy-loads on first XLSX export via export.js ensureXLSX()
+       (was render-blocking at 951KB) -->
   <script type="module" src="js/main.js"></script>
 </body>
 </html>

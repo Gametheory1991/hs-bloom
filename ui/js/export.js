@@ -161,6 +161,25 @@ function xlsxAvailable() {
   return typeof window !== "undefined" && window.XLSX && window.XLSX.utils;
 }
 
+// Lazy-load the vendored SheetJS library on first XLSX export request.
+// The <script> tag in index.html was removed to avoid blocking first paint
+// (951KB synchronous). This loads it on demand and caches the promise.
+let _xlsxLoadPromise = null;
+function ensureXLSX() {
+  if (xlsxAvailable()) return Promise.resolve(true);
+  if (_xlsxLoadPromise) return _xlsxLoadPromise;
+  _xlsxLoadPromise = new Promise((resolve) => {
+    const s = document.createElement("script");
+    s.src = "vendor/xlsx/xlsx.full.min.js";
+    s.onload = () => resolve(xlsxAvailable());
+    s.onerror = () => resolve(false);
+    document.head.appendChild(s);
+    // Safety timeout: don't hang the export UI forever
+    setTimeout(() => resolve(xlsxAvailable()), 15000);
+  });
+  return _xlsxLoadPromise;
+}
+
 function aoaSheet(headers, rows, meta) {
   const aoa = [];
   aoa.push([`HSUGAMA DASH — ${meta?.title ?? ""}`]);
@@ -191,10 +210,16 @@ function aboutSheet() {
 
 // sheets: [{ name, table }] — meta taken from each table's h3 when available.
 export function exportTablesXLSX(sheets, baseName) {
-  if (!xlsxAvailable()) {
-    alert("XLSX library not loaded — try the CSV export instead.");
-    return;
-  }
+  ensureXLSX().then((ok) => {
+    if (!ok) {
+      alert("XLSX library failed to load — try the CSV export instead.");
+      return;
+    }
+    _exportTablesXLSXNow(sheets, baseName);
+  });
+}
+
+function _exportTablesXLSXNow(sheets, baseName) {
   const wb = window.XLSX.utils.book_new();
   for (const { name, table, meta } of sheets) {
     const { headers, rows } = tableToMatrix(table);
@@ -362,7 +387,8 @@ function wireSection(h3) {
   const options = [];
   if (realTable) {
     options.push({ label: "CSV", fn: () => exportTableCSV(realTable, base, meta) });
-    if (xlsxAvailable()) options.push({ label: "XLSX", fn: () => exportTablesXLSX([{ name: meta.title, table: realTable, meta }], base) });
+    // XLSX library lazy-loads on first use (non-blocking); always offer it.
+    options.push({ label: "XLSX", fn: () => exportTablesXLSX([{ name: meta.title, table: realTable, meta }], base) });
   }
   if (hasChart) {
     // Query the LIVE section at click time (clones lose canvas bitmaps).

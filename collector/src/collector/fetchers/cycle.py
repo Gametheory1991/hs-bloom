@@ -4,7 +4,10 @@ summary error raises at the end so /healthz surfaces it)."""
 from __future__ import annotations
 
 import asyncio
+import logging
 from datetime import date
+
+log = logging.getLogger(__name__)
 
 from collector.config import CycleSeriesCfg
 from collector.fetchers import aaii, cboe, cftc, dbnomics, eia, fred, oecd, ofr, wei, yahoo
@@ -132,5 +135,14 @@ async def fetch_cycle(
         except Exception as exc:  # noqa: BLE001 — per-series isolation
             errors.append(f"{cfg.id}: {exc}")
     if errors:
-        raise RuntimeError(f"{len(errors)}/{len(series)} cycle series failed: {'; '.join(errors)}")
-    return "cycle"
+        # Partial failure: data for successful series IS in the store (upserted
+        # in the loop above). Only raise if most series failed — otherwise the
+        # job would be marked failed and last_success would go stale even
+        # though 95% of the data is fresh. The error details are still logged
+        # and surfaced via record_error.
+        total = len([c for c in series if not c.external])
+        log.warning(
+            "cycle: %d/%d series failed: %s", len(errors), total, "; ".join(errors[:5]))
+        if len(errors) > total / 2:
+            raise RuntimeError(f"{len(errors)}/{total} cycle series failed: {'; '.join(errors)}")
+    return f"cycle ({len(errors)} failed)" if errors else "cycle"
