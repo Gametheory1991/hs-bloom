@@ -4,6 +4,9 @@
 // re-rendered on every dashboard refresh (15-min interval in main.js).
 import { getScorecard, getSeries, getDashboard, getAuctions, getEconCalendar } from "../api.js";
 import { rangePlotDotted, zToPct } from "../rangeviz.js";
+// TRACE/Treasury monthly volume: reuse the grid's canonical TOTAL math
+// (Treasury Total + all 10 TRACE products, 11 components — corrected 2026-10-05).
+import { TOTAL_PARTS, toMetric, totalVals, rowStats, rangeById } from "./trace_grid.js";
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -106,6 +109,50 @@ function tileHtml({ t, row, pts, w1, q1 }) {
     `<div class="hz">${hz}<span class="zbadge">z ${z == null ? "—" : (z > 0 ? "+" : "") + z.toFixed(1)}</span></div></div>`;
 }
 
+// ---- TRACE/TREASURY VOLUME: TOTAL + Treasury + TRACE ex-Treasury tiles ----
+const MONTH_ABBR = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const mlabel = (d) => (d && d.length >= 7 ? `${MONTH_ABBR[+d.slice(5, 7) - 1]} ${d.slice(0, 4)}` : "—");
+const fmtVol = (v) => { // $B/d -> $T/d or $B/d
+  if (v == null || !isFinite(v)) return "—";
+  if (v >= 1000) return `$${(v / 1000).toFixed(2)}T/d`;
+  if (v >= 10) return `$${v.toFixed(0)}B/d`;
+  if (v >= 1) return `$${v.toFixed(1)}B/d`;
+  return `$${v.toFixed(2)}B/d`;
+};
+const pctFrac = (x) => (x == null || !isFinite(x) ? "—" : `${x >= 0 ? "+" : ""}${(x * 100).toFixed(1)}%`);
+
+async function volumeData() {
+  const jobs = TOTAL_PARTS.map(async (p) => {
+    const s = await getSeries(p.par, "max").catch(() => null);
+    if (!s?.points?.length) return null;
+    return { p, par: s.points };
+  });
+  const data = (await Promise.all(jobs)).filter(Boolean);
+  if (!data.length) return null;
+  const r3y = rangeById("3y");
+  const advTotal = rowStats(totalVals(data, "adv"), r3y);
+  const advUst = rowStats(totalVals(data, "adv", TOTAL_PARTS.filter((p) => p.id === "ust")), r3y);
+  const advTrace = rowStats(totalVals(data, "adv", TOTAL_PARTS.filter((p) => p.id !== "ust")), r3y);
+  const prods = data.map(({ p, par }) => ({ p, st: rowStats(toMetric(p, par, "adv"), r3y) }));
+  return { advTotal, advUst, advTrace, prods };
+}
+
+// Monthly rows: 1D/1W are "—" by design (monthly cadence), headline is M/M.
+function volTileHtml(label, st) {
+  const m1 = st?.m1;
+  const cls = m1 == null ? "flat" : m1 > 0 ? "up" : m1 < 0 ? "down" : "flat";
+  const hz = [["1D", st?.d1], ["1W", st?.w1], ["1M", st?.m1], ["1Q", st?.q1], ["1Y", st?.y1]]
+    .map(([h, val]) => `<span><b>${h}</b> ${pctFrac(val)}</span>`).join("");
+  const z = st?.z;
+  const pts = (st?.win ?? []).map(({ d, v }) => [d, v]);
+  return `<div class="kpi"><div class="lbl">${esc(label)}</div>` +
+    `<div class="val">${fmtVol(st?.cur?.v)}</div>` +
+    `<div class="chg ${cls}">${pctFrac(m1)} <span class="note">1M</span></div>` +
+    `${sparkSvg(pts, cls === "up" ? true : cls === "down" ? false : null)}` +
+    `<div class="hz">${hz}<span class="zbadge">z ${z == null ? "—" : (z > 0 ? "+" : "") + z.toFixed(1)}</span></div>` +
+    `<div class="muted" style="font-size:9px;margin-top:2px">${esc(mlabel(st?.asof))} · monthly</div></div>`;
+}
+
 // ---- RANGE CHECK: key series with dotted range in both versions ----
 const RANGE_SERIES = [
   { label: "UST 10Y", sid: "us10y", fmt: "yld" },
@@ -116,32 +163,80 @@ const RANGE_SERIES = [
   { label: "IG OAS", sid: "ig-oas", fmt: "bp" },
 ];
 
-async function rangeCheckHtml(scoreRows) {
+function rangeRow(label, valTxt, pct, z) {
+  const pctCls = pct == null ? "" : pct >= 75 ? "up" : pct <= 25 ? "down" : "flat";
+  const zCls = z == null ? "" : Math.abs(z) >= 2 ? (z > 0 ? "up strong" : "down strong") : Math.abs(z) >= 1 ? (z > 0 ? "up" : "down") : "flat";
+  return `<tr><td class="sym">${esc(label)}</td><td class="num">${valTxt}</td>` +
+    `<td>${rangePlotDotted({ pct, z }, "pct")}</td>` +
+    `<td>${rangePlotDotted({ pct, z }, "z")}</td>` +
+    `<td class="${pctCls} num">${pct == null ? "—" : pct.toFixed(0)}</td>` +
+    `<td class="${zCls} num">${z == null ? "—" : (z > 0 ? "+" : "") + z.toFixed(2)}</td></tr>`;
+}
+
+async function rangeCheckHtml(scoreRows, vol) {
   const rows = await Promise.all(RANGE_SERIES.map(async ({ label, sid, fmt }) => {
     const row = scoreRows.find((r) => r.id === sid || r.series === sid);
     const z = row?.z_1y ?? null;
-    const pct = zToPct(z);
-    const pctCls = pct == null ? "" : pct >= 75 ? "up" : pct <= 25 ? "down" : "flat";
-    const zCls = z == null ? "" : Math.abs(z) >= 2 ? (z > 0 ? "up strong" : "down strong") : Math.abs(z) >= 1 ? (z > 0 ? "up" : "down") : "flat";
-    return `<tr><td class="sym">${esc(label)}</td><td class="num">${fmtVal(row?.last, fmt)}</td>` +
-      `<td>${rangePlotDotted({ pct, z }, "pct")}</td>` +
-      `<td>${rangePlotDotted({ pct, z }, "z")}</td>` +
-      `<td class="${pctCls} num">${pct == null ? "—" : pct.toFixed(0)}</td>` +
-      `<td class="${zCls} num">${z == null ? "—" : (z > 0 ? "+" : "") + z.toFixed(2)}</td></tr>`;
+    return rangeRow(label, fmtVal(row?.last, fmt), zToPct(z), z);
   }));
+  // TRACE/Treasury monthly ADV rows (3Y window stats, same math as the grid)
+  const vst = (id) => vol?.prods?.find((x) => x.p.id === id)?.st ?? null;
+  const volDefs = [
+    ["TOTAL ADV (TRACE + TSY)", vol?.advTotal],
+    ["Treasury ADV", vol?.advUst],
+    ["TBA ADV", vst("tba")],
+    ["Corporate ADV", vst("corp")],
+  ];
+  const volRows = volDefs.filter(([, st]) => st != null)
+    .map(([label, st]) => rangeRow(label, fmtVol(st.cur?.v), st.pct ?? null, st.z ?? null));
   return `<table data-sortable><tr><th>Series</th><th>Now</th>` +
     `<th data-sort="off">Range · percentile</th><th data-sort="off">Range · z-score</th>` +
-    `<th>%ile</th><th>z</th></tr>${rows.join("")}</table>`;
+    `<th>%ile</th><th>z</th></tr>${rows.join("")}${volRows.join("")}</table>`;
 }
 
 // ---- TALK TRACK: auto-generated 60-second bullets from live data ----
-function talkBullets(dash) {
+function volumeBullets(vol) {
+  const out = [];
+  const t = vol?.advTotal;
+  if (!t?.cur) return out;
+  const curM = mlabel(t.asof);
+  const win = t.win ?? [];
+  const prevPt = win.length >= 2 ? win[win.length - 2] : null;
+  const prevM = mlabel(prevPt?.d);
+  const vsAvg = t.avg ? (t.cur.v - t.avg) / t.avg : null;
+  // Top contributor: product with the largest MoM delta in the total's direction.
+  const deltas = (vol.prods ?? []).map(({ p, st }) => {
+    if (st?.m1 == null || st?.cur == null) return null;
+    const prev = st.cur.v / (1 + st.m1);
+    return { label: p.label, delta: st.cur.v - prev, m1: st.m1, z: st.z };
+  }).filter(Boolean);
+  const totalDelta = prevPt ? t.cur.v - prevPt.v : null;
+  let leader = null;
+  if (totalDelta != null && deltas.length) {
+    const sameSign = deltas.filter((d) => (totalDelta > 0 ? d.delta > 0 : d.delta < 0));
+    leader = (sameSign.length ? sameSign : deltas)
+      .sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta))[0];
+  }
+  out.push(`<b>Volume:</b> TOTAL fixed-income ADV ${fmtVol(t.cur.v)} in ${curM} (${pctFrac(t.m1)} vs ${prevM})` +
+    (leader ? ` — led by ${leader.label} (${pctFrac(leader.m1)} MoM)` : "") +
+    (vsAvg != null ? `; now ${vsAvg >= 0 ? "+" : ""}${(vsAvg * 100).toFixed(0)}% vs 3Y avg (${fmtVol(t.avg)}).` : "."));
+  // Flags: |1M%| > 20% or |z| > 2
+  const flags = deltas.filter((d) => Math.abs(d.m1) > 0.20 || Math.abs(d.z ?? 0) > 2)
+    .sort((a, b) => Math.abs(b.m1) - Math.abs(a.m1))
+    .map((d) => `${d.label} ${pctFrac(d.m1)} MoM${d.z != null ? `, z ${d.z > 0 ? "+" : ""}${d.z.toFixed(1)}` : ""}`);
+  if (flags.length) {
+    out.push(`<b>Volume flags:</b> ${flags.join(" · ")} — ${flags.length === 1 ? "watch" : "watch these products"} for dealer positioning shifts.`);
+  }
+  return out;
+}
+
+function talkBullets(dash, vol) {
   const p = dash.panels ?? {};
   const rows = p.scorecard?.rows ?? [];
   const byId = (id) => rows.find((r) => r.id === id || r.series === id);
   const us10y = byId("us10y"), vix = byId("vix"), vvix = byId("vvix");
   const hyOas = byId("hy-oas"), igOas = byId("ig-oas");
-  const bullets = [];
+  const bullets = volumeBullets(vol);
   // Rates
   if (us10y?.last != null) {
     const bp = us10y.d1 != null ? `${us10y.d1 * 100 >= 0 ? "+" : ""}${(us10y.d1 * 100).toFixed(0)}bp 1D` : "—";
@@ -198,27 +293,39 @@ export async function renderPulse() {
     return;
   }
 
+  // TRACE/Treasury monthly volume: TOTAL + Treasury + TRACE ex-Treasury
+  let vol = null;
+  try {
+    vol = await volumeData();
+    if (req !== pulseReq) return;
+  } catch { /* volume tiles degrade gracefully */ }
+
   // KPI tiles
   if (tilesEl) {
     tilesEl.innerHTML = `<p class="muted">Loading tiles…</p>`;
     const datas = await Promise.all(TILES.map((t) => tileData(t, scoreRows)));
     if (req !== pulseReq) return;
     const asof = new Date().toLocaleString("en-US", { timeZone: "America/New_York" });
-    tilesEl.innerHTML = datas.map(tileHtml).join("") +
-      `<div class="kpi-foot muted">LIVE · as of ${esc(asof)} ET · 1D/1W/1M/1Q/1Y + 1Y z</div>`;
+    const volTiles = vol ? [
+      ["TOTAL FI ADV", vol.advTotal],
+      ["TREASURY ADV", vol.advUst],
+      ["TRACE ADV (EX-TSY)", vol.advTrace],
+    ].filter(([, st]) => st != null).map(([label, st]) => volTileHtml(label, st)).join("") : "";
+    tilesEl.innerHTML = datas.map(tileHtml).join("") + volTiles +
+      `<div class="kpi-foot muted">LIVE · as of ${esc(asof)} ET · 1D/1W/1M/1Q/1Y + 1Y z · volume tiles monthly ADV (3Y stats)</div>`;
   }
 
   // Range check
   if (rangeEl) {
-    rangeEl.innerHTML = await rangeCheckHtml(scoreRows);
+    rangeEl.innerHTML = await rangeCheckHtml(scoreRows, vol);
     if (req !== pulseReq) return;
   }
 
   // Talk track (both snapshot panel and talktrack subtab)
-  const talkHtml = `<ul class="talk">${talkBullets(dash)}</ul>`;
+  const talkHtml = `<ul class="talk">${talkBullets(dash, vol)}</ul>`;
   if (talkEl) talkEl.innerHTML = talkHtml;
   const talkTab = document.querySelector('[data-hub="pulse"][data-sub="talktrack"] .panel-body');
-  if (talkTab) talkTab.innerHTML = `<ul class="talk big">${talkBullets(dash)}</ul>` +
+  if (talkTab) talkTab.innerHTML = `<ul class="talk big">${talkBullets(dash, vol)}</ul>` +
     `<p class="muted">Auto-built from live terminal data · ${esc(new Date().toLocaleString("en-US", { timeZone: "America/New_York" }))} ET</p>`;
   if (req !== pulseReq) return;
 
