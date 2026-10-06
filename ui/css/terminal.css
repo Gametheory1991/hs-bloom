@@ -528,3 +528,56 @@ td.risk-lo { background: rgba(22, 163, 74, 0.10); }
 table[data-sortable] th[data-scol] { cursor: pointer; user-select: none; }
 table[data-sortable] th[data-scol]:hover { color: var(--fg); background: rgba(37, 99, 235, 0.07); }
 .sort-arrow { color: #2563eb; font-size: 0.85em; white-space: nowrap; }
+
+/* Export buttons (ui/js/export.js): unobtrusive ⤓ on section headers. */
+.exp-wrap { position: relative; display: inline-block; margin-left: 8px; }
+.exp-btn {
+  border: 1px solid var(--line, #e5e7eb);
+  background: transparent;
+  color: var(--muted, #6b7280);
+  border-radius: 4px;
+  font-size: 12px;
+  line-height: 1;
+  padding: 2px 6px;
+  cursor: pointer;
+}
+.exp-btn:hover { color: #2563eb; border-color: #2563eb; }
+.exp-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 60;
+  background: #ffffff;
+  border: 1px solid var(--line, #e5e7eb);
+  border-radius: 6px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.10);
+  padding: 4px;
+  min-width: 90px;
+}
+.exp-menu.hidden { display: none; }
+.exp-opt {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  padding: 6px 10px;
+  font-size: 13px;
+  cursor: pointer;
+  border-radius: 4px;
+  color: var(--fg, #1a1a1a);
+}
+.exp-opt:hover { background: rgba(37, 99, 235, 0.08); }
+.exp-all-btn {
+  border: 1px solid var(--line, #e5e7eb);
+  background: transparent;
+  color: var(--muted, #6b7280);
+  border-radius: 4px;
+  font-size: 11px;
+  padding: 2px 8px;
+  margin-left: 10px;
+  cursor: pointer;
+  vertical-align: middle;
+}
+.exp-all-btn:hover { color: #2563eb; border-color: #2563eb; }
+#chart-overlay .overlay-head .exp-btn { margin-right: 6px; }

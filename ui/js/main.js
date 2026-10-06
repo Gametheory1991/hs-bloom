@@ -22,6 +22,7 @@ import { renderCentral } from "./panels/central.js";
 import { renderPredict } from "./panels/predict.js";
 import { renderFinra } from "./panels/finra.js";
 import { initSortableObserver } from "./sortable.js";
+import { initExportObserver } from "./export.js";
 import { renderKoi } from "./panels/koi_scorecard.js";
 import { renderAlerts } from "./panels/alerts.js";
 import { renderBriefcheck } from "./panels/briefcheck.js";
@@ -157,6 +158,7 @@ initChat();
 initHealth();
 initPalette();
 initSortableObserver(); // click-to-sort on every table[data-sortable]
+initExportObserver(); // ⤓ CSV/XLSX/PNG/JPG export on every section + panel
 renderFutures();
 renderFlows();
 renderScorecard();
