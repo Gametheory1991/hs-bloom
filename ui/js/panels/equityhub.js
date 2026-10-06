@@ -192,7 +192,7 @@ async function drawSvChart() {
       const rs = y2.filter((v) => v != null);
       const avg = (n) => rs.slice(-n).reduce((a, b) => a + b, 0) / Math.min(n, rs.length);
       statsEl.textContent = rs.length
-        ? `Consolidated (CNMS) — ${dates.length} pts (${rLbl}) · short ratio latest ${pct1(rs[rs.length - 1])} · 1W avg ${pct1(avg(5))} · 1M avg ${pct1(avg(21)})`
+        ? `Consolidated (CNMS) — ${dates.length} pts (${rLbl}) · short ratio latest ${pct1(rs[rs.length - 1])} · 1W avg ${pct1(avg(5))} · 1M avg ${pct1(avg(21))}`
         : `${dates.length} pts (${rLbl})`;
     }
   } catch (e) {
