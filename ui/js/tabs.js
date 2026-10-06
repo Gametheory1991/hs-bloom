@@ -72,6 +72,13 @@ export function initTabs() {
     renderSubs(hub, sub);
   };
   window.addEventListener("hashchange", apply);
+  // Hub buttons: click switches to that hub's default sub.
+  document.querySelectorAll("[data-hub-link]").forEach((b) =>
+    b.addEventListener("click", () => {
+      const target = `#/${b.dataset.hubLink}`;
+      if (location.hash !== target) location.hash = target;
+      else apply(); // already there — re-apply in case content is stale
+    }));
   document.addEventListener("keydown", (e) => {
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     const tag = document.activeElement?.tagName ?? "";
