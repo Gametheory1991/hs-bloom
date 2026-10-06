@@ -21,7 +21,7 @@
     <button type="button" data-hub-link="macro">MACRO</button>
     <button type="button" data-hub-link="markets">MARKETS</button>
     <button type="button" data-hub-link="positioning">POSITIONING</button>
-    <button type="button" data-hub-link="structure">STRUCTURE</button>
+    <button type="button" data-hub-link="structure">FLOW</button>
     <button type="button" data-hub-link="desk">DESK</button>
   </nav>
   <nav class="sub-row" id="sub-row" aria-label="subtabs"></nav>
@@ -237,7 +237,7 @@
     </section>
   </main>
 
-  <!-- ============ STRUCTURE ============ -->
+  <!-- ============ FLOW ============ -->
   <main class="grid hidden" data-hub="structure" data-sub="trace" style="grid-template-columns: 1fr;">
     <section class="panel" id="panel-koi">
       <div class="panel-title">KOI — FINRA/TRACE Y/Y SCORECARD</div>
@@ -251,6 +251,14 @@
     </section>
   </main>
   <main class="grid grid-cycle hidden" data-hub="structure" data-sub="trace" id="cycle-struct"></main>
+  <main class="grid hidden" data-hub="structure" data-sub="factbook" style="grid-template-columns: 1fr;">
+    <section class="panel" id="panel-factbook">
+      <div class="panel-title">TRACE FACT BOOK</div>
+      <div class="panel-body"></div>
+      <div class="panel-foot muted"></div>
+    </section>
+  </main>
+
   <main class="grid hidden" data-hub="structure" data-sub="maps" style="grid-template-columns: 1fr 1fr;">
     <section class="panel" id="panel-riskmap">
       <div class="panel-title">RISK MAP — WORLD</div>
