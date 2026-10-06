@@ -85,4 +85,4 @@ def test_main_builds_app(tmp_path, monkeypatch):
 
     app, scheduler = build()
     assert app.title == "os-bloom collector"
-    assert len(scheduler.get_jobs()) == 63  # +1 finra_breadth, +1 finra_corp, +1 finra_regsho, +1 finra_capped, +1 finra_ids_star, +1 ticker_stats, +2 bank universe, +4 tech/vendor universes, +2 etf universe, +2 crypto universe
+    assert len(scheduler.get_jobs()) == 65  # +1 finra_breadth, +1 finra_corp, +1 finra_regsho, +1 finra_capped, +1 finra_ids_star, +1 ticker_stats, +2 bank universe, +4 tech/vendor universes, +2 etf universe, +2 crypto universe, +2 factbook
