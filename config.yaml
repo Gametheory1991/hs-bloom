@@ -41,6 +41,8 @@ cadences:          # seconds between fetcher runs
   finra_regsho: 86400    # FINRA Reg SHO daily short volume + OTC threshold list; daily, keyless
   finra_capped: 2592000  # FINRA capped volume report (corp/agency); monthly keyless CSV, 12 rolling months
   finra_ids_star: 86400  # FINRA IDS STAR Structured Product Activity Reports; daily ZIPs, keyless, 36-mo backfill
+  finra_factbook: 2592000  # FINRA TRACE Fact Book quarterly workbooks (corp/agency/sec XLSX); monthly poll, quarterly release
+  finra_factbook_annual: 31536000  # FINRA Fact Book annual Transaction/Issue/Participant workbooks; yearly poll, annual release
   ms_capex: 604800       # market-structure universe XBRL financials; weekly (quarterly data)
   ms_graph: 604800       # market-structure money-flow graph; weekly (zero HTTP, overlays ms_capex)
   tsv_capex: 604800      # tokenized-securities universe XBRL fundamentals; weekly
