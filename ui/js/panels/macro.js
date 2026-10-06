@@ -21,7 +21,7 @@ export function renderMacro(panel) {
     `<td style="text-align:left">${esc(r.name ?? "—")}</td>` +
     `<td>${esc(r.previous ?? "—")}</td><td>${esc(r.consensus ?? "—")}</td>` +
     `<td class="actual">${esc(r.actual ?? "—")}</td></tr>`;
-  body.innerHTML = `<table>
+  body.innerHTML = `<table data-sortable>
     <tr><th>When (local)</th><th>Ctry</th><th>Release</th><th>Prev</th><th>Cons</th><th>Act</th></tr>
     ${past.map(row).join("")}
     ${past.length && panel.releases.length

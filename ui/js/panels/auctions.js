@@ -29,11 +29,11 @@ export function renderAuctions(panel) {
   body.innerHTML =
     `<div class="panel-subhead">UPCOMING</div>` +
     (upc.length
-      ? `<table><tr><th>Date</th><th>Tenor</th><th>Offering</th></tr>${upRows}</table>`
+      ? `<table data-sortable><tr><th>Date</th><th>Tenor</th><th>Offering</th></tr>${upRows}</table>`
       : `<div class="muted">No announced auctions on the schedule.</div>`) +
     `<div class="panel-subhead">RECENT RESULTS</div>` +
     (rec.length
-      ? `<table><tr><th>Date</th><th>Tenor</th><th>High yield</th>` +
+      ? `<table data-sortable><tr><th>Date</th><th>Tenor</th><th>High yield</th>` +
         `<th>Bid/cover</th><th>Indirect %</th><th>Direct %</th>` +
         `<th>Dealer %</th><th>Offering</th></tr>${recRows}</table>`
       : `<div class="muted">No results yet.</div>`);

@@ -522,3 +522,9 @@ td.risk-lo { background: rgba(22, 163, 74, 0.10); }
 .risk-hi-tag { background: #dc2626; color: #fff; border-radius: 3px; padding: 1px 6px; font-size: 10px; font-weight: bold; }
 .risk-mid-tag { background: #f5a623; color: #fff; border-radius: 3px; padding: 1px 6px; font-size: 10px; font-weight: bold; }
 .risk-lo-tag { background: #16a34a; color: #fff; border-radius: 3px; padding: 1px 6px; font-size: 10px; font-weight: bold; }
+
+/* Sortable tables (ui/js/sortable.js): click any header to sort high→low,
+   again for low→high, a third time to restore default order. */
+table[data-sortable] th[data-scol] { cursor: pointer; user-select: none; }
+table[data-sortable] th[data-scol]:hover { color: var(--fg); background: rgba(37, 99, 235, 0.07); }
+.sort-arrow { color: #2563eb; font-size: 0.85em; white-space: nowrap; }

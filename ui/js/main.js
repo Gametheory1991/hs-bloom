@@ -21,6 +21,7 @@ import { renderScorecard } from "./panels/scorecard.js";
 import { renderCentral } from "./panels/central.js";
 import { renderPredict } from "./panels/predict.js";
 import { renderFinra } from "./panels/finra.js";
+import { initSortableObserver } from "./sortable.js";
 import { renderKoi } from "./panels/koi_scorecard.js";
 import { renderAlerts } from "./panels/alerts.js";
 import { renderBriefcheck } from "./panels/briefcheck.js";
@@ -155,6 +156,7 @@ initNotifications();
 initChat();
 initHealth();
 initPalette();
+initSortableObserver(); // click-to-sort on every table[data-sortable]
 renderFutures();
 renderFlows();
 renderScorecard();

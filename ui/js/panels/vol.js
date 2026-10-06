@@ -34,7 +34,7 @@ function tableSection(v) {
   }).join("");
   return `
     <div class="panel-subhead"><span>MACRO EQUITY VOLATILITY <span class="muted">1M implied vs realized</span></span></div>
-    <div style="overflow-x:auto"><table class="voltable">
+    <div style="overflow-x:auto"><table class="voltable" data-sortable>
       <thead><tr><th>Ticker</th><th>1M Impl.</th><th>Wkly</th><th>%ile (1Y)</th><th>1M Real.</th><th>Impl−Real</th><th>%ile (1Y)</th></tr></thead>
       <tbody>${trs}</tbody>
     </table></div>

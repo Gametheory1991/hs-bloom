@@ -39,7 +39,7 @@ export function renderCycle(cycle) {
     root.innerHTML = tab.panels.map((panel, pi) => `
       <section class="panel">
         <div class="panel-title">${esc(panel.title)}</div>
-        <div class="panel-body"><table>
+        <div class="panel-body"><table data-sortable>
           <tr><th>Series</th><th>Now</th><th>Δ1M</th><th>Δ1Y</th></tr>
           ${panel.rows.map((r, ri) => {
             const m = fmtChg(r.chg_1m, r.unit);

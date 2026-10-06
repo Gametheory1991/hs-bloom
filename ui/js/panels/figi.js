@@ -52,7 +52,7 @@ export function renderFigiLookup() {
         return;
       }
       const cell = (x) => esc(x ?? "—");
-      out.innerHTML = `<table class="figi-table">
+      out.innerHTML = `<table class="figi-table" data-sortable>
         <tr><th>Name</th><th>Ticker</th><th>FIGI</th><th>Comp. FIGI</th><th>Type</th><th>Exch</th></tr>
         ${data.results.map((r) => `<tr>
           <td class="sym">${cell(r.name)}</td><td>${cell(r.ticker)}</td>

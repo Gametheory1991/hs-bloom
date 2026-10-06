@@ -9,7 +9,7 @@ export function renderEquity(panel) {
     const { text, cls } = fmtPct(row[`chg_${h}`]);
     return `<td class="${cls}">${text}</td>`;
   }).join("");
-  body.innerHTML = `<table>
+  body.innerHTML = `<table data-sortable>
     <tr><th>Index</th><th>Last</th><th>1D</th><th>1W</th><th>YTD</th><th>1Y</th></tr>
     ${panel.rows.map((r, i) =>
       `<tr class="clickable" data-i="${i}"><td class="sym" title="${r.name}">${r.symbol}</td>` +
@@ -32,7 +32,7 @@ export function renderBonds(panel) {
   const yld = (r, pct, sid, title) => pct == null
     ? `<td>—</td>`
     : `<td class="clickable" data-sid="${r.country}${sid}" data-title="${title}">${pct.toFixed(2)}</td>`;
-  body.innerHTML = `<table>
+  body.innerHTML = `<table data-sortable>
     <tr><th>Ctry</th><th>CB</th><th>3M</th><th>10Y</th><th>1D</th><th>1W</th></tr>
     ${panel.rows.map((r) =>
       `<tr><td class="sym">${r.country}</td>` +

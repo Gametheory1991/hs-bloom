@@ -13,7 +13,7 @@ export function renderRefs(panel) {
     return;
   }
   const cell = (bp) => { const { text, cls } = fmtBp(bp); return `<td class="${cls}">${text}</td>`; };
-  body.innerHTML = `<table>
+  body.innerHTML = `<table data-sortable>
     <tr><th>Ref</th><th>Now</th><th>1D</th><th>1W</th></tr>
     ${panel.rows.map((r, i) =>
       `<tr class="release clickable" data-i="${i}">` +

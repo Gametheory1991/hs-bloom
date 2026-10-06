@@ -89,7 +89,7 @@ function renderMarkets(morphoPanel) {
     body.innerHTML = `<div class="empty-state">NO DATA</div>`;
     return;
   }
-  body.innerHTML = `<table>
+  body.innerHTML = `<table data-sortable>
     <tr><th>Collat</th><th>Lltv</th><th>Chain</th><th>Supply</th><th>Borrow</th><th>Util</th><th>Tvl</th></tr>
     ${rows.map((r) => `<tr>
       <td class="sym">${esc(r.collateral)}</td>
@@ -143,7 +143,7 @@ function renderCrypto(panel) {
   const dom = panel.btc_dominance_pct;
   body.innerHTML =
     (dom != null ? `<div class="muted" style="margin-bottom:6px">BTC dominance ${dom.toFixed(1)}%</div>` : "") +
-    `<table class="crypto-table">
+    `<table class="crypto-table" data-sortable>
     <tr><th>#</th><th>Coin</th><th>Price</th><th>24h</th><th>7d</th><th>MCap</th><th>Vol24h</th></tr>
     ${coins.map((c) => `<tr>
       <td class="num">${c.rank ?? "—"}</td>
@@ -166,7 +166,7 @@ export function renderMidnight(panel) {
     body.innerHTML = `<div class="empty-state">NO LIVE MARKETS</div>`;
     return;
   }
-  body.innerHTML = `<table>
+  body.innerHTML = `<table data-sortable>
     <tr><th>Mat</th><th>Days</th><th>Lend%</th><th>Borr%</th><th>Depth A/B</th><th>Collat</th></tr>
     ${panel.rows.map((r) => `<tr>
       <td class="sym">${esc(r.maturity)}</td>

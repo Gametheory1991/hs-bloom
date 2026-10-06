@@ -194,15 +194,15 @@ function regshoSection(r, ts) {
     `<td class="num" title="${sec} sector short vol in top-50">${secPct == null ? "—" : (secPct * 100).toFixed(1) + "%"}</td></tr>`;
   }).join("");
   return `<h3>SHORT VOLUME — REG SHO DAILY <span class="muted">as of ${r.as_of ?? "—"}</span></h3>
-    <table><tr><th>Market</th><th>Short vol</th><th>Total vol</th><th>Short ratio</th></tr>${rows}</table>
+    <table data-sortable><tr><th>Market</th><th>Short vol</th><th>Total vol</th><th>Short ratio</th></tr>${rows}</table>
     <h3>TOP SHORTED TICKERS <span class="muted">${top50.length} names · 1D/1W/1M/1Q/1Y % changes</span></h3>
-    <div class="table-scroll"><table class="topshorted"><tr><th>Symbol</th><th>Name</th>` +
+    <div class="table-scroll"><table class="topshorted" data-sortable><tr><th>Symbol</th><th>Name</th>` +
     `<th colspan="9">Price action <span class="muted">${statsAsOf ? "as of " + statsAsOf : "stats pending"}</span></th>` +
     `<th>Short vol</th>` +
     `<th>Short ratio</th><th colspan="5">%Chg short vol — 1D | 1W | 1M | 1Q | 1Y</th>` +
     `<th colspan="5">%Chg short ratio — 1D | 1W | 1M | 1Q | 1Y</th>` +
     `<th>% of sector short</th></tr><tr><td colspan="2"></td>` +
-    `<th>Price</th><th>%1D</th><th>Mkt cap</th><th>P/E</th><th>%YTD</th><th>1Y</th><th>Δ52wH</th><th>RS 1M</th><th>20/50/200</th>` +
+    `<th>Price</th><th>%1D</th><th>Mkt cap</th><th>P/E</th><th>%YTD</th><th data-sort="off">1Y</th><th>Δ52wH</th><th>RS 1M</th><th data-sort="off">20/50/200</th>` +
     `<td colspan="2"></td>` +
     `<th>1D</th><th>1W</th><th>1M</th><th>1Q</th><th>1Y</th>` +
     `<th>1D</th><th>1W</th><th>1M</th><th>1Q</th><th>1Y</th><td></td></tr>${top}</table></div>
@@ -219,7 +219,7 @@ function thresholdSection(t) {
     `<tr><td><b>${s.symbol}</b></td><td>${(s.name ?? "").slice(0, 50)}</td>` +
     `<td>${s.category ?? "—"}</td></tr>`).join("");
   return `<h3>THRESHOLD LIST — REG SHO <span class="muted">${t.count} securities as of ${t.as_of ?? "—"}</span></h3>
-    ${secs ? `<table><tr><th>Symbol</th><th>Name</th><th>Category</th></tr>${secs}</table>` : ""}`;
+    ${secs ? `<table data-sortable><tr><th>Symbol</th><th>Name</th><th>Category</th></tr>${secs}</table>` : ""}`;
 }
 
 function shortInterestSection(s) {
@@ -321,7 +321,7 @@ async function renderBreadthSentiment() {
         dc(r1) + dc(r7) + dc(r30) + dc(r91) + dc(r365) + `</tr>`;
     }).join("");
     host.innerHTML =
-      `<table class="bs-deltas"><tr><th>Indicator</th><th>Now</th><th>1D</th><th>1W</th><th>1M</th><th>1Q</th><th>1Y</th></tr>${trows}</table>` +
+      `<table class="bs-deltas" data-sortable><tr><th>Indicator</th><th>Now</th><th>1D</th><th>1W</th><th>1M</th><th>1Q</th><th>1Y</th></tr>${trows}</table>` +
       BS_CHART_DEFS.map((c) => `<h4>${c.title}</h4><div id="${c.el}" class="bs-chart"></div>` +
         (c.foot ? `<p class="muted">${c.foot}</p>` : "")).join("") +
       `<p class="muted">FINRA fixed-income breadth (advances/declines/52wk high-low) and sentiment ` +
@@ -369,7 +369,7 @@ function corpSection(c) {
         `<td>${yld}</td><td>${spr}</td><td>${pctCol(bd.d52hi_pct)}</td><td>${spk}</td></tr>`;
     }).join("");
     return `<h3>MOST ACTIVE — ${slug.toUpperCase()} <span class="muted">${l.as_of ?? ""} · ${l.count} bonds</span></h3>` +
-      (bonds ? `<div class="tbl-wrap"><table class="bond-tbl"><tr><th>#</th><th>Symbol</th><th>Issuer</th><th>Coupon</th><th>Maturity</th><th>Rating</th><th>Price</th><th>%1D</th><th>Yield</th><th>G-Spr bp</th><th>Δ52w Hi</th><th>1Y Price</th></tr>${bonds}</table></div>` +
+      (bonds ? `<div class="tbl-wrap"><table class="bond-tbl" data-sortable><tr><th>#</th><th>Symbol</th><th>Issuer</th><th>Coupon</th><th>Maturity</th><th>Rating</th><th>Price</th><th>%1D</th><th>Yield</th><th>G-Spr bp</th><th>Δ52w Hi</th><th data-sort="off">1Y Price</th></tr>${bonds}</table></div>` +
       `<p class="muted foot">Rank = position in FINRA's most-active list (volume rank). G-Spr = G-spread vs interpolated Treasury par curve (DGS); "—" for convertibles. Ratings are Moody's/S&P as reported by FINRA. Δ52w Hi = price vs trailing-52w high. Sparklines build from daily history going forward.</p>`
              : `<p class="muted">No bond rows.</p>`);
   }).join("");
@@ -386,7 +386,7 @@ function cappedSection(c) {
     `<td>${g.avgsize == null ? "—" : "$" + Number(g.avgsize).toLocaleString("en-US", { maximumFractionDigits: 0 }) + "k"}</td>` +
     `<td>${usdM(g.total)}</td></tr>`).join("");
   return `<h3>CAPPED VOLUME — MONTHLY <span class="muted">${c.as_of ?? "—"} · ${c.months ?? 0} months</span></h3>
-    ${rows ? `<table><tr><th>Grade</th><th>Avg capped size</th><th>Total par</th></tr>${rows}</table>`
+    ${rows ? `<table data-sortable><tr><th>Grade</th><th>Avg capped size</th><th>Total par</th></tr>${rows}</table>`
            : `<p class="muted">No grade rows — September pull pending.</p>`}`;
 }
 
@@ -434,7 +434,7 @@ function starSection(s) {
       `<td class="num">${tr == null ? "—" : Math.round(tr).toLocaleString("en-US")}</td></tr>`;
   }).join("");
   return `<h3>STRUCTURED PRODUCT ACTIVITY — STAR <span class="muted">daily · as of ${s.as_of ?? "—"} · click a row for its trend chart</span></h3>
-    <table class="star-table"><tr><th>Product</th><th>$ Volume</th><th>Trades</th></tr>${rows}</table>
+    <table class="star-table" data-sortable><tr><th>Product</th><th>$ Volume</th><th>Trades</th></tr>${rows}</table>
     <p class="muted">FINRA-ICE Data Services Structured Trading Activity Reports — the public equivalent of the ` +
     `login-walled ICE Vantage structured aggregates. Daily TBA/specified/CMO/CMBS/ABS/CLO activity by issuer and ` +
     `investment grade. Full trend lines in the TRACE chart above and the grid below.</p>`;

@@ -38,7 +38,7 @@ export async function renderFutures() {
       }
     })
   );
-  body.innerHTML = `<table>
+  body.innerHTML = `<table data-sortable>
       <tr><th>Contract</th><th>Underlying</th><th>Last</th><th>Δ 1D</th><th>Δ 1D %</th></tr>
       ${rows.map((r, i) => {
         const cls = r.chg == null ? "flat" : r.chg === 0 ? "flat" : r.chg > 0 ? "up" : "down";

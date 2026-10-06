@@ -71,7 +71,7 @@ export async function renderCentral() {
   // --- FOMC calendar ---
   const cal = fomcRows();
   const calHtml = `<div class="panel-subhead">FOMC MEETINGS — COUNTDOWN TO DECISION</div>
-    <table><tr><th>Meeting</th><th>Decision</th><th>SEP</th><th>Countdown</th></tr>
+    <table data-sortable><tr><th>Meeting</th><th>Decision</th><th>SEP</th><th>Countdown</th></tr>
     ${cal.map((r) => {
       const cls = r.past ? "flat" : r.next ? "up" : "";
       const cd = r.past ? "done" : r.days === 0 ? "<b>TODAY</b>" :
@@ -96,7 +96,7 @@ export async function renderCentral() {
       stripHtml += `<div class="muted">strip unavailable</div>`;
     } else {
       stripHtml += pathChart(good) +
-        `<table><tr><th>Contract</th><th>Implied 3M</th><th>As of</th></tr>` +
+        `<table data-sortable><tr><th>Contract</th><th>Implied 3M</th><th>As of</th></tr>` +
         good.map((r) => `<tr><td class="sym">${r.label}</td><td>${r.impl.toFixed(2)}%</td><td>${r.asof ?? "—"}</td></tr>`).join("") +
         `</table><div class="muted" style="font-size:10px">implied = 100 − futures price · strip rolls: codes cover Oct-26 → Mar-28</div>`;
     }

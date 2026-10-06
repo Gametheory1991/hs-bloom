@@ -16,7 +16,7 @@ export async function renderBriefcheck() {
   }
   const mm = rep.mismatches ?? [];
   const rows = mm.length
-    ? `<table><tr><th>Metric</th><th>Briefing</th><th>Terminal</th><th>Δ</th></tr>` +
+    ? `<table data-sortable><tr><th>Metric</th><th>Briefing</th><th>Terminal</th><th>Δ</th></tr>` +
       mm.map((m) => {
         const dev = m.deviation;
         const cls = dev == null ? "flat" : "down";

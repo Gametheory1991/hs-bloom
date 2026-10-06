@@ -29,14 +29,14 @@ export function renderFiscalEcon(panel) {
     const list = (rows) => rows.slice(0, 8).map((r) =>
       `<tr><td class="sym">${esc(r.name)}</td><td>${fmtB(r.amount_b)}</td></tr>`).join("");
     html += sectionShell("FISCAL — TOP RECIPIENTS & AGENCIES (12M)",
-      `<div class="two-col"><div><table><tr><th>Recipient</th><th>Oblig</th></tr>${list(recips)}</table></div>` +
-      `<div><table><tr><th>Agency</th><th>Oblig</th></tr>${list(agencies)}</table></div></div>`,
+      `<div class="two-col"><div><table data-sortable><tr><th>Recipient</th><th>Oblig</th></tr>${list(recips)}</table></div>` +
+      `<div><table data-sortable><tr><th>Agency</th><th>Oblig</th></tr>${list(agencies)}</table></div></div>`,
       footText, stale);
   }
   if (monthly.length) {
     const last6 = monthly.slice(-6);
     html += sectionShell("FISCAL — MONTHLY OBLIGATIONS ($B)",
-      `<table><tr><th>Month</th><th>Total</th><th>Contracts</th><th>Grants</th></tr>` +
+      `<table data-sortable><tr><th>Month</th><th>Total</th><th>Contracts</th><th>Grants</th></tr>` +
       last6.map((m) => `<tr><td class="sym">${esc(m.date.slice(0, 7))}</td>` +
         `<td>${fmtB(m.total_b)}</td><td>${fmtB(m.contract_b)}</td><td>${fmtB(m.grants_b)}</td></tr>`).join("") +
       `</table>`, footText, stale);
@@ -62,7 +62,7 @@ export function renderEarningsProfit(panel) {
   if (earnings.length) {
     const fmtE = (x) => (x == null ? "—" : Number(x).toFixed(2));
     html += sectionShell("EARNINGS — WATCHLIST (NEXT 3W)",
-      `<table><tr><th>Date</th><th>Sym</th><th>EPS est</th><th>Rev est $B</th><th>Q</th></tr>` +
+      `<table data-sortable><tr><th>Date</th><th>Sym</th><th>EPS est</th><th>Rev est $B</th><th>Q</th></tr>` +
       earnings.slice(0, 25).map((e) =>
         `<tr><td class="sym">${esc(e.date)}</td><td class="sym">${esc(e.symbol)}</td>` +
         `<td>${fmtE(e.eps_estimate)}</td>` +
@@ -81,7 +81,7 @@ export function renderEarningsProfit(panel) {
         `<td class="${cls}">${v == null ? "—" : (v > 0 ? "+" : "") + v.toFixed(1)}</td></tr>`;
     }).join("");
     html += sectionShell("INSIDER SENTIMENT — MSPR (−100..+100)",
-      `<table><tr><th>Sym</th><th>MSPR</th></tr>${rows}</table>`, footText, stale);
+      `<table data-sortable><tr><th>Sym</th><th>MSPR</th></tr>${rows}</table>`, footText, stale);
   }
   const wrap = document.createElement("div");
   wrap.setAttribute("data-batch11", "earnings");

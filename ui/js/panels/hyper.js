@@ -87,7 +87,7 @@ export function renderHyper(hyper) {
   body.innerHTML = `
     <div class="hyper-cards">${cards}</div>
     <div class="hyper-section-title">DEBT ISSUANCE — SEC FILINGS (90D)</div>
-    <table class="hyper-table">
+    <table class="hyper-table" data-sortable>
       <thead><tr><th>DATE</th><th>ISSUER</th><th>FORM</th><th>TRANCHES (coupon · maturity · size)</th><th></th></tr></thead>
       <tbody>${issuanceRows(issuances)}</tbody>
     </table>

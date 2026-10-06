@@ -49,7 +49,7 @@ export async function renderFlows() {
       </div>
       <div class="flow-meta muted">filed ${esc(f.filing_date)} vs ${esc(f.prev_filing_date)} ·
         ${f.n_new ?? 0} new · ${f.n_closed ?? 0} closed · ${f.n_increased ?? 0} adds · ${f.n_decreased ?? 0} trims</div>
-      <table><tr><th>Position</th><th>Kind</th><th>Δ $</th></tr>${top}</table>
+      <table data-sortable><tr><th>Position</th><th>Kind</th><th>Δ $</th></tr>${top}</table>
     </section>`;
   }).join("");
   const foot = document.querySelector("#panel-flows .panel-foot");

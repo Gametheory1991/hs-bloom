@@ -11,7 +11,7 @@ const link = (url, text) =>
 function edgeTable(edges) {
   if (!edges.length)
     return `<p class="muted">No cross-venue divergences above threshold right now.</p>`;
-  return `<table>
+  return `<table data-sortable>
       <tr><th>Event</th><th>Poly Yes</th><th>Kalshi Yes</th><th>Spread</th>
       <th>Edge est.</th><th>Score</th><th>Tradable?</th></tr>
       ${edges.map((e) => {
@@ -30,7 +30,7 @@ function edgeTable(edges) {
 
 function marketsTable(title, rows, priceKey) {
   if (!rows.length) return `<p class="muted">No ${title} data yet.</p>`;
-  return `<h3>${title}</h3><table>
+  return `<h3>${title}</h3><table data-sortable>
       <tr><th>Market</th><th>Yes</th><th>24h vol</th></tr>
       ${rows.map((m) => {
         const label = m.question ?? m.title ?? "—";
@@ -44,7 +44,7 @@ function marketsTable(title, rows, priceKey) {
 function calibTable(rows) {
   if (!rows.length)
     return `<p class="muted">No resolved markets scored yet — calibration builds as tracked markets settle.</p>`;
-  return `<table>
+  return `<table data-sortable>
       <tr><th>Venue</th><th>Category</th><th>n</th><th>Brier</th><th>Win rate</th><th>Avg implied</th></tr>
       ${rows.map((r) => `<tr><td>${r.venue}</td><td>${r.category}</td><td>${r.n}</td>` +
         `<td>${r.brier.toFixed(3)}</td><td>${(r.win_rate * 100).toFixed(1)}%</td>` +
@@ -55,7 +55,7 @@ function calibTable(rows) {
 
 function moversTable(movers) {
   if (!movers.length) return "";
-  return `<h3>BIGGEST 1D MOVERS — POLYMARKET</h3><table>
+  return `<h3>BIGGEST 1D MOVERS — POLYMARKET</h3><table data-sortable>
       <tr><th>Market</th><th>Yes</th><th>Δ 1D</th><th>24h vol</th></tr>
       ${movers.map((m) => {
         const cls = m.chg_1d > 0 ? "up" : "down";

@@ -56,7 +56,7 @@ export async function renderScorecard() {
       `<td class="num">${fmtLast(r)}</td>${cells}` +
       `<td class="${zClass(r.z_1y)} num">${r.z_1y == null ? "—" : (r.z_1y > 0 ? "+" : "") + r.z_1y.toFixed(2)}</td></tr>`;
   }).join("");
-  body.innerHTML = `<table class="scorecard"><tr><th>Series</th><th>Last</th><th>1D</th>` +
+  body.innerHTML = `<table class="scorecard" data-sortable><tr><th>Series</th><th>Last</th><th>1D</th>` +
     `<th>1M</th><th>3M</th><th>1Y</th><th>1Y z</th></tr>${trs}</table>`;
   body.querySelectorAll("tr.clickable").forEach((tr) =>
     tr.addEventListener("click", () => openChart(tr.dataset.series, tr.dataset.name)));

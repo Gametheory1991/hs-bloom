@@ -101,10 +101,10 @@ async function oasTable(rows, title, note) {
       `<td class="num">${so?.pct == null ? "—" : so.pct.toFixed(0)}</td>` +
       `<td>${pctSvg}</td><td>${zSvg}</td></tr>`;
   }).join("");
-  return `<h4>${title}</h4><div class="tbl-wrap"><table class="wall-tbl">` +
+  return `<h4>${title}</h4><div class="tbl-wrap"><table class="wall-tbl" data-sortable>` +
     `<tr><th>Bucket</th><th>OAS bp<br><span class="muted">as of</span></th><th>YTW</th>` +
     `<th>1D Δbp</th><th>1W Δbp</th><th>1M Δbp</th><th>1Q Δbp</th><th>1Y Δbp</th>` +
-    `<th>%ile</th><th>Range %ile</th><th>Range z</th></tr>${body}</table></div>` +
+    `<th>%ile</th><th data-sort="off">Range %ile</th><th data-sort="off">Range z</th></tr>${body}</table></div>` +
     `<p class="muted">${note}</p>`;
 }
 
