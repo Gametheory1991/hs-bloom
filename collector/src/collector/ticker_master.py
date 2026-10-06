@@ -260,7 +260,8 @@ async def _resolve_via_finnhub(symbols: list[str], get_text) -> dict[str, dict]:
     """Finnhub stock/profile2 per ticker: name + finnhubIndustry."""
     api_key = os.environ.get("FINNHUB_API_KEY", "").strip()
     if not api_key:
-        log.info("ticker_master: no FINNHUB_API_KEY — skipping Finnhub leg")
+        log.warning("ticker_master: FINNHUB_API_KEY not set — cannot resolve "
+                    "unknown ticker names via Finnhub; falling back to seed only")
         return {}
     out: dict[str, dict] = {}
     for i, sym in enumerate(symbols):
@@ -290,7 +291,8 @@ async def _resolve_via_openfigi(symbols: list[str], post_json) -> dict[str, dict
     """OpenFIGI mapping POST, batched: name (+ securityType for the sector)."""
     api_key = os.environ.get("OPENFIGI_API_KEY", "").strip()
     if not api_key:
-        log.info("ticker_master: no OPENFIGI_API_KEY — skipping OpenFIGI leg")
+        log.warning("ticker_master: OPENFIGI_API_KEY not set — cannot resolve "
+                    "unknown ticker names via OpenFIGI")
         return {}
     import json as _json
     out: dict[str, dict] = {}

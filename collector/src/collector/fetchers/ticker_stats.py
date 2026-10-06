@@ -196,7 +196,9 @@ async def fetch_ticker_stats(store: Store, get_text: GetText,
     today = today or date.today()
     api_key = os.environ.get("FINNHUB_API_KEY", "").strip()
     if not api_key:
-        log.info("ticker_stats: no FINNHUB_API_KEY set — skipping")
+        log.warning("ticker_stats: FINNHUB_API_KEY not set in environment — "
+                    "cannot fetch price stats; top-shorted table will lack "
+                    "price/%%1D/P/E/sparkline columns")
         return "ticker-stats-skipped-no-key"
 
     # universe: today's top-shorted symbols (panel shows the first 25)

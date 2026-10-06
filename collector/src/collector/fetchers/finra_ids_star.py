@@ -242,11 +242,17 @@ async def fetch_finra_ids_star(store: Store, get_bytes: GetBytes,
     if len(store.points("cycle:star-tba-par")) < 20:
         y, m = today.year, today.month
         total = 0
-        for _ in range(backfill_months):
+        log.info("finra_ids_star: starting %d-month backfill (store has <20 days)",
+                 backfill_months)
+        for i in range(backfill_months):
             m -= 1
             if m == 0:
                 m, y = 12, y - 1
-            total += await process_month(y, m)
+            n = await process_month(y, m)
+            total += n
+            if (i + 1) % 6 == 0:
+                log.info("finra_ids_star: backfill %d/%d months, %d files so far",
+                         i + 1, backfill_months, total)
             await asyncio.sleep(REQUEST_GAP)
         log.info("finra_ids_star backfilled %d daily files", total)
     # always (re)fetch current + previous month (idempotent upserts;

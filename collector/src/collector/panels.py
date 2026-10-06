@@ -606,8 +606,9 @@ def _finra_panel(store: Store) -> dict:
                            "updated_at": monthly_upd, "source": monthly_src}
                           if monthly else {"as_of": None, "blocked": True,
                                            "updated_at": None, "source": None}),
-        "star": ({"as_of": star.get("as_of"), "status": star.get("status"),
-                  "days": star.get("days", 0),
+        "star": ({"as_of": star.get("as_of"),
+                  "latest": star.get("latest", {}),
+                  "days": len(store.points("cycle:star-tba-par")),
                   "updated_at": star_upd, "source": star_src}
                  if star else None),
     }
