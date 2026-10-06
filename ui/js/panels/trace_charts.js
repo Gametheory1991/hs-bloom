@@ -25,6 +25,28 @@ const PRODUCTS = [
   { id: "chrc", label: "Church Plans", par: "trace-chrc-par", trades: "trace-chrc-trades", monthly: true },
   { id: "onrun", label: "Treasury On-the-Run", par: "trace-ust-onrun-par", trades: null, monthly: false },
   { id: "offrun", label: "Treasury Off-the-Run", par: "trace-ust-offrun-par", trades: null, monthly: false },
+  // STAR: FINRA IDS Structured Trading Activity Reports (daily)
+  { id: "star-total", label: "STAR — Total", synthetic: true, star: true },
+  { id: "star-tba", label: "STAR — TBA Total", par: "star-tba-par", trades: "star-tba-trades", monthly: false, daily: true },
+  { id: "star-tba-umbs", label: "STAR — TBA UMBS", par: "star-tba-umbs-par", trades: null, monthly: false, daily: true },
+  { id: "star-tba-fnma", label: "STAR — TBA FNMA", par: "star-tba-fnma-par", trades: null, monthly: false, daily: true },
+  { id: "star-tba-fhlmc", label: "STAR — TBA FHLMC", par: "star-tba-fhlmc-par", trades: null, monthly: false, daily: true },
+  { id: "star-tba-gnma", label: "STAR — TBA GNMA", par: "star-tba-gnma-par", trades: null, monthly: false, daily: true },
+  { id: "star-spec", label: "STAR — Specified Pools", par: "star-spec-par", trades: "star-spec-trades", monthly: false, daily: true },
+  { id: "star-agcmo", label: "STAR — Agency CMO", par: "star-agcmo-par", trades: "star-agcmo-trades", monthly: false, daily: true },
+  { id: "star-nagcmo", label: "STAR — Non-Agency CMO", par: "star-nagcmo-par", trades: "star-nagcmo-trades", monthly: false, daily: true },
+  { id: "star-nagcmo-ig", label: "STAR — Non-Agency CMO IG", par: "star-nagcmo-ig-par", trades: null, monthly: false, daily: true },
+  { id: "star-nagcmo-hy", label: "STAR — Non-Agency CMO HY", par: "star-nagcmo-nonig-par", trades: null, monthly: false, daily: true },
+  { id: "star-nagcmbs", label: "STAR — Non-Agency CMBS", par: "star-nagcmbs-par", trades: "star-nagcmbs-trades", monthly: false, daily: true },
+  { id: "star-nagcmbs-ig", label: "STAR — Non-Agency CMBS IG", par: "star-nagcmbs-ig-par", trades: null, monthly: false, daily: true },
+  { id: "star-nagcmbs-hy", label: "STAR — Non-Agency CMBS HY", par: "star-nagcmbs-nonig-par", trades: null, monthly: false, daily: true },
+  { id: "star-agcmbs", label: "STAR — Agency CMBS", par: "star-agcmbs-par", trades: "star-agcmbs-trades", monthly: false, daily: true },
+  { id: "star-abs", label: "STAR — ABS Total", par: "star-abs-par", trades: "star-abs-trades", monthly: false, daily: true },
+  { id: "star-abs-ig", label: "STAR — ABS IG", par: "star-abs-ig-par", trades: null, monthly: false, daily: true },
+  { id: "star-abs-hy", label: "STAR — ABS HY", par: "star-abs-nonig-par", trades: null, monthly: false, daily: true },
+  { id: "star-clo", label: "STAR — CLO Total", par: "star-clo-par", trades: "star-clo-trades", monthly: false, daily: true },
+  { id: "star-clo-ig", label: "STAR — CLO IG", par: "star-clo-ig-par", trades: null, monthly: false, daily: true },
+  { id: "star-clo-hy", label: "STAR — CLO HY", par: "star-clo-nonig-par", trades: null, monthly: false, daily: true },
   { id: "si-total", label: "Short Interest — Total", par: "finra-short-total", trades: null, unit: "shares" },
   { id: "si-msft", label: "Short Interest — MSFT", par: "short-MSFT", trades: null, unit: "shares" },
   { id: "si-nvda", label: "Short Interest — NVDA", par: "short-NVDA", trades: null, unit: "shares" },
@@ -47,6 +69,19 @@ const TOTAL_PARTS = [
   { par: "trace-cmo-par", trades: null, monthly: true },
   { par: "trace-mbs-par", trades: null, monthly: true },
   { par: "trace-chrc-par", trades: "trace-chrc-trades", monthly: true },
+];
+
+// STAR Total components: 8 top-level categories (daily). Issuer/grade
+// breakdowns excluded to avoid double-counting.
+const STAR_TOTAL_PARTS = [
+  { par: "star-tba-par", trades: "star-tba-trades", monthly: false, daily: true },
+  { par: "star-spec-par", trades: "star-spec-trades", monthly: false, daily: true },
+  { par: "star-agcmo-par", trades: "star-agcmo-trades", monthly: false, daily: true },
+  { par: "star-nagcmo-par", trades: "star-nagcmo-trades", monthly: false, daily: true },
+  { par: "star-nagcmbs-par", trades: "star-nagcmbs-trades", monthly: false, daily: true },
+  { par: "star-agcmbs-par", trades: "star-agcmbs-trades", monthly: false, daily: true },
+  { par: "star-abs-par", trades: "star-abs-trades", monthly: false, daily: true },
+  { par: "star-clo-par", trades: "star-clo-trades", monthly: false, daily: true },
 ];
 
 // Synthetic TOTAL series: monthly values summed over Treasury + all 10
@@ -72,6 +107,32 @@ async function totalSeries(metric) {
   return {
     id: "total", unit: mu.unit,
     name: `TOTAL ${mu.label} — Treasury + TRACE (${mu.unit})`,
+    points: rows.map(({ d, v }) => [d, v]),
+  };
+}
+
+// Synthetic STAR Total series: daily values summed over the 8 top-level
+// STAR categories, normalized to the selected metric.
+async function starTotalSeries(metric) {
+  const isCount = metric === "adt" || metric === "trades";
+  const all = (await Promise.all(STAR_TOTAL_PARTS.map(async (c) => {
+    const sid = isCount ? c.trades : c.par;
+    if (!sid) return null;
+    const s = await getSeries(sid, "max");
+    return toMetric(c, s.points, metric);
+  }))).filter(Boolean);
+  const sums = new Map(); // "YYYY-MM-DD" -> {d, v} (daily granularity)
+  for (const vals of all)
+    for (const { d, v } of vals) {
+      const e = sums.get(d);
+      if (e) e.v += v;
+      else sums.set(d, { d, v });
+    }
+  const rows = [...sums.values()].sort((a, b) => (a.d < b.d ? -1 : 1));
+  const mu = metricById(metric);
+  return {
+    id: "star-total", unit: mu.unit,
+    name: `STAR Total ${mu.label} — structured products (${mu.unit})`,
     points: rows.map(({ d, v }) => [d, v]),
   };
 }
@@ -163,6 +224,10 @@ function filterRange(points) {
 
 async function loadMain() {
   const p = PRODUCTS.find((x) => x.id === state.product);
+  if (p.id === "star-total") {
+    const s = await starTotalSeries(state.metric);
+    return { ...s, points: filterRange(s.points) };
+  }
   if (p.synthetic) {
     const s = await totalSeries(state.metric);
     return { ...s, points: filterRange(s.points) };

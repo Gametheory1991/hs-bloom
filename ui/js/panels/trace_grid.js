@@ -30,6 +30,30 @@ const PRODUCTS = [
   { id: "cmo",  label: "CMO",            par: "trace-cmo-par",  trades: null,                 monthly: true  },
   { id: "mbs",  label: "MBS",            par: "trace-mbs-par",  trades: null,                 monthly: true  },
   { id: "chrc", label: "Church",         par: "trace-chrc-par", trades: "trace-chrc-trades", monthly: true  },
+  // STAR: FINRA IDS Structured Trading Activity Reports (daily).
+  // Granular breakdown: TBA by issuer, specified pools, agency/non-agency
+  // CMO/CMBS, ABS, CLO. Daily data — 1D/1W deltas are meaningful.
+  { id: "star-total", label: "STAR — Total", synthetic: true, star: true },
+  { id: "star-tba",      label: "STAR — TBA Total",       par: "star-tba-par",      trades: "star-tba-trades",      monthly: false, daily: true, star: true },
+  { id: "star-tba-umbs",  label: "STAR — TBA UMBS",       par: "star-tba-umbs-par",  trades: null,                  monthly: false, daily: true, star: true },
+  { id: "star-tba-fnma",  label: "STAR — TBA FNMA",       par: "star-tba-fnma-par",  trades: null,                  monthly: false, daily: true, star: true },
+  { id: "star-tba-fhlmc", label: "STAR — TBA FHLMC",      par: "star-tba-fhlmc-par", trades: null,                  monthly: false, daily: true, star: true },
+  { id: "star-tba-gnma",  label: "STAR — TBA GNMA",       par: "star-tba-gnma-par",  trades: null,                  monthly: false, daily: true, star: true },
+  { id: "star-spec",     label: "STAR — Specified Pools", par: "star-spec-par",     trades: "star-spec-trades",    monthly: false, daily: true, star: true },
+  { id: "star-agcmo",    label: "STAR — Agency CMO",      par: "star-agcmo-par",    trades: "star-agcmo-trades",   monthly: false, daily: true, star: true },
+  { id: "star-nagcmo",    label: "STAR — Non-Agency CMO",      par: "star-nagcmo-par",        trades: "star-nagcmo-trades",        monthly: false, daily: true, star: true },
+  { id: "star-nagcmo-ig",    label: "STAR — Non-Agency CMO IG",      par: "star-nagcmo-ig-par",     trades: null,                  monthly: false, daily: true, star: true },
+  { id: "star-nagcmo-hy",    label: "STAR — Non-Agency CMO HY",      par: "star-nagcmo-nonig-par",  trades: null,                  monthly: false, daily: true, star: true },
+  { id: "star-nagcmbs",    label: "STAR — Non-Agency CMBS",      par: "star-nagcmbs-par",        trades: "star-nagcmbs-trades",        monthly: false, daily: true, star: true },
+  { id: "star-nagcmbs-ig",    label: "STAR — Non-Agency CMBS IG",      par: "star-nagcmbs-ig-par",     trades: null,                  monthly: false, daily: true, star: true },
+  { id: "star-nagcmbs-hy",    label: "STAR — Non-Agency CMBS HY",      par: "star-nagcmbs-nonig-par",  trades: null,                  monthly: false, daily: true, star: true },
+  { id: "star-agcmbs",   label: "STAR — Agency CMBS",     par: "star-agcmbs-par",   trades: "star-agcmbs-trades",  monthly: false, daily: true, star: true },
+  { id: "star-abs",      label: "STAR — ABS Total",       par: "star-abs-par",      trades: "star-abs-trades",     monthly: false, daily: true, star: true },
+  { id: "star-abs-ig",   label: "STAR — ABS IG",          par: "star-abs-ig-par",   trades: null,                  monthly: false, daily: true, star: true },
+  { id: "star-abs-hy",   label: "STAR — ABS HY",          par: "star-abs-nonig-par", trades: null,                 monthly: false, daily: true, star: true },
+  { id: "star-clo",      label: "STAR — CLO Total",       par: "star-clo-par",      trades: "star-clo-trades",     monthly: false, daily: true, star: true },
+  { id: "star-clo-ig",   label: "STAR — CLO IG",          par: "star-clo-ig-par",   trades: null,                  monthly: false, daily: true, star: true },
+  { id: "star-clo-hy",   label: "STAR — CLO HY",          par: "star-clo-nonig-par", trades: null,                 monthly: false, daily: true, star: true },
   // Short interest: biweekly settlement levels (shares), not rates — no
   // trading-day division; deltas are true MoM (vs ~30d prior point) and
   // YoY (vs ~365d prior point) since adjacent points are 2 weeks apart.
@@ -49,7 +73,14 @@ const PRODUCTS = [
 // have no on/off-the-run split in the FINRA file), so they do NOT sum to
 // the Treasury Total — verified Sep-26: on+off = $23,483.5B vs Total $28,142.0B.
 export const TOTAL_PARTS = PRODUCTS.filter((p) =>
-  !p.synthetic && !p.raw && !p.id.startsWith("ust-")); // ust- bills/coupons/tips/frns/onrun/offrun excluded
+  !p.synthetic && !p.raw && !p.star && !p.id.startsWith("ust-")); // ust- bills/coupons/tips/frns/onrun/offrun excluded; star excluded (separate total)
+// Components summed into the synthetic STAR — Total row: the 8 top-level
+// STAR categories. Issuer/grade breakdowns (TBA UMBS/FNMA/FHLMC/GNMA,
+// non-agency IG/HY, ABS IG/HY, CLO IG/HY) are EXCLUDED — they sum to their
+// respective totals, so including them would double-count.
+export const STAR_TOTAL_PARTS = PRODUCTS.filter((p) =>
+  p.star && !p.synthetic && ["star-tba", "star-spec", "star-agcmo", "star-nagcmo",
+    "star-nagcmbs", "star-agcmbs", "star-abs", "star-clo"].includes(p.id));
 
 // ---- NYSE trading-day calendar ----
 const ONE_OFF_CLOSURES = new Set(["2018-12-05"]); // G.H.W. Bush national day of mourning
@@ -121,6 +152,8 @@ const isMonthEnd = (d) => {
 // Monthly ADV ($B/day) from raw points. Treasury rows (monthly:false) use
 // month-end points only (monthly-file values are monthly TOTALS in $bn).
 export function toAdv(p, points) {
+  // Daily products (STAR): values are already daily — return as-is.
+  if (p.daily) return points.map(([d, v]) => ({ d, v }));
   if (!p.monthly) return points.filter(([d]) => isMonthEnd(d)).map(([d, v]) => {
     const [y, m] = d.split("-").map(Number);
     return { d, v: v / tradingDays(y, m) };
@@ -131,6 +164,8 @@ export function toAdv(p, points) {
   });
 }
 export function toAdt(p, points) {
+  // Daily products (STAR): trade counts are already daily.
+  if (p.daily) return points.map(([d, v]) => ({ d, v }));
   const src = p.monthly ? points : points.filter(([d]) => isMonthEnd(d));
   return src.map(([d, v]) => {
     const [y, m] = d.split("-").map(Number);
@@ -139,12 +174,16 @@ export function toAdt(p, points) {
 }
 // Monthly PAR totals ($B/month). Treasury rows are already $bn monthly
 // totals; monthly TRACE products are $M monthly -> $B.
+// Daily products (STAR): par is already daily $ — return as-is.
 export function toPar(p, points) {
+  if (p.daily) return points.map(([d, v]) => ({ d, v }));
   if (!p.monthly) return points.filter(([d]) => isMonthEnd(d)).map(([d, v]) => ({ d, v }));
   return points.map(([d, v]) => ({ d, v: v / 1000 }));
 }
 // Monthly TRADE totals (raw counts). Treasury rows use month-end points.
+// Daily products (STAR): trades are already daily counts — return as-is.
 export function toTrades(p, points) {
+  if (p.daily) return points.map(([d, v]) => ({ d, v }));
   const src = p.monthly ? points : points.filter(([d]) => isMonthEnd(d));
   return src.map(([d, v]) => ({ d, v }));
 }
@@ -202,7 +241,51 @@ export function rowStats(vals, range) { // vals sorted asc by d — monthly ADV/
   const ym = cur.d.slice(0, 7);
   const yoyKey = `${+ym.slice(0, 4) - 1}${ym.slice(4)}`;
   const yoyPt = vals.find((v) => v.d.slice(0, 7) === yoyKey);
-  return finishStats(win, cur, { d1: null, w1: null, m1: back(1), q1: back(3), y1: yoyPt }, winLabel, fellBack);
+  return finishStats(win, cur, { d1: null, w1: null, m1: back(1), q1: back(3), y1: yoyPt, y3: null }, winLabel, fellBack);
+}
+// Daily stats (STAR): true daily deltas. 1D = prior trading day, 1W = 7
+// calendar days back, 1M = 30d, 1Q = 91d, 1Y = 365d, 3Y = 1095d. Uses the
+// nearest available point at least N days back (handles weekends/holidays).
+export function rowStatsDaily(vals, range) {
+  const n = vals.length;
+  if (!n) return null;
+  const { win, winLabel, fellBack } = windowSliceDaily(vals, range);
+  if (!win.length) return null;
+  const cur = win[win.length - 1];
+  // Reference lookup on full history (not window-truncated).
+  const idx = vals.findIndex((v) => v.d === cur.d);
+  const refBack = (days) => {
+    if (idx < 0) return null;
+    let ref = null;
+    for (let i = idx - 1; i >= 0; i--) {
+      if (dayDiff(vals[i].d, cur.d) >= days) { ref = vals[i]; break; }
+    }
+    return ref;
+  };
+  return finishStats(win, cur, {
+    d1: refBack(1), w1: refBack(7), m1: refBack(30),
+    q1: refBack(91), y1: refBack(365), y3: refBack(1095),
+  }, winLabel, fellBack);
+}
+// Slice daily vals to the selected range (day-based, not month-based).
+export function windowSliceDaily(vals, range) {
+  if (!range || range.id === "max") return { win: vals, winLabel: "full history", fellBack: false };
+  let win;
+  if (range.id === "custom" && range.start && range.end) {
+    win = vals.filter((v) => v.d >= range.start && v.d <= range.end);
+  } else {
+    // Convert month-based ranges to approximate day counts for daily data.
+    const days = { "1m": 22, "3m": 66, "6m": 132, "1y": 262, "3y": 786, "5y": 1310 }[range.id] || 786;
+    win = vals.slice(-days);
+  }
+  if (win.length >= 22) {
+    const lbl = range.id === "custom" ? `${win[0].d}→${win[win.length - 1].d}` : range.label;
+    return { win, winLabel: lbl, fellBack: false };
+  }
+  const fb = vals.slice(-786);
+  const anchor = win.length ? win[win.length - 1] : fb[fb.length - 1];
+  const fbWin = fb.filter((v) => v.d <= anchor.d);
+  return { win: fbWin.length >= 22 ? fbWin : fb, winLabel: "3Y", fellBack: true };
 }
 // Slice vals to the selected range. Returns the window slice plus a label
 // and whether we fell back to 3Y (window too short for meaningful stats).
@@ -257,6 +340,7 @@ export function finishStats(vals, cur, refs, winLabel = "3Y", fellBack = false) 
     hi52: w52.length ? Math.max(...w52) : null,
     lo52: w52.length ? Math.min(...w52) : null,
     d1: rc(refs.d1), w1: rc(refs.w1), m1: rc(refs.m1), q1: rc(refs.q1), y1: rc(refs.y1),
+    y3: rc(refs.y3),
     d3: avg ? (cur.v - avg) / avg : null,
     pct: (100 * rank) / vs.length,
   };
@@ -341,6 +425,7 @@ const COLS = [
   { key: "m1", title: "1M %", num: true, heat: true, tip: "1-month % change" },
   { key: "q1", title: "1Q %", num: true, heat: true, tip: "3-month % change" },
   { key: "y1", title: "1Y %", num: true, heat: true, tip: "12-month % change" },
+  { key: "y3", title: "3Y %", num: true, heat: true, tip: "3-year % change (daily data only)" },
   { key: "d3",    title: "Δ 3Y avg %", num: true, heat: true },
   { key: "rngpct", title: "Range %ile", num: false, tip: "Dotted 3Y range: blue dot = now (percentile), ◆ = 50th pct" },
   { key: "rngz", title: "Range z", num: false, tip: "Dotted 3Y range: blue dot = now (z-score), ◆ = mean (z=0)" },
@@ -377,16 +462,47 @@ function buildRows(data, metric, range) {
     if (!src) return { p, stats: null, out: OUTSTANDING[p.id] || null };
     const vals = toMetric(p, src, metric)
       .sort((a, b) => (a.d < b.d ? -1 : 1));
-    return { p, stats: rowStats(vals, range), out: OUTSTANDING[p.id] || null };
+    // Daily products (STAR) use daily stats with true 1D/1W deltas.
+    const stats = p.daily ? rowStatsDaily(vals, range) : rowStats(vals, range);
+    return { p, stats, out: OUTSTANDING[p.id] || null };
   });
-  const tot = PRODUCTS.find((p) => p.synthetic);
+  // Synthetic TOTAL (Treasury + TRACE) — always first per Harry's rule.
+  const tot = PRODUCTS.find((p) => p.id === "total");
   const totOut = totalOutstanding(TOTAL_PARTS.map((p) => p.id));
   rows.unshift({
     p: tot,
     stats: rowStats(totalVals(data, metric), range),
     out: { amt: totOut.amt, asof: "mixed", src: `sum of component floats (${totOut.parts.length} products; agency-MBS float counted once)` },
   });
+  // Synthetic STAR Total — sum of 8 top-level STAR categories (daily).
+  const starTot = PRODUCTS.find((p) => p.id === "star-total");
+  if (starTot) {
+    const starVals = totalValsDaily(data, metric, STAR_TOTAL_PARTS);
+    rows.push({
+      p: starTot,
+      stats: starVals ? rowStatsDaily(starVals, range) : null,
+      out: null,
+    });
+  }
   return rows;
+}
+// Sum daily values across STAR parts (no month bucketing — daily granularity).
+export function totalValsDaily(data, metric, parts = STAR_TOTAL_PARTS) {
+  const isCount = metric === "adt" || metric === "trades";
+  const byDate = new Map();
+  for (const { p, par, tr } of data) {
+    if (!parts.some((sp) => sp.id === p.id)) continue;
+    const src = isCount ? tr : par;
+    if (!src) continue;
+    const vals = toMetric(p, src, metric);
+    for (const { d, v } of vals) {
+      const e = byDate.get(d);
+      if (e) e.v += v;
+      else byDate.set(d, { d, v });
+    }
+  }
+  const rows = [...byDate.values()].sort((a, b) => (a.d < b.d ? -1 : 1));
+  return rows.length ? rows : null;
 }
 
 function turnVal(r) { // annualized turnover % = ADV × 252 ÷ outstanding; ADV view only
@@ -411,6 +527,7 @@ function sortRows(rows) {
       case "m1": return r.stats.m1 ?? -Infinity;
       case "q1": return r.stats.q1 ?? -Infinity;
       case "y1": return r.stats.y1 ?? -Infinity;
+      case "y3": return r.stats.y3 ?? -Infinity;
       case "d3": return r.stats.d3 ?? -Infinity;
       case "pct": return r.stats.pct;
       case "z": return r.stats.z ?? -Infinity;
@@ -462,6 +579,7 @@ function renderTable() {
       `<td class="num"${heat(s.m1)}>${pct1(s.m1)}</td>` +
       `<td class="num"${heat(s.q1)}>${pct1(s.q1)}</td>` +
       `<td class="num"${heat(s.y1)}>${pct1(s.y1)}</td>` +
+      `<td class="num"${heat(s.y3)}>${pct1(s.y3)}</td>` +
       `<td class="num"${heat(s.d3)}>${pct1(s.d3)}</td>` +
       `<td>${rangePlotDotted(s, "pct")}</td>` +
       `<td>${rangePlotDotted(s, "z")}</td>` +
