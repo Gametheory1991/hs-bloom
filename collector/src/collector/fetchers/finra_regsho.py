@@ -165,14 +165,20 @@ def _store_day(store: Store, day: date, per_market: dict[str, list[dict]]) -> di
         store.upsert_points(f"cycle:regsho-{suffix}-shortvol", [(day, agg["short"])])
         store.upsert_points(f"cycle:regsho-{suffix}-shortexempt", [(day, agg["exempt"])])
         store.upsert_points(f"cycle:regsho-{suffix}-shortratio", [(day, agg["ratio"])])
+    # Combined ticker rows: use the CNMS consolidated file ONLY. CNMS already
+    # aggregates every venue; summing CNMS + FNYX + FNSQ would double-count
+    # NYSE and TRF volume (audit 2026-10-05). Fall back to summing venues
+    # only if the consolidated file is missing for the day.
     combined: dict[str, dict] = {}
-    for rows in per_market.values():
-        for r in rows:
-            c = combined.setdefault(r["symbol"],
-                                    {"short": 0.0, "exempt": 0.0, "total": 0.0})
-            c["short"] += r["short"]
-            c["exempt"] += r["exempt"]
-            c["total"] += r["total"]
+    cnms_rows = per_market.get("cnms")
+    combo_rows = cnms_rows if cnms_rows else [
+        r for rows in per_market.values() for r in rows]
+    for r in combo_rows:
+        c = combined.setdefault(r["symbol"],
+                                {"short": 0.0, "exempt": 0.0, "total": 0.0})
+        c["short"] += r["short"]
+        c["exempt"] += r["exempt"]
+        c["total"] += r["total"]
     for sym in TICKERS:
         if sym in combined:
             store.upsert_points(f"cycle:regsho-short-{sym}",

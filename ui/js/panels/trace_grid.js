@@ -42,8 +42,11 @@ const PRODUCTS = [
 ];
 // Components summed into the synthetic TOTAL row: Treasury Total + all 10
 // TRACE products. Treasury breakdown rows (bills/coupons/TIPS/FRNs/
-// on-the-run/off-the-run) are EXCLUDED — they sum to the Treasury Total,
-// so including them would double-count Treasury.
+// on-the-run/off-the-run) are EXCLUDED — bills+coupons+TIPS+FRNs sum to the
+// Treasury Total, so including any breakdown would double-count Treasury.
+// Note: on-the-run + off-the-run cover coupons + TIPS only (bills and FRNs
+// have no on/off-the-run split in the FINRA file), so they do NOT sum to
+// the Treasury Total — verified Sep-26: on+off = $23,483.5B vs Total $28,142.0B.
 export const TOTAL_PARTS = PRODUCTS.filter((p) =>
   !p.synthetic && !p.raw && !p.id.startsWith("ust-")); // ust- bills/coupons/tips/frns/onrun/offrun excluded
 
@@ -510,6 +513,7 @@ function renderTable() {
     asofEl.textContent =
       `as of ${mlabel(state.asof)} · ${m.label} (${unit}) · ${winNote} (● = now, ◆ = avg/50th pct) · ` +
       `Treasury history from Feb 2023 · 1D/1W n/a on monthly rows · ` +
+      `On-the-run + Off-the-run = coupons + TIPS only (excl. bills/FRNs) · ` +
       `${isCount ? "ADT/TRADES sum products with trade-count data" : ""} · ${OUTSTANDING_NOTE}`;
   }
 }

@@ -150,8 +150,8 @@ def test_job_latest_day_and_snapshot(tmp_path, monkeypatch):
     assert store.points("cycle:regsho-cnms-shortratio")[date(2026, 10, 2)] == pytest.approx(0.2)
     assert store.points("cycle:regsho-fnyx-shortexempt")[date(2026, 10, 2)] == 5.0
     assert store.points("cycle:regsho-fnsq-shortvol") == {}
-    # watchlist sums across venues: MSFT 200 + 100
-    assert store.points("cycle:regsho-short-MSFT")[date(2026, 10, 2)] == 300.0
+    # watchlist uses CNMS consolidated only (no double-count): MSFT 200, NVDA 300
+    assert store.points("cycle:regsho-short-MSFT")[date(2026, 10, 2)] == 200.0
     assert store.points("cycle:regsho-short-NVDA")[date(2026, 10, 2)] == 300.0
 
     doc = store.doc("regsho_daily").payload
@@ -160,10 +160,10 @@ def test_job_latest_day_and_snapshot(tmp_path, monkeypatch):
     assert doc["markets"]["cnms"]["short"] == 600.0
     assert "fnsq" not in doc["markets"]
     top = [r["symbol"] for r in doc["top50"]]
-    assert top == ["MSFT", "NVDA", "A"]  # combined short volume desc (MSFT=300 ties NVDA=300)
+    assert top == ["NVDA", "MSFT", "A"]  # CNMS-only: NVDA=300 > MSFT=200 > A=100
     nvda = doc["top50"][0]
     assert nvda["short_ratio"] == pytest.approx(300.0 / 1200.0, abs=1e-4)
-    assert doc["tickers"]["MSFT"] == 300.0
+    assert doc["tickers"]["MSFT"] == 200.0  # CNMS-only, no venue double-count
 
     # threshold: count series + snapshot doc
     assert store.points("cycle:regsho-threshold-count")[date(2026, 10, 2)] == 2.0
