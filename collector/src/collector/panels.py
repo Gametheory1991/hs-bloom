@@ -613,6 +613,52 @@ def _finra_panel(store: Store) -> dict:
     }
 
 
+def _shortinterest_panel(store: Store) -> dict:
+    """Focused POSITIONING → Short Interest view.
+
+    Reg SHO daily short volume + OTC threshold list + FINRA biweekly
+    short-interest settlement. A deeper cut than the FINRA tab summary:
+    full top-50 shorted tickers, the complete threshold list, per-ticker
+    settlement detail (change vs prior settlement, avg daily volume,
+    days-to-cover) for the watchlist, and cycle series the UI charts.
+    Every section degrades to None when its fetcher hasn't run yet.
+    """
+    def _d(key: str):
+        doc = store.doc(key)
+        if doc is None:
+            return None, None, None
+        return doc.payload, doc.updated_at, doc.source
+
+    regsho, regsho_upd, regsho_src = _d("regsho_daily")
+    thresh, thresh_upd, thresh_src = _d("regsho_threshold")
+    short, short_upd, short_src = _d("finra_short")
+
+    # Threshold list can be long; keep the payload bounded but tell the UI
+    # the true count so it can say "showing N of M".
+    secs = (thresh.get("securities") or []) if thresh else []
+    latest_upd = max([u for u in (regsho_upd, thresh_upd, short_upd) if u],
+                     default=None)
+    return {
+        "regsho": ({"as_of": regsho.get("as_of"),
+                    "markets": regsho.get("markets", {}),
+                    "top50": regsho.get("top50") or [],
+                    "tickers": regsho.get("tickers", {}),
+                    "updated_at": regsho_upd, "source": regsho_src}
+                   if regsho else None),
+        "threshold": ({"as_of": thresh.get("as_of"), "count": thresh.get("count", 0),
+                       "securities": secs[:200],
+                       "updated_at": thresh_upd, "source": thresh_src}
+                      if thresh else None),
+        "short_interest": ({"as_of": short.get("as_of"),
+                            "total_short_shares": short.get("total_short_shares"),
+                            "tickers": short.get("tickers", {}),
+                            "updated_at": short_upd, "source": short_src}
+                           if short else None),
+        "updated_at": latest_upd,
+        "source": "finra",
+    }
+
+
 def _predict_panel(store: Store) -> dict:
     """Prediction markets (batch 12): venue snapshots, cross-venue edge
     estimates, unusual movers, and the calibration leaderboard. Empty
@@ -687,5 +733,6 @@ def build_dashboard(
             "finnhub": _finnhub_panel(store),
             "predict": _predict_panel(store),
             "finra": _finra_panel(store),
+            "shortinterest": _shortinterest_panel(store),
         },
     }
