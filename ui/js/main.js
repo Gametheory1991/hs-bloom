@@ -31,6 +31,7 @@ import { initExportObserver } from "./export.js";
 import { renderKoi } from "./panels/koi_scorecard.js";
 import { renderAlerts } from "./panels/alerts.js";
 import { renderBriefcheck } from "./panels/briefcheck.js";
+import { renderUsage } from "./panels/usage.js";
 import { initPalette, updateIndex } from "./palette.js";
 import { initHealth } from "./health.js";
 import { renderRefs } from "./panels/refs.js";
@@ -42,7 +43,7 @@ import { renderDebtCube } from "./panels/debtcube.js";
 import { renderRegwatchNews, renderRegwatchRules, renderRegwatchTopics } from "./panels/regwatch.js";
 
 const POLL_MS = 60_000;
-const STALE_MINUTES = { equity: 20, bonds: 130, macro: 390, auctions: 2880, news: 40, defi: 35, midnight: 35, refs: 35, insights: 70, riskmap: 2880, xcorr: 2880, gse: 86400, vol: 2880, movers: 10080, radar: 2880, hyper: 10080, tsv: 10080, usaspending: 20160, finnhub: 2880, worldbank: 20160, coingecko: 2880, predict: 120, finra: 2880, star: 2880, shortvol: 2880, margin: 43200, shortint: 2880, factbook: 43200, regwatch: 120 };  // ~2x cadence
+const STALE_MINUTES = { equity: 20, bonds: 130, macro: 390, auctions: 2880, news: 40, defi: 35, midnight: 35, refs: 35, insights: 70, riskmap: 2880, xcorr: 2880, gse: 86400, vol: 2880, movers: 10080, radar: 2880, hyper: 10080, tsv: 10080, usaspending: 20160, finnhub: 2880, worldbank: 20160, coingecko: 2880, predict: 120, finra: 2880, star: 2880, shortvol: 2880, margin: 43200, shortint: 2880, factbook: 43200, regwatch: 120, usage: 60 };  // ~2x cadence
 
 const EMPTY = { rows: [], updated_at: null, source: null };
 
@@ -189,6 +190,7 @@ async function tick() {
     foot("regwatch-news", "regwatch", p.regwatch ?? {});
     foot("regwatch-rules", "regwatch", p.regwatch ?? {});
     foot("regwatch-topics", "regwatch", p.regwatch ?? {});
+    foot("usage", "usage", { source: "os-bloom", updated_at: new Date().toISOString() });
     foot("riskmap", "riskmap", p.riskmap ?? { updated_at: null, source: null });
     foot("radar", "radar", p.radar ?? { updated_at: null, source: null });
     foot("hyper", "hyper", p.hyper ?? { updated_at: null, source: null });
@@ -216,6 +218,7 @@ renderScorecard();
 renderCentral();
 renderAlerts();
 renderBriefcheck();
+renderUsage();
 refreshSearchIndex();
 setInterval(() => { renderFutures(); renderFlows(); renderScorecard(); renderCentral(); renderBriefcheck(); renderKoi(); refreshSearchIndex(); }, 15 * 60_000);
 initDefiViewToggle(() => {

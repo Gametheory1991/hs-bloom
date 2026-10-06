@@ -40,6 +40,29 @@ CREATE TABLE IF NOT EXISTS fetcher_status(
   last_error_at TEXT,
   active_source TEXT
 );
+CREATE TABLE IF NOT EXISTS visits(
+  ts         TEXT NOT NULL,
+  day        TEXT NOT NULL,
+  path       TEXT NOT NULL,
+  method     TEXT NOT NULL,
+  ip_hash    TEXT NOT NULL,
+  user_agent TEXT NOT NULL,
+  referrer   TEXT NOT NULL,
+  device     TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS events(
+  ts      TEXT NOT NULL,
+  day     TEXT NOT NULL,
+  session TEXT NOT NULL,
+  type    TEXT NOT NULL,
+  hub     TEXT,
+  subtab  TEXT,
+  detail  TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_visits_day ON visits(day);
+CREATE INDEX IF NOT EXISTS idx_visits_ip_ts ON visits(ip_hash, ts);
+CREATE INDEX IF NOT EXISTS idx_events_day ON events(day);
+CREATE INDEX IF NOT EXISTS idx_events_session ON events(session, ts);
 """
 
 try:  # optional: only needed when DATABASE_URL is set

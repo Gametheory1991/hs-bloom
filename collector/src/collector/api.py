@@ -5,7 +5,7 @@ import os
 from datetime import datetime, timedelta, timezone
 from typing import Literal
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -15,6 +15,7 @@ from collector.config import Config
 from collector import debt_cube
 from collector.panels import build_dashboard, econ_calendar_payload
 from collector.store import Store
+from collector.usage import client_ip, log_visit, record_event, usage_stats
 
 RANGE_DAYS = {"1y": 365, "5y": 5 * 365, "10y": 10 * 365}
 
@@ -371,5 +372,51 @@ def create_app(store: Store, cfg: Config) -> FastAPI:
         if doc is None:
             raise HTTPException(status_code=404, detail="no briefcheck report yet")
         return doc.payload
+
+    # ---- built-in usage analytics (no third-party service) ----------------
+    @app.middleware("http")
+    async def usage_log(request: Request, call_next):  # noqa: ANN001,ANN202
+        resp = await call_next(request)
+        try:
+            log_visit(
+                store,
+                ts=datetime.now(timezone.utc),
+                path=request.url.path,
+                method=request.method,
+                ip=client_ip(request.headers.get("x-forwarded-for"),
+                             request.client.host if request.client else None),
+                user_agent=request.headers.get("user-agent", ""),
+                referrer=request.headers.get("referer", ""),
+            )
+        except Exception:  # noqa: BLE001 — analytics must never break responses
+            pass
+        return resp
+
+    @app.post("/api/event")
+    async def usage_event(request: Request) -> dict:
+        """Client beacon: {type: pageview|hub_click|subtab_click,
+        session, hub?, subtab?, detail?}. Fire-and-forget from the UI."""
+        try:
+            body = await request.json()
+        except Exception:  # noqa: BLE001
+            raise HTTPException(status_code=400, detail="invalid JSON")
+        ok = record_event(
+            store,
+            ts=datetime.now(timezone.utc),
+            session=str(body.get("session") or "na"),
+            type=str(body.get("type") or ""),
+            hub=body.get("hub"),
+            subtab=body.get("subtab"),
+            detail=body.get("detail"),
+        )
+        if not ok:
+            raise HTTPException(status_code=400, detail="invalid event type")
+        return {"ok": True}
+
+    @app.get("/api/usage")
+    def usage(days: int = 30) -> dict:
+        """Usage analytics: visitors, pageviews, bounce, sessions, top
+        routes, hub clicks, referrers, device split over trailing `days`."""
+        return usage_stats(store, days)
 
     return app

@@ -2,6 +2,7 @@
 // 19 legacy tabs -> 6 hubs. Hash format: #/hub/sub (e.g. #/markets/equities).
 // Legacy single-segment hashes (#/mkt, #/finra, ...) redirect to their hub home,
 // so old bookmarks, palette entries and external links keep working.
+import { track } from "./usage.js";
 
 export const HUBS = [
   { id: "pulse", label: "PULSE",
@@ -17,7 +18,8 @@ export const HUBS = [
   { id: "structure", label: "FLOW",
     subs: [["trace", "TRACE Volume"], ["star", "STAR"], ["factbook", "Fact Book"], ["maps", "Maps"], ["desks", "Desks"]] },
   { id: "desk", label: "DESK",
-    subs: [["alerts", "Alerts"], ["briefcheck", "Brief Check"], ["analyst", "Analyst"]] },
+    subs: [["alerts", "Alerts"], ["briefcheck", "Brief Check"], ["analyst", "Analyst"],
+           ["usage", "Usage"]] },
   { id: "regwatch", label: "REG WATCH",
     subs: [["news", "News Feed"], ["rules", "Rulemaking Tracker"], ["topics", "Topic Watch"]] },
   { id: "equity", label: "EQUITY",
@@ -71,6 +73,7 @@ function renderSubs(hubId, activeSub) {
     .join("");
   bar.querySelectorAll("[data-sub-link]").forEach((b) =>
     b.addEventListener("click", () => {
+      track("subtab_click", { hub: hubId, subtab: b.dataset.subLink });
       const target = `#/${hubId}/${b.dataset.subLink}`;
       if (location.hash !== target) location.hash = target;
     }));
@@ -84,11 +87,13 @@ export function initTabs() {
     document.querySelectorAll("[data-hub-link]").forEach((b) =>
       b.classList.toggle("active", b.dataset.hubLink === hub));
     renderSubs(hub, sub);
+    track("pageview", { hub, subtab: sub });
   };
   window.addEventListener("hashchange", apply);
   // Hub buttons: click switches to that hub's default sub.
   document.querySelectorAll("[data-hub-link]").forEach((b) =>
     b.addEventListener("click", () => {
+      track("hub_click", { hub: b.dataset.hubLink });
       const target = `#/${b.dataset.hubLink}`;
       if (location.hash !== target) location.hash = target;
       else apply(); // already there — re-apply in case content is stale
