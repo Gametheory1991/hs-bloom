@@ -21,8 +21,27 @@ def test_load_real_config():
     assert cfg.max_news == 15
     ids = [s.id for s in cfg.series]
     assert "us-cpi-yoy" in ids and "ez-hicp-yoy" in ids
+    assert "us-ppi-yoy" in ids and "us-core-ppi-yoy" in ids
+    assert "us-jobless-claims" in ids and "us-housing-starts" in ids
+    assert "us-indpro-yoy" in ids
+    series_by_id = {s.id: s for s in cfg.series}
+    assert series_by_id["us-ppi-yoy"].fred == "PPIFIS"
+    assert series_by_id["us-core-ppi-yoy"].fred == "PPIFES"
+    assert series_by_id["us-jobless-claims"].unit == "count"
     assert cfg.calendar_map[0].match == "Core CPI"  # order preserved
+    cal_usd = [m for m in cfg.calendar_map if m.country == "USD"]
+    by_match = {m.match: m.series for m in cal_usd}
+    assert by_match["Core PPI"] == "us-core-ppi-yoy"
+    assert by_match["PPI"] == "us-ppi-yoy"
+    assert by_match["Unemployment Claims"] == "us-jobless-claims"
+    assert by_match["Housing Starts"] == "us-housing-starts"
+    assert by_match["Industrial Production"] == "us-indpro-yoy"
+    assert cal_usd.index(next(m for m in cal_usd if m.match == "Core PPI")) < cal_usd.index(
+        next(m for m in cal_usd if m.match == "PPI")
+    )
     assert cfg.feeds[0].name == "FT"
+    assert cfg.cadences["etf"] == 86400
+    assert cfg.etfdb_catalog_url.endswith("/pyetfdb_scraper/data/etfdb.json")
 
 
 def test_env_overrides_db_path(tmp_path, monkeypatch):
@@ -101,6 +120,10 @@ def test_cycle_config():
     assert by_id["pc-total"].cboe == "TOTAL PUT/CALL RATIO"
     assert by_id["aaii-spread"].aaii == "bull_bear_spread"
     assert by_id["spw-spx"].yahoo_ratio == ["RSP", "SPY"]
+    assert by_id["payrolls-yoy"].fred == "PAYEMS"
+    assert by_id["indpro-yoy"].fred == "INDPRO"
+    assert by_id["housing-starts"].fred == "HOUST"
+    assert by_id["stlfsi"].fred == "STLFSI4"
     assert by_id["m2-yoy"].transform == "yoy"
     assert by_id["vix"].transform == "none"  # default
     # every source entry has exactly one source key

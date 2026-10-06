@@ -61,6 +61,10 @@ def seeded_store(tmp_path) -> Store:
         {"headline": "h", "url": "u", "feed": "FT", "published_at": "2026-07-08T13:00:00Z",
          "source": "rss"},
     ]}, source="rss")
+    store.put_doc("etf_catalog", {"rows": [
+        {"symbol": "SPY", "name": "SPDR S&P 500 ETF Trust", "url": "u"},
+        {"symbol": "IVV", "name": "iShares Core S&P 500 ETF", "url": "u"},
+    ]}, source="etfdb")
     store.put_doc("defi_pools", {"rows": [
         {"tier": "Conservative", "chain": "Base", "chain_id": 8453,
          "pool_address": "0x91c0", "protocol": "Morpho", "pool": "Clearstar",
@@ -123,6 +127,8 @@ def test_build_dashboard_full_shape(tmp_path):
     ]
     assert macro["past"][1]["actual"] == "0.4%"
     assert dash["panels"]["news"]["items"][0]["feed"] == "FT"
+    assert dash["panels"]["etf"]["count"] == 2
+    assert dash["panels"]["etf"]["source"] == "etfdb"
 
     defi = dash["panels"]["defi"]
     assert defi["rows"][0]["pool"] == "Clearstar" and defi["source"] == "zyfai"
@@ -156,6 +162,7 @@ def test_build_dashboard_empty_store(tmp_path):
     assert dash["panels"]["macro"]["releases"] == []
     assert dash["panels"]["macro"]["past"] == []
     assert dash["panels"]["news"]["items"] == []
+    assert dash["panels"]["etf"] == {"count": 0, "updated_at": None, "source": None}
     assert dash["panels"]["defi"]["rows"] == []
     assert dash["panels"]["midnight"]["rows"] == []
     assert dash["panels"]["morpho"]["rows"] == []

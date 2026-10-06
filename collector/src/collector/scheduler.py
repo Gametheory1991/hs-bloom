@@ -21,6 +21,7 @@ from collector.config import Config
 from collector.fetchers.bonds import fetch_bonds
 from collector.fetchers.cycle import fetch_cycle
 from collector.fetchers.equity import fetch_equity
+from collector.fetchers.etf import fetch_etf_catalog
 from collector.fetchers.fred import fetch_macro_history
 from collector.fetchers.macro import fetch_calendar_if_due
 from collector.fetchers.midnight import fetch_midnight
@@ -56,6 +57,7 @@ def register_jobs(
         "macro": (cfg.cadences["macro"], partial(fetch_calendar_if_due, cfg.calendar_url, cfg.calendar_map,
                                                  store, get_text), start),
         "news": (cfg.cadences["news"], partial(fetch_news, cfg.feeds, store, get_text, max_items=cfg.max_news), start),
+        "etf": (cfg.cadences["etf"], partial(fetch_etf_catalog, cfg.etfdb_catalog_url, store, get_text), start),
         "macro_history": (MACRO_HISTORY_SECONDS, partial(fetch_macro_history, cfg.series, store, fred_api_key, get_text), start),
         "defi": (cfg.cadences["defi"], partial(fetch_defi, cfg.defi, cfg.zyfai_base, store, get_text), start),
         "midnight": (cfg.cadences["midnight"], partial(fetch_midnight, cfg.defi, cfg.midnight_base, store, get_text), start),

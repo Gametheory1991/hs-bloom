@@ -7,6 +7,7 @@ cadences:          # seconds between fetcher runs
   bonds: 3600
   macro: 3600      # job runs hourly; refresh decision logic inside (spec: 6h, hourly on release days)
   news: 600
+  etf: 86400
   defi: 900
   midnight: 900
   refs: 900
@@ -42,8 +43,13 @@ cb_rates:          # policy rates for the WORLD BONDS matrix; country must match
 series:            # macro click-through charts; transform per changes.apply_transform
   - { id: us-cpi-yoy,       name: "US CPI YoY %",            fred: CPIAUCSL,           unit: "%",   transform: yoy }
   - { id: us-core-cpi-yoy,  name: "US Core CPI YoY %",       fred: CPILFESL,           unit: "%",   transform: yoy }
+  - { id: us-ppi-yoy,       name: "US PPI YoY %",            fred: PPIFIS,             unit: "%",   transform: yoy }
+  - { id: us-core-ppi-yoy,  name: "US Core PPI YoY %",       fred: PPIFES,             unit: "%",   transform: yoy }
   - { id: us-pce-yoy,       name: "US PCE YoY %",            fred: PCEPI,              unit: "%",   transform: yoy }
   - { id: us-nfp,           name: "US Non-Farm Payrolls Δk", fred: PAYEMS,             unit: "k",   transform: diff }
+  - { id: us-jobless-claims, name: "US Initial Jobless Claims", fred: ICSA,             unit: "count", transform: none }
+  - { id: us-housing-starts, name: "US Housing Starts SAAR",  fred: HOUST,              unit: "k",   transform: none }
+  - { id: us-indpro-yoy,    name: "US Industrial Production YoY %", fred: INDPRO,       unit: "%",   transform: yoy }
   - { id: us-unemployment,  name: "US Unemployment %",       fred: UNRATE,             unit: "%",   transform: none }
   - { id: us-gdp,           name: "US Real GDP QoQ SAAR %",  fred: A191RL1Q225SBEA,    unit: "%",   transform: none }
   - { id: us-retail,        name: "US Retail Sales MoM %",   fred: RSAFS,              unit: "%",   transform: pct_prev }
@@ -77,6 +83,9 @@ cycle_series:      # market-cycle series (spec 2026-08-24); exactly one source k
   - { id: claims,       name: "Initial jobless claims",    unit: k,     fred: ICSA }
   - { id: jolts,        name: "Job openings (JOLTS)",      unit: k,     fred: JTSJOL }
   - { id: trucks,       name: "Heavy truck sales",         unit: m,     fred: HTRUCKSSAAR }  # FRED serves millions of units SAAR
+  - { id: payrolls-yoy, name: "Payrolls YoY",              unit: "%",   fred: PAYEMS, transform: yoy }
+  - { id: indpro-yoy,   name: "Industrial production YoY", unit: "%",   fred: INDPRO, transform: yoy }
+  - { id: housing-starts, name: "Housing starts",          unit: k,     fred: HOUST }
   - { id: umich,        name: "UMich consumer sentiment",  unit: idx,   fred: UMCSENT }
   - { id: m2-yoy,       name: "M2 YoY",                    unit: "%",   fred: M2SL, transform: yoy }
   - { id: m2-velocity,  name: "M2 velocity",               unit: ratio, fred: M2V }
@@ -93,6 +102,7 @@ cycle_series:      # market-cycle series (spec 2026-08-24); exactly one source k
   - { id: bbb-oas,      name: "US BBB OAS",                unit: "%",   fred: BAMLC0A4CBBB }
   - { id: ccc-oas,      name: "US CCC OAS",                unit: "%",   fred: BAMLH0A3HYC }
   - { id: nfci,         name: "Chicago Fed NFCI",          unit: idx,   fred: NFCI }
+  - { id: stlfsi,       name: "St. Louis Fed stress idx",  unit: idx,   fred: STLFSI4 }
   - { id: bank-lending, name: "Bank loans & leases YoY",   unit: "%",   fred: LOANS, transform: yoy }  # monthly; weekly TOTLL never aligns for the yoy transform
   # ---- PROFIT ---- (S&P EPS workbook is Akamai-403'd; FRED CP carries the cycle)
   - { id: corp-profits, name: "Corporate profits YoY",     unit: "%",   fred: CP, transform: yoy }
@@ -135,6 +145,9 @@ cycle_tabs:        # layout only; rows reference cycle_series ids
           - { series: claims }
           - { series: jolts }
           - { series: trucks }
+          - { series: payrolls-yoy }
+          - { series: indpro-yoy }
+          - { series: housing-starts }
           - { series: m2-yoy }
           - { series: m2-velocity }
           - { series: usd-broad }
@@ -158,6 +171,7 @@ cycle_tabs:        # layout only; rows reference cycle_series ids
           - { series: bbb-oas }
           - { series: ccc-oas }
           - { series: nfci }
+          - { series: stlfsi }
           - { series: bank-lending }
   - id: profit
     label: PROFIT
@@ -178,8 +192,13 @@ cycle_tabs:        # layout only; rows reference cycle_series ids
 calendar_map:      # first match wins — keep Core before CPI
   - { country: USD, match: "Core CPI",     series: us-core-cpi-yoy }
   - { country: USD, match: "CPI",          series: us-cpi-yoy }
+  - { country: USD, match: "Core PPI",     series: us-core-ppi-yoy }
+  - { country: USD, match: "PPI",          series: us-ppi-yoy }
   - { country: USD, match: "Core PCE",     series: us-pce-yoy }
   - { country: USD, match: "Non-Farm",     series: us-nfp }
+  - { country: USD, match: "Unemployment Claims", series: us-jobless-claims }
+  - { country: USD, match: "Housing Starts", series: us-housing-starts }
+  - { country: USD, match: "Industrial Production", series: us-indpro-yoy }
   - { country: USD, match: "Unemployment", series: us-unemployment }
   - { country: USD, match: "GDP",          series: us-gdp }
   - { country: USD, match: "Retail Sales", series: us-retail }
@@ -196,6 +215,8 @@ feeds:             # RSS bundle; a dead feed is skipped silently
   - { name: MarketWatch, url: "https://feeds.content.dowjones.io/public/rss/mw_topstories" }
   - { name: ECB,         url: "https://www.ecb.europa.eu/rss/press.html" }
   - { name: Fed,         url: "https://www.federalreserve.gov/feeds/press_all.xml" }
+
+etfdb_catalog_url: https://raw.githubusercontent.com/lvxhnat/pyetfdb-scraper/master/src/pyetfdb_scraper/data/etfdb.json
 
 zyfai_base: https://defiapi.zyf.ai/api/v2/opportunities
 midnight_base: https://api.morpho.org/v0/midnight   # v0 is real; docs-site "v1" 404s

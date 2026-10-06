@@ -209,6 +209,14 @@ def _insights_panel(store: Store) -> dict:
     }
 
 
+def _etf_panel(store: Store) -> dict:
+    doc = store.doc("etf_catalog")
+    if doc is None:
+        return {"count": 0, "updated_at": None, "source": None}
+    rows = doc.payload.get("rows", [])
+    return {"count": len(rows), "updated_at": doc.updated_at, "source": doc.source}
+
+
 def build_dashboard(
     store: Store,
     indexes: list[IndexCfg],
@@ -228,6 +236,7 @@ def build_dashboard(
                       "updated_at": bonds_doc.updated_at if bonds_doc else None,
                       "source": bonds_doc.source if bonds_doc else None},
             "news": _doc_panel(store, "news", "items"),
+            "etf": _etf_panel(store),
             "defi": _doc_panel(store, "defi_pools", "rows"),
             "midnight": _doc_panel(store, "midnight_curve", "rows"),
             "morpho": _doc_panel(store, "morpho_markets", "rows"),

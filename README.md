@@ -49,12 +49,12 @@ Press `1`–`7`, or use `#/mkt`-style URL fragments.
 | **MKT** | Macro release calendar (past 7 days + upcoming), 10 world equity indexes, a bond matrix (10Y / 3M / central bank rate, for the US and Germany), and top headlines. Every row opens a click-through chart. |
 | **DEFI** | Zyfai decentralized-finance USDC yield tiers, Morpho Midnight fixed-term structure with a hover-readout curve, Morpho markets, and a RATE REFS panel (Aave, Pendle implied APY, BTC perp funding) with history charts. |
 | **RISK** | Volatility and hedging (VIX, VXN, put/call), sentiment and rotation (AAII spread, cyclicals/defensives, small/large, gold/silver). |
-| **ECON** | ISM PMIs, OECD leading indicators, jobless claims, JOLTS, heavy truck sales, UMich sentiment, M2, breakevens, real rates, dollar index. |
-| **CREDIT** | Yield curves (10Y-3M, 10Y-2Y), IG/HY/BBB/CCC option-adjusted spreads, the Chicago Fed NFCI, and bank lending growth. |
+| **ECON** | ISM PMIs, OECD leading indicators, jobless claims, JOLTS, heavy truck sales, payrolls and industrial production YoY, housing starts, UMich sentiment, M2, breakevens, real rates, dollar index. |
+| **CREDIT** | Yield curves (10Y-3M, 10Y-2Y), IG/HY/BBB/CCC option-adjusted spreads, the Chicago Fed NFCI, the St. Louis Fed stress index, and bank lending growth. |
 | **PROFIT** | Corporate profits growth. |
 | **POS** | CFTC Commitments of Traders net non-commercial positioning (VIX, crude, USD index, GBP). |
 
-The 39 market-cycle series across RISK/ECON/CREDIT/PROFIT/POS refresh daily.
+The 43 market-cycle series across RISK/ECON/CREDIT/PROFIT/POS refresh daily.
 
 ## Every row opens a chart
 
@@ -104,6 +104,8 @@ UI_PORT=9090 docker compose up --build
 `GET /healthz` reports, per fetcher, its last run, the source actually used,
 and any error. `GET /api/insights` returns the current automated digest and
 newsletter delivery state.
+`GET /api/etfs` returns the ETF catalog pulled from ETFDB (with `q` and `limit`
+query params), and `GET /api/etfs/{symbol}` returns a single ETF row.
 
 ### Gmail newsletter delivery
 
@@ -179,6 +181,7 @@ keyless.
 | [CBOE](https://www.cboe.com/) | Daily total + equity put/call ratios | — |
 | [AAII](https://www.aaii.com/sentimentsurvey) | Bull-bear sentiment spread (legacy `.xls`) | — |
 | [Yahoo Finance](https://finance.yahoo.com/) | Equity index closes and ratio series | — |
+| [ETFDB](https://etfdb.com/) via [pyetfdb-scraper](https://github.com/lvxhnat/pyetfdb-scraper) catalog export | ETF universe symbols, names, URLs, and trailing return fields | — |
 | [ECB Data Portal](https://data.ecb.europa.eu/) | Euro-area AAA yield curve (3M) | — |
 | [Bundesbank](https://www.bundesbank.de/) | German 10Y benchmark | — |
 | ForexFactory mirror | Macro release calendar | — |

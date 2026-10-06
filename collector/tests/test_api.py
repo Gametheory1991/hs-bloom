@@ -20,7 +20,7 @@ def test_dashboard_shape_on_empty_store(tmp_path):
     client, _ = make_client(tmp_path)
     body = client.get("/api/dashboard").json()
     assert set(body["panels"].keys()) == {
-        "macro", "equity", "bonds", "news", "defi", "midnight", "morpho", "refs", "cycle",
+        "macro", "equity", "bonds", "news", "etf", "defi", "midnight", "morpho", "refs", "cycle",
         "insights",
     }
     assert [t["id"] for t in body["panels"]["cycle"]["tabs"]] == [
@@ -164,3 +164,30 @@ def test_insights_endpoint_defaults_when_digest_missing(tmp_path):
     assert body["trends"] == []
     assert body["delivery"]["state"] == "disabled"
     assert body["generated_at"] is None
+
+
+def test_etfs_endpoints(tmp_path):
+    client, store = make_client(tmp_path)
+    store.put_doc("etf_catalog", {"rows": [
+        None,
+        {"symbol": "SPY", "name": "SPDR S&P 500 ETF Trust", "url": "u1"},
+        {"symbol": "IVV", "name": "iShares Core S&P 500 ETF", "url": "u2"},
+    ]}, source="etfdb")
+    listing = client.get("/api/etfs").json()
+    assert listing["count"] == 2
+    assert listing["returned_count"] == 2
+    assert listing["source"] == "etfdb"
+    assert listing["rows"][0]["symbol"] == "SPY"
+    paged = client.get("/api/etfs?limit=1").json()
+    assert paged["count"] == 2
+    assert paged["returned_count"] == 1
+    assert paged["rows"][0]["symbol"] == "SPY"
+    filtered = client.get("/api/etfs?q=ishares&limit=1").json()
+    assert filtered["count"] == 1
+    assert filtered["returned_count"] == 1
+    assert filtered["rows"][0]["symbol"] == "IVV"
+    assert client.get("/api/etfs?limit=0").status_code == 400
+    assert client.get("/api/etfs?limit=-1").status_code == 400
+    one = client.get("/api/etfs/SPY").json()
+    assert one["name"] == "SPDR S&P 500 ETF Trust"
+    assert client.get("/api/etfs/NOPE").status_code == 404

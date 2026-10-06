@@ -32,12 +32,13 @@ def test_register_jobs_creates_all_jobs_with_config_cadences(tmp_path):
     )
     jobs = {j.id: j for j in scheduler.get_jobs()}
     assert set(jobs) == {
-        "equity", "bonds", "macro", "news", "macro_history", "defi", "midnight",
+        "equity", "bonds", "macro", "news", "etf", "macro_history", "defi", "midnight",
         "refs", "refs_history", "morpho", "cycle", "insights", "newsletter",
     }
     assert jobs["equity"].trigger.interval.total_seconds() == 300
     assert jobs["news"].trigger.interval.total_seconds() == 600
     assert jobs["macro"].trigger.interval.total_seconds() == 3600
+    assert jobs["etf"].trigger.interval.total_seconds() == 86400
     assert jobs["macro_history"].trigger.interval.total_seconds() == 86400
     assert jobs["defi"].trigger.interval.total_seconds() == 900
     assert jobs["midnight"].trigger.interval.total_seconds() == 900
@@ -57,4 +58,4 @@ def test_main_builds_app(tmp_path, monkeypatch):
 
     app, scheduler = build()
     assert app.title == "os-bloom collector"
-    assert len(scheduler.get_jobs()) == 13
+    assert len(scheduler.get_jobs()) == 14

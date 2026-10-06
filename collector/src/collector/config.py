@@ -186,6 +186,7 @@ class Config:
     cycle_tabs: list[CycleTabCfg]
     calendar_map: list[CalendarMapEntry]
     feeds: list[FeedCfg]
+    etfdb_catalog_url: str
     zyfai_base: str
     midnight_base: str
     defi: DefiCfg
@@ -219,6 +220,7 @@ def load_config(path: str | Path) -> Config:
         ],
         calendar_map=[CalendarMapEntry(**m) for m in raw["calendar_map"]],
         feeds=[FeedCfg(**f) for f in raw["feeds"]],
+        etfdb_catalog_url=raw["etfdb_catalog_url"],
         zyfai_base=raw["zyfai_base"],
         midnight_base=raw["midnight_base"],
         defi=DefiCfg(
