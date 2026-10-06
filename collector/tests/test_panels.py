@@ -242,3 +242,47 @@ def test_cycle_panel_applies_transform(tmp_path):
     ])]
     dash = build_dashboard(store, INDEXES, now=NOW, cycle_series=series, cycle_tabs=tabs)
     assert dash["panels"]["cycle"]["tabs"][0]["panels"][0]["rows"][0]["value"] == 10.0
+
+
+def test_shortinterest_panel_shape_and_degrade(tmp_path):
+    from collector.panels import _shortinterest_panel
+    store = Store(tmp_path / "t.db")
+    # Empty store: every section degrades, panel still builds.
+    empty = _shortinterest_panel(store)
+    assert empty["regsho"] is None
+    assert empty["threshold"] is None
+    assert empty["short_interest"] is None
+    assert empty["updated_at"] is None
+    assert empty["source"] == "finra"
+
+    store.put_doc("regsho_daily", {
+        "as_of": "2026-10-02",
+        "markets": {"cnms": {"label": "Consolidated", "short": 3958095820.0,
+                             "exempt": 100.0, "total": 7577000000.0, "ratio": 0.5226}},
+        "top50": [{"symbol": "NVDA", "short_volume": 48349928.0, "exempt_volume": 0.0,
+                   "total_volume": 100000000.0, "short_ratio": 0.4835}],
+        "tickers": {"NVDA": 48349928.0},
+    }, source="finra-regsho")
+    store.put_doc("regsho_threshold", {
+        "as_of": "2026-10-02", "count": 15,
+        "securities": [{"symbol": "XYZ", "name": "Xyz Corp", "category": "OTCQX",
+                        "reg_sho": True, "rule4320": False}],
+    }, source="finra-regsho")
+    store.put_doc("finra_short", {
+        "as_of": "2026-09-30", "total_short_shares": 12_000_000_000.0,
+        "tickers": {"NVDA": {"short": 95_000_000.0, "prev": 90_000_000.0,
+                             "adv": 200_000_000.0, "dtc": 0.5, "chg_pct": 5.6}},
+    }, source="finra-short-interest")
+    p = _shortinterest_panel(store)
+    assert p["regsho"]["as_of"] == "2026-10-02"
+    assert p["regsho"]["markets"]["cnms"]["ratio"] == 0.5226
+    assert p["regsho"]["top50"][0]["symbol"] == "NVDA"
+    assert p["threshold"]["count"] == 15
+    assert p["threshold"]["securities"][0]["symbol"] == "XYZ"
+    assert p["short_interest"]["total_short_shares"] == 12_000_000_000.0
+    assert p["short_interest"]["tickers"]["NVDA"]["dtc"] == 0.5
+    assert p["updated_at"] is not None
+    # Full dashboard exposes the new panel key.
+    dash = build_dashboard(store, INDEXES, now=NOW)
+    assert "shortinterest" in dash["panels"]
+    assert dash["panels"]["shortinterest"]["regsho"]["as_of"] == "2026-10-02"
