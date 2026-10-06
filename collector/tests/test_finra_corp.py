@@ -156,3 +156,90 @@ def test_fetch_finra_corp_empty_raises():
         assert "empty response" in str(e)
     else:
         raise AssertionError("should have raised")
+
+
+class FakeCurveStore(FakeStore):
+    """Store with a flat 4% Treasury curve at every tenor."""
+
+    def points(self, key, since=None):
+        if key.startswith("cycle:us-") or key == "cycle:us10y":
+            return {date(2026, 10, 1): 4.0, date(2026, 10, 2): 4.0}
+        return super().points(key, since)
+
+
+def _bond(**kw):
+    b = {"issuer": "ACME", "symbol": "ACME123", "cat": "ig",
+         "coupon": 4.5, "maturity": "2031-10-02", "moodys": "Baa2",
+         "sp": "BBB", "last": 102.5, "change": 0.5, "yield": 5.0}
+    b.update(kw)
+    return b
+
+
+def test_derive_bond_stats_basic():
+    store = FakeCurveStore()
+    s = finra_corp.derive_bond_stats(_bond(), store, date(2026, 10, 2))
+    # chg_pct = 0.5 / 102.0 * 100
+    assert s["chg_pct"] == pytest.approx(0.4902, rel=1e-3)
+    assert s["ytm_yrs"] == pytest.approx(5.0, rel=1e-2)
+    assert s["rating"] == "Baa2/BBB"
+    # flat 4% curve -> 100 bps spread
+    assert s["spread_bps"] == pytest.approx(100.0)
+
+
+def test_derive_bond_stats_conv_no_spread():
+    store = FakeCurveStore()
+    s = finra_corp.derive_bond_stats(_bond(cat="conv"), store,
+                                     date(2026, 10, 2))
+    assert s["spread_bps"] is None
+
+
+def test_derive_bond_stats_same_rating():
+    store = FakeCurveStore()
+    s = finra_corp.derive_bond_stats(_bond(moodys="Baa2", sp="Baa2"),
+                                     store, date(2026, 10, 2))
+    assert s["rating"] == "Baa2"
+
+
+def test_treasury_yield_interpolation():
+    store = FakeStore()
+    store.upsert_points("cycle:us-2y-yield",
+                        [(date(2026, 10, 2), 3.0)])
+    store.upsert_points("cycle:us-3y-yield",
+                        [(date(2026, 10, 2), 4.0)])
+    # 2.5y -> midpoint 3.5
+    assert finra_corp.treasury_yield_at(store, 2.5,
+                                       date(2026, 10, 2)) == pytest.approx(3.5)
+    # below shortest tenor -> clamp to shortest
+    assert finra_corp.treasury_yield_at(store, 0.01,
+                                       date(2026, 10, 2)) == pytest.approx(3.0)
+    # above longest -> clamp to longest
+    assert finra_corp.treasury_yield_at(store, 30,
+                                       date(2026, 10, 2)) == pytest.approx(4.0)
+
+
+def test_treasury_yield_missing():
+    store = FakeStore()
+    assert finra_corp.treasury_yield_at(store, 5,
+                                       date(2026, 10, 2)) is None
+
+
+def test_merge_bond_history_accumulates():
+    h = finra_corp.merge_bond_history({}, {
+        "2026-10-01": [_bond()],
+        "2026-10-02": [_bond(last=103.0)],
+    })
+    assert h["ACME123"]["d"] == ["2026-10-01", "2026-10-02"]
+    assert h["ACME123"]["p"] == [102.5, 103.0]
+    # merging again with the same days is idempotent
+    h2 = finra_corp.merge_bond_history(h, {"2026-10-02": [_bond(last=999)]})
+    assert h2["ACME123"]["p"] == [102.5, 103.0]
+
+
+def test_week52_stats():
+    prices = [100.0 + (i % 50) for i in range(300)]
+    stats = finra_corp._week52_stats({"p": prices})
+    assert stats["hi52"] == 149.0
+    assert stats["lo52"] == 100.0
+    last = prices[-1]
+    assert stats["d52hi_pct"] == pytest.approx((last - 149.0) / 149.0 * 100)
+    assert finra_corp._week52_stats({})["hi52"] is None

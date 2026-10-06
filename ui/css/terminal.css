@@ -501,3 +501,12 @@ td.sma { white-space: nowrap; letter-spacing: 2px; }
 svg.spark { display: block; }
 svg.spark polyline.up { color: var(--up); }
 svg.spark polyline.down { color: var(--down); }
+
+/* Most-active bonds table: 12-column speculator-style layout */
+.tbl-wrap { overflow-x: auto; }
+table.bond-tbl { border-collapse: collapse; font-size: 12px; white-space: nowrap; }
+table.bond-tbl th, table.bond-tbl td { padding: 4px 8px; text-align: right; }
+table.bond-tbl th:nth-child(2), table.bond-tbl td:nth-child(2),
+table.bond-tbl th:nth-child(3), table.bond-tbl td:nth-child(3),
+table.bond-tbl th:nth-child(6), table.bond-tbl td:nth-child(6) { text-align: left; }
+p.foot { font-size: 11px; }

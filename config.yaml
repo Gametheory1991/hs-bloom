@@ -146,6 +146,10 @@ series:            # macro click-through charts; transform per changes.apply_tra
   - { id: eur-usd,                  name: "EUR/USD",                          fred: DEXUSEU,          unit: "fx",  transform: none }
   - { id: usd-jpy,                  name: "USD/JPY",                          fred: DEXJPUS,          unit: "fx",  transform: none }
   - { id: us-2y-yield,              name: "US 2Y Yield %",                    fred: DGS2,             unit: "%",   transform: none }
+  - { id: us-3y-yield,              name: "US 3Y Yield %",                    fred: DGS3,             unit: "%",   transform: none }
+  - { id: us-5y-yield,              name: "US 5Y Yield %",                    fred: DGS5,             unit: "%",   transform: none }
+  - { id: us-7y-yield,              name: "US 7Y Yield %",                    fred: DGS7,             unit: "%",   transform: none }
+  - { id: us-20y-yield,             name: "US 20Y Yield %",                   fred: DGS20,            unit: "%",   transform: none }
   - { id: us-30y-yield,             name: "US 30Y Yield %",                   fred: DGS30,            unit: "%",  transform: none }
   - { id: us-5y-breakeven,          name: "US 5Y Breakeven %",                fred: T5YIE,            unit: "%",  transform: none }
   - { id: us-umich-infl-exp,        name: "UMich 1Y Inflation Expectations %", fred: MICH,           unit: "%",   transform: none }

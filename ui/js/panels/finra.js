@@ -344,17 +344,32 @@ function breadthSection(b) {
 function corpSection(c) {
   if (!c) return `<h3>MOST-ACTIVE CORPORATE BONDS</h3><p class="muted">No corporate activity data yet.</p>`;
   const lists = c.lists ?? {};
+  const pctCol = (x) => {
+    if (x == null) return "—";
+    const cls = x > 0 ? "up" : x < 0 ? "down" : "";
+    const s = x > 0 ? "+" : "";
+    return `<span class="${cls}">${s}${x.toFixed(2)}%</span>`;
+  };
   const html = Object.entries(lists).map(([slug, l]) => {
     const bonds = (l.bonds ?? []).map((bd) => {
       const cpn = bd.coupon != null ? `${Number(bd.coupon).toFixed(3)}%` : "—";
-      const mat = (bd.maturity ?? "").slice(0, 10) || "—";
+      const ytm = bd.ytm_yrs != null ? `${Number(bd.ytm_yrs).toFixed(1)}y` : "";
+      const mat = ((bd.maturity ?? "").slice(0, 10) || "—") + (ytm ? ` <span class="muted">${ytm}</span>` : "");
       const yld = bd.yield != null ? `${Number(bd.yield).toFixed(2)}%` : "—";
       const px = bd.last != null ? Number(bd.last).toFixed(2) : "—";
-      return `<tr><td><b>${bd.symbol ?? "—"}</b></td><td>${(bd.issuer ?? "").slice(0, 40)}</td>` +
-        `<td>${cpn}</td><td>${mat}</td><td>${yld}</td><td>${px}</td></tr>`;
+      const spr = bd.spread_bps != null ? `${Math.round(bd.spread_bps)}` : "—";
+      const rating = bd.rating ?? "—";
+      const spk = bd.spark && bd.spark.length >= 2
+        ? spark(bd.spark.map((v) => ({ v })), 140, 36)
+        : `<span class="muted">building…</span>`;
+      return `<tr><td class="muted">${bd.rank ?? "—"}</td><td><b>${bd.symbol ?? "—"}</b></td>` +
+        `<td>${(bd.issuer ?? "").slice(0, 32)}</td><td>${cpn}</td><td>${mat}</td>` +
+        `<td>${rating}</td><td>${px}</td><td>${pctCol(bd.chg_pct)}</td>` +
+        `<td>${yld}</td><td>${spr}</td><td>${pctCol(bd.d52hi_pct)}</td><td>${spk}</td></tr>`;
     }).join("");
     return `<h3>MOST ACTIVE — ${slug.toUpperCase()} <span class="muted">${l.as_of ?? ""} · ${l.count} bonds</span></h3>` +
-      (bonds ? `<table><tr><th>Symbol</th><th>Issuer</th><th>Coupon</th><th>Maturity</th><th>Yield</th><th>Price</th></tr>${bonds}</table>`
+      (bonds ? `<div class="tbl-wrap"><table class="bond-tbl"><tr><th>#</th><th>Symbol</th><th>Issuer</th><th>Coupon</th><th>Maturity</th><th>Rating</th><th>Price</th><th>%1D</th><th>Yield</th><th>G-Spr bp</th><th>Δ52w Hi</th><th>1Y Price</th></tr>${bonds}</table></div>` +
+      `<p class="muted foot">Rank = position in FINRA's most-active list (volume rank). G-Spr = G-spread vs interpolated Treasury par curve (DGS); "—" for convertibles. Ratings are Moody's/S&P as reported by FINRA. Δ52w Hi = price vs trailing-52w high. Sparklines build from daily history going forward.</p>`
              : `<p class="muted">No bond rows.</p>`);
   }).join("");
   return `<h3>CORPORATE ACTIVITY — FINRA <span class="muted">as of ${c.as_of ?? "—"}</span></h3>` + html;

@@ -541,10 +541,22 @@ def _finra_panel(store: Store) -> dict:
 
     corp_lists = {}
     if corp:
+        bond_hist = corp.get("bond_hist") or {}
         for dslug, lst in (corp.get("lists") or {}).items():
             bonds = (lst or {}).get("bonds") or []
+            slim = []
+            for b in bonds[:15]:
+                b2 = dict(b)
+                # 52 weekly-downsampled price points for the 1Y sparkline
+                h = bond_hist.get(b.get("symbol")) or {}
+                ps = [p for p in (h.get("p") or []) if p is not None]
+                if len(ps) > 52:
+                    step = len(ps) / 52
+                    ps = [ps[int(i * step)] for i in range(52)]
+                b2["spark"] = ps
+                slim.append(b2)
             corp_lists[dslug] = {"as_of": (lst or {}).get("as_of"),
-                                 "count": len(bonds), "bonds": bonds[:15]}
+                                 "count": len(bonds), "bonds": slim}
 
     return {
         "regsho": ({"as_of": regsho.get("as_of"), "markets": regsho.get("markets", {}),
