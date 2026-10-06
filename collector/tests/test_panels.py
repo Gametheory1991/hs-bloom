@@ -286,3 +286,52 @@ def test_shortinterest_panel_shape_and_degrade(tmp_path):
     dash = build_dashboard(store, INDEXES, now=NOW)
     assert "shortinterest" in dash["panels"]
     assert dash["panels"]["shortinterest"]["regsho"]["as_of"] == "2026-10-02"
+
+def test_factbook_panel_shape_and_degrade(tmp_path):
+    from collector.panels import _factbook_panel
+    store = Store(tmp_path / "t.db")
+    # Empty store: every section degrades, panel still builds.
+    empty = _factbook_panel(store)
+    assert empty["as_of"] is None
+    assert empty["headlines"] == {}
+    assert empty["hist"] == {}
+    assert empty["annual_top"] == {}
+    assert empty["interval"] == {}
+    assert empty["participant"] == {}
+    assert empty["issue"] == {}
+    assert empty["source"] == "finra"
+
+    store.put_doc("finra_factbook", {
+        "as_of": "2026-10-05",
+        "quarter_end": "2026-06-30",
+        "headlines": {"ig": {"trades": 112117.0, "pv": 46.9e9}},
+        "top": {"ig_trades": [{"cusip": "X", "trades": 100}]},
+        "buy_sell_latest": {"ig": [{"bucket": ">= $25M", "ratio": 0.81}]},
+        "buckets_latest": {"ig": {"trades": {"total": 112117.0}}},
+        "annual_top": {"2025": {"ig_trades": [{"cusip": "Y", "trades": 200}]}},
+        "interval": {"2025": {"ig": {"segments": []}}},
+        "annual_adv_adt": {"2025": {"ig": {"trades": {"total": 103987.0}}}},
+        "issue": {"2025": {"corp": {"total": {}}}},
+        "participant": {"2025": {"corp": {"tiers": ["5", "10"]}}},
+    }, source="finra-factbook")
+    store.upsert_points("cycle:fb-ig-trades", [
+        (date(2026, 3, 31), 100000.0),
+        (date(2026, 6, 30), 112117.0),
+    ])
+    store.upsert_points("cycle:fb-ig-pv", [
+        (date(2026, 3, 31), 40.0e9),
+        (date(2026, 6, 30), 46.9e9),
+    ])
+    p = _factbook_panel(store)
+    assert p["as_of"] == "2026-10-05"
+    assert p["headlines"]["ig"]["trades"] == 112117.0
+    assert p["top"]["ig_trades"][0]["cusip"] == "X"
+    assert len(p["hist"]["fb-ig-trades"]) == 2
+    assert p["hist"]["fb-ig-trades"][-1] == {"d": "2026-06-30", "v": 112117.0}
+    assert len(p["hist"]["fb-ig-pv"]) == 2
+    # Products with no points are simply absent, never null-crashing.
+    assert "fb-tba-trades" not in p["hist"]
+    assert p["annual_top"]["2025"]["ig_trades"][0]["cusip"] == "Y"
+    assert p["interval"]["2025"]["ig"]["segments"] == []
+    assert p["participant"]["2025"]["corp"]["tiers"] == ["5", "10"]
+    assert p["source"] == "finra-factbook"
