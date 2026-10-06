@@ -12,6 +12,7 @@ from pydantic import BaseModel
 from collector.changes import apply_transform, to_bands
 from collector.chat import SYSTEM_PROMPT, ask_gemini, build_context
 from collector.config import Config
+from collector import debt_cube
 from collector.panels import build_dashboard, econ_calendar_payload
 from collector.store import Store
 
@@ -225,6 +226,41 @@ def create_app(store: Store, cfg: Config) -> FastAPI:
                         "unit": ccfg.unit, "kind": r.kind})
             rows.append(row)
         return {"rows": rows}
+
+    @app.get("/api/debt-cube")
+    def debt_cube_api(product: str | None = None, maturity: str | None = None,
+                      holder: str | None = None) -> dict:
+        """Debt-outstanding slice cube: product x maturity x holder cells from
+        MSPD Table III (outstanding) + NY Fed SOMA (CUSIP par), denominator =
+        MSPD Table 1 Total Public Debt Outstanding. All params optional;
+        returns an empty-cells payload (never a 500) when the cube doc is
+        missing — the debt_cube scheduler job writes it daily."""
+        doc = store.doc("debt_cube")
+        if doc is None or not doc.payload:
+            return {"asof": None, "denominator": None, "cells": [],
+                    "updated_at": None}
+        payload = doc.payload
+        cells = debt_cube.query_cube(
+            payload,
+            product=(product or None) or None,
+            maturity=(maturity or None) or None,
+            holder=(holder or None) or None,
+        )
+        denom_mn = payload.get("denominator_mn") or 0.0
+        return {
+            "asof": payload.get("asof"),
+            "denominator": {
+                "notional_bn": round(denom_mn / 1000.0, 1),
+                "desc": payload.get("denominator_desc"),
+            },
+            "cells": [
+                {"product": c["product"], "maturity": c["maturity"],
+                 "holder": c["holder"], "notional_bn": c["notional_bn"],
+                 "pct_of_total": c["pct_of_total"]}
+                for c in cells
+            ],
+            "updated_at": doc.updated_at,
+        }
 
     @app.get("/api/figi/lookup")
     def figi_lookup(idtype: str = "TICKER", idvalue: str = "") -> dict:

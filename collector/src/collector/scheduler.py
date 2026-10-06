@@ -47,7 +47,7 @@ from collector.fetchers.refs import fetch_refs
 from collector.fetchers.risk import refresh_risk
 from collector.fetchers.thirteenf import fetch_thirteenf
 from collector.notify import refresh_digest_and_notify
-from collector.fetchers.tic import fetch_tic
+from collector.fetchers.tic_flows import fetch_tic_all
 from collector.fetchers.voldash import refresh_voldash
 from collector.fetchers.auctions import fetch_auctions
 from collector.fetchers.dealer import fetch_dealer
@@ -60,6 +60,15 @@ from collector.fetchers.finra_regsho import fetch_finra_regsho
 from collector.fetchers.ticker_stats import fetch_ticker_stats
 from collector.fetchers.finra_ids_star import fetch_finra_ids_star
 from collector.fetchers.finra_factbook import fetch_finra_factbook, fetch_finra_factbook_annual
+from collector.fetchers.ofr_stfm import fetch_ofr_stfm
+from collector.fetchers.frb_ddp import fetch_frb_ddp
+from collector.fetchers.sec_ncen import fetch_sec_ncen
+from collector.fetchers.sec_nport import fetch_sec_nport
+from collector.fetchers.sec_pfs import fetch_sec_pfs
+from collector.fetchers.z1_holdings import fetch_z1_holdings
+from collector.fetchers.mspd import fetch_mspd
+from collector.fetchers.soma_cusip import fetch_soma_cusip
+from collector.debt_cube import refresh_debt_cube
 from collector.fetchers.ice_star import fetch_ice_star
 from collector.fetchers.refs_history import fetch_refs_history
 from collector.fetchers.trace_monthly import fetch_trace_monthly
@@ -152,7 +161,7 @@ def register_jobs(
         "cycle": (cfg.cadences["cycle"], partial(fetch_cycle, cfg.cycle_series, store, fred_api_key, get_text, get_bytes), start),
         "ofr": (cfg.cadences["ofr"], partial(fetch_ofr, cfg.ofr_series, store, get_text), start),
         "cftc_pos": (cfg.cadences["cftc_pos"], partial(fetch_cftc_positioning, cfg.cftc_pos, store, get_text), start),
-        "tic": (cfg.cadences["tic"], partial(fetch_tic, cfg.tic, store, get_text), start),
+        "tic": (cfg.cadences["tic"], partial(fetch_tic_all, cfg.tic, store, get_text), start),
         "insights": (cfg.cadences["insights"], partial(refresh_digest_and_notify, store, cfg, post_json), start),
         "thirteenf": (cfg.cadences["thirteenf"], partial(fetch_thirteenf, cfg.thirteenf, store, get_text), start),
         "auctions": (cfg.cadences["auctions"], partial(fetch_auctions, cfg.auctions, store, get_text), start),
@@ -367,6 +376,45 @@ def register_jobs(
         # dealer concentration, issues outstanding). Yearly refresh.
         "finra_factbook_annual": (cfg.cadences.get("finra_factbook_annual", 365 * 86400), partial(fetch_finra_factbook_annual, store, get_text, get_bytes),
                  start + timedelta(seconds=8550)),
+        # batch 13: OFR Short-Term Funding Monitor (keyless API; SOFR daily,
+        # cleared repo daily-prelim, MMF monthly, dealer fails/RP/RRP weekly).
+        # Daily job; series stored as-is via upsert.
+        "ofr_stfm": (cfg.cadences.get("ofr_stfm", 86400), partial(fetch_ofr_stfm, cfg.ofr_stfm, store, get_text),
+                 start + timedelta(seconds=8400)),
+        # batch 13: FRB SLOOS + Commercial Paper (Board source via FRED — the
+        # DDP is retiring Nov 2026). Weekly poll, idempotent upserts.
+        "frb_ddp": (cfg.cadences.get("frb_ddp", 604800), partial(fetch_frb_ddp, cfg.frb_ddp, store, fred_api_key, get_text),
+                 start + timedelta(seconds=8700)),
+        # batch 13: SEC N-CEN fund census (~8-16 MB receipt-batch zips; declared
+        # contact UA, 1 req/2s). Monthly poll; quarterly receipt batches.
+        "sec_ncen": (cfg.cadences.get("sec_ncen", 2592000), partial(fetch_sec_ncen, cfg.sec_data, store, get_bytes),
+                 start + timedelta(seconds=9000)),
+        # batch 13: SEC N-PORT holdings aggregates — aggregate-first, streamed
+        # download, selective zip extraction; never unpacks the ~420 MB
+        # archive. ~6-month holdings lag (public 3rd-month reports, 60-day delay).
+        "sec_nport": (cfg.cadences.get("sec_nport", 2592000), partial(fetch_sec_nport, cfg.sec_data, store),
+                 start + timedelta(seconds=9300)),
+        # batch 13: SEC Private Fund Statistics supporting XLSX — latest quarter
+        # resolved at runtime from the index page; anchor-driven table parse.
+        "sec_pfs": (cfg.cadences.get("sec_pfs", 2592000), partial(fetch_sec_pfs, cfg.sec_data, store, get_bytes),
+                 start + timedelta(seconds=9600)),
+        # batch 13: FRED Z.1 holdings-by-holder (keyless FRED CSV; quarterly
+        # levels in $mn, idempotent upserts). Monthly poll; quarterly data.
+        "z1_holdings": (cfg.cadences.get("z1_holdings", 2592000), partial(fetch_z1_holdings, store, get_text),
+                 start + timedelta(seconds=9900)),
+        # batch 13: MSPD Tables 1 + 3 (keyless Fiscal Data API; ~1 MB/month
+        # CUSIP detail). Monthly poll; ~5-week publication lag.
+        "mspd": (cfg.cadences.get("mspd", 2592000), partial(fetch_mspd, store, get_text),
+                 start + timedelta(seconds=10200)),
+        # batch 13: NY Fed SOMA Treasury holdings by CUSIP (keyless CSV;
+        # weekly, as-of Wednesdays). Weekly poll.
+        "soma_cusip": (cfg.cadences.get("soma_cusip", 604800), partial(fetch_soma_cusip, store, get_text),
+                 start + timedelta(seconds=10500)),
+        # batch 13: debt-outstanding slice cube (product x maturity x holder).
+        # Compute-only: no network, reads the mspd/soma docs, skips cleanly
+        # until all source docs exist. Daily.
+        "debt_cube": (cfg.cadences.get("debt_cube", 86400), partial(refresh_debt_cube, store),
+                 start + timedelta(seconds=10800)),
         "newsletter": (cfg.cadences["insights"], partial(deliver_newsletter, store, smtp_cfg), start + timedelta(seconds=5)),
     }
     # Boot catch-up (see _catchup_first_runs): overdue staggered jobs run

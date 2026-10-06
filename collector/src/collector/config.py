@@ -241,6 +241,25 @@ class DealerSeriesCfg:
 
 
 @dataclass(frozen=True)
+class FrbDdpCfg:
+    """One FRB release series (Board source, FRED delivery — see frb_ddp.py).
+
+    Exactly one of `fred` (single FRED id) or `fred_sum` (FRED ids summed
+    pointwise on fully-aligned dates) is set.
+    """
+    id: str
+    name: str
+    unit: str
+    fred: str | None = None
+    fred_sum: list[str] | None = None
+
+
+@dataclass(frozen=True)
+class SecDataCfg:
+    user_agent: str  # SEC mandates a descriptive UA with contact; no default is safe
+
+
+@dataclass(frozen=True)
 class Config:
     db_path: str
     calendar_url: str
@@ -265,6 +284,9 @@ class Config:
     auctions: AuctionsCfg
     dealer: list[DealerSeriesCfg]
     scorecard: list[ScorecardRowCfg] = field(default_factory=list)
+    ofr_stfm: list[OfrSeriesCfg] = field(default_factory=list)
+    frb_ddp: list[FrbDdpCfg] = field(default_factory=list)
+    sec_data: SecDataCfg | None = None
 
 
 def load_config(path: str | Path) -> Config:
@@ -305,6 +327,10 @@ def load_config(path: str | Path) -> Config:
         ),
         scorecard=[ScorecardRowCfg(**r) for r in raw.get("scorecard", [])],
         dealer=[DealerSeriesCfg(**s) for s in raw["dealer"]],
+        ofr_stfm=[OfrSeriesCfg(**s) for s in raw.get("ofr_stfm", [])],
+        frb_ddp=[FrbDdpCfg(**s) for s in raw.get("frb_ddp", [])],
+        sec_data=(SecDataCfg(user_agent=raw["sec_data"]["user_agent"])
+                  if raw.get("sec_data") else None),
         calendar_map=[CalendarMapEntry(**m) for m in raw["calendar_map"]],
         feeds=[FeedCfg(**f) for f in raw["feeds"]],
         zyfai_base=raw["zyfai_base"],
