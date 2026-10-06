@@ -38,6 +38,8 @@ def test_register_jobs_creates_all_jobs_with_config_cadences(tmp_path):
         "gse", "xcorr", "voldash", "movers", "home_radar", "hyperscaler",
         "ai_capex", "ai_graph", "ms_capex", "ms_graph", "trace_treasury", "trace_monthly", "ice_star",
         "finra_short", "finra_margin", "tsv_capex", "tsv_graph", "tsv_watch", "newsletter",
+        "ofr_stfm", "frb_ddp", "sec_ncen", "sec_nport", "sec_pfs",
+        "z1_holdings", "mspd", "soma_cusip", "debt_cube",
         "worldbank", "usaspending", "coingecko", "openfigi", "finnhub",
         "polymarket", "kalshi", "pred_edge", "finra_breadth", "finra_corp", "finra_regsho",
         "finra_capped", "finra_ids_star", "finra_factbook", "finra_factbook_annual",
@@ -85,4 +87,4 @@ def test_main_builds_app(tmp_path, monkeypatch):
 
     app, scheduler = build()
     assert app.title == "os-bloom collector"
-    assert len(scheduler.get_jobs()) == 65  # +1 finra_breadth, +1 finra_corp, +1 finra_regsho, +1 finra_capped, +1 finra_ids_star, +1 ticker_stats, +2 bank universe, +4 tech/vendor universes, +2 etf universe, +2 crypto universe, +2 factbook
+    assert len(scheduler.get_jobs()) == 74  # +1 finra_breadth, +1 finra_corp, +1 finra_regsho, +1 finra_capped, +1 finra_ids_star, +1 ticker_stats, +2 bank universe, +4 tech/vendor universes, +2 etf universe, +2 crypto universe, +2 factbook, +9 batch13 (ofr_stfm, frb_ddp, sec_ncen, sec_nport, sec_pfs, z1_holdings, mspd, soma_cusip, debt_cube)
