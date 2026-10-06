@@ -206,7 +206,7 @@ async function drawPxChart() {
       ? `${blabel} — ${mlabel}: ${pts.length} daily points (${rLbl}) · FINRA-IDS PXTABLES`
       : `No data for ${sid} yet — PXTABLES backfill in progress.`;
   } catch (e) {
-    if (statusEl) statusEl.textContent = `Chart unavailable — ${e.message}`;
+    if (statusEl) statusEl.textContent = `No price data yet — first PXTABLES pull pending (tonight's scheduled run).`;
   }
 }
 
@@ -463,7 +463,7 @@ async function fillStarTable() {
           `<td><b>${esc(label)}</b></td><td class="num"><b>${fmtVal(st.cur)}</b> <span class="muted">${st.asof}</span></td>` +
           dc("d1") + dc("w1") + dc("m1") + dc("q1") + dc("y1") + dc("y3") +
           rangeCells(stats, "full history") + `</tr>`;
-      } catch { return `<tr data-sort-row="off"><td><b>${esc(label)}</b></td><td colspan="9" class="muted">load failed</td></tr>`; }
+      } catch { return `<tr data-sort-row="off"><td><b>${esc(label)}</b></td><td colspan="9" class="muted">pending first data pull</td></tr>`; }
     }));
     tbody.innerHTML = rows.filter(Boolean).join("");
     tbody.querySelectorAll("tr[data-star-chart]").forEach((tr) => {
