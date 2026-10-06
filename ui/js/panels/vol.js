@@ -3,6 +3,7 @@
 // spot-vol beta. Data: /api/dashboard "voldash" panel.
 // Vanilla JS + inline SVG, no new libraries.
 import { fmtAge } from "../fmt.js";
+import { rangePlotDotted } from "../rangeviz.js";
 
 const STALE_MINUTES = 2880; // 2x the daily voldash cadence
 
@@ -30,12 +31,14 @@ function tableSection(v) {
     const spr = r.spread == null ? "—"
       : `<span class="${r.spread > 0 ? "up" : r.spread < 0 ? "down" : ""}">${r.spread > 0 ? "+" : ""}${r.spread.toFixed(1)}</span>`;
     return `<tr><td><b>${esc(r.ticker)}</b></td><td>${n1(r.implied)}</td><td>${chg}</td>` +
-      `${pctCell(r.pctile_1y)}<td>${n1(r.realized)}</td><td>${spr}</td>${pctCell(r.spread_pctile_1y)}</tr>`;
+      `${pctCell(r.pctile_1y)}<td data-sort="off">${rangePlotDotted({ pct: r.pctile_1y }, "pct")}</td>` +
+      `<td>${n1(r.realized)}</td><td>${spr}</td>${pctCell(r.spread_pctile_1y)}` +
+      `<td data-sort="off">${rangePlotDotted({ pct: r.spread_pctile_1y }, "pct")}</td></tr>`;
   }).join("");
   return `
     <div class="panel-subhead"><span>MACRO EQUITY VOLATILITY <span class="muted">1M implied vs realized</span></span></div>
     <div style="overflow-x:auto"><table class="voltable" data-sortable>
-      <thead><tr><th>Ticker</th><th>1M Impl.</th><th>Wkly</th><th>%ile (1Y)</th><th>1M Real.</th><th>Impl−Real</th><th>%ile (1Y)</th></tr></thead>
+      <thead><tr><th>Ticker</th><th>1M Impl.</th><th>Wkly</th><th>%ile (1Y)</th><th data-sort="off">Range</th><th>1M Real.</th><th>Impl−Real</th><th>%ile (1Y)</th><th data-sort="off">Range</th></tr></thead>
       <tbody>${trs}</tbody>
     </table></div>
     <div class="muted">Implied = vol index (VIX/VXN/GVZ/OVX/VXSLV); realized = 21d ann. from prices. RTY/TLT/LQD/HYG have no free implied feed — realized only.</div>`;

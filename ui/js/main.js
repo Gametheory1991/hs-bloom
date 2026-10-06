@@ -10,6 +10,7 @@ import { renderEarningsProfit, renderFiscalEcon } from "./panels/fiscal.js";
 import { renderFigiLookup } from "./panels/figi.js";
 import { renderRiskMap } from "./panels/riskmap.js";
 import { renderRadar } from "./panels/radar.js";
+import { renderPulse } from "./panels/pulse.js";
 import { renderHyper } from "./panels/hyper.js";
 import { renderUniverseSelector } from "./panels/ai_flow.js";
 import { renderTsv } from "./panels/tsv.js";
@@ -136,6 +137,7 @@ async function tick() {
     renderMovers(p.movers ?? { indexes: {}, asof: null, updated_at: null, source: null });
     renderRadar(p.radar ?? { indicators: [], regime: "UNKNOWN", as_of: null, updated_at: null, source: null },
                 p.riskmap ?? { countries: [], asof: null, updated_at: null, source: null });
+    renderPulse(); // PULSE Phase 2: KPI tiles + range check + talk track (async, self-guarded)
     renderKoi();
     renderHyper(p.hyper ?? { issuances: [], equities: [], note: null, updated_at: null, source: null });
     renderUniverseSelector(p.ai_flow ?? { universe_id: "ai_buildout", verticals: [], edges: [], rollups: {}, capex_stack: {}, risk_notes: [], updated_at: null, source: null },

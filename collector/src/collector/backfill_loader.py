@@ -18,11 +18,11 @@ def maybe_load_backfill(store, backfill_dir: Path) -> bool:
     """Load backfill data if not already loaded. Returns True if loaded this run."""
     try:
         # Check marker
-        existing = store.get_doc("system", MARKER_KEY)
+        existing = store.doc(MARKER_KEY)
         if existing:
             return False
     except Exception:
-        pass  # store may not support get_doc this way; try loading
+        pass  # try loading anyway
 
     if not backfill_dir.is_dir():
         log.info("backfill: no backfill_data dir at %s, skipping", backfill_dir)
@@ -51,7 +51,7 @@ def maybe_load_backfill(store, backfill_dir: Path) -> bool:
         _load_all(store, extract_dir)
         # Set marker
         try:
-            store.put_doc("system", MARKER_KEY, {"loaded": True})
+            store.put_doc(MARKER_KEY, {"loaded": True}, "backfill")
         except Exception:
             pass
         log.info("backfill: complete")
@@ -113,7 +113,8 @@ def _load_all(store, d: Path) -> None:
 
     if price_files:
         try:
-            doc = store.get_doc("ticker_stats", "price_hist") or {}
+            existing_doc = store.doc("ticker_stats")
+            doc = (existing_doc.payload.get("price_hist", {}) if existing_doc else {})
         except Exception:
             doc = {}
         for pf in price_files:
@@ -129,7 +130,7 @@ def _load_all(store, d: Path) -> None:
             if closes:
                 doc[sym] = closes[-260:]  # keep last year
         try:
-            store.put_doc("ticker_stats", "price_hist", doc)
+            store.put_doc("ticker_stats", {"price_hist": doc}, "backfill")
             log.info("backfill: prices loaded (%d tickers)", len(doc))
         except Exception as e:
             log.warning("backfill prices: %s", e)
@@ -141,11 +142,19 @@ def _load_all(store, d: Path) -> None:
             with open(reg_json) as f:
                 registry = json.load(f)
             try:
-                existing = store.get_doc("finra_corp", "cusip_registry") or {}
+                existing_doc = store.doc("finra_corp")
+                existing = (existing_doc.payload.get("cusip_registry", {}) if existing_doc else {})
             except Exception:
                 existing = {}
             existing.update(registry)
-            store.put_doc("finra_corp", "cusip_registry", existing)
+            # Merge into finra_corp doc preserving other keys
+            try:
+                full = store.doc("finra_corp")
+                payload = dict(full.payload) if full else {}
+            except Exception:
+                payload = {}
+            payload["cusip_registry"] = existing
+            store.put_doc("finra_corp", payload, "backfill")
             log.info("backfill: cusip registry loaded (%d cusips)", len(registry))
         except Exception as e:
             log.warning("backfill cusip registry: %s", e)

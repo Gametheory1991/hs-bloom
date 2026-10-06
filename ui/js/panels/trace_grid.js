@@ -9,6 +9,7 @@
 import { getSeries } from "../api.js";
 import { setTraceChartProduct } from "./trace_charts.js";
 import { OUTSTANDING, totalOutstanding, OUTSTANDING_NOTE } from "./outstanding.js";
+import { rangePlotDotted } from "../rangeviz.js";
 
 const PRODUCTS = [
   { id: "total", label: "TOTAL (Treasury + TRACE)", synthetic: true },
@@ -300,28 +301,9 @@ const heat = (x) => {
   return ` style="background:rgba(${x >= 0 ? "22,163,74" : "220,38,38"},${a.toFixed(2)})"`;
 };
 
-// Bloomberg-style dotted range sparkline (Harry's standing visual, 2026-10-05):
-// horizontal dotted line spanning the 3Y range, blue dot = current value,
-// orange diamond = historical average. Two versions: percentile scale and
-// z-score scale.
-export function rangePlotDotted(s, mode) {
-  const w = 130, p = 8;
-  const isPct = mode === "pct";
-  const lo = isPct ? 0 : Math.min(s.zlo, -0.5);
-  const hi = isPct ? 100 : Math.max(s.zhi, 0.5);
-  const span = (hi - lo) || 1;
-  const X = (v) => p + Math.max(0, Math.min(1, (v - lo) / span)) * (w - 2 * p);
-  const curPos = isPct ? s.pct : (s.z ?? 0);
-  const avgPos = isPct ? 50 : 0;
-  const cx = X(curPos), ax = X(avgPos);
-  const tip = isPct ? `Now: ${s.pct.toFixed(0)}th percentile of 3Y window`
-                    : `Now: z = ${s.z == null ? "—" : s.z.toFixed(2)} (3Y)`;
-  return `<svg class="trng" width="${w}" height="20" viewBox="0 0 ${w} 20">` +
-    `<line x1="${p}" y1="10" x2="${w - p}" y2="10" style="stroke:var(--line)" stroke-width="2" stroke-dasharray="2,3" stroke-linecap="round"/>` +
-    `<polygon points="${ax.toFixed(1)},5 ${(ax + 4.5).toFixed(1)},10 ${ax.toFixed(1)},15 ${(ax - 4.5).toFixed(1)},10" fill="#f5a623"><title>${isPct ? "50th percentile" : "Mean (z = 0)"}</title></polygon>` +
-    `<circle cx="${cx.toFixed(1)}" cy="10" r="5" fill="#2563eb" stroke="#fff" stroke-width="1.5"><title>${tip}</title></circle>` +
-    `</svg>`;
-}
+// Bloomberg-style dotted range sparkline lives in ../rangeviz.js (shared).
+// (local definition removed 2026-10-05; re-exported here for compatibility)
+export { rangePlotDotted } from "../rangeviz.js";
 function sparkline(win) {
   if (!win || win.length < 2) return `<span class="muted">—</span>`;
   const w = 120, h = 34;

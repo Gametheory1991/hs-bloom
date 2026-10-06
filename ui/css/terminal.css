@@ -462,6 +462,9 @@ table.trace-grid tbody tr[data-pid] { cursor: pointer; }
 table.trace-grid tbody tr[data-pid]:hover td:first-child { text-decoration: underline; }
 table.trace-grid tbody tr.total-row td { background: rgba(37, 99, 235, 0.07); font-weight: 600; }
 table.trace-grid svg.trng, table.trace-grid svg.tspark { display: block; }
+/* Shared Bloomberg range sparklines (rangeviz.js) — used on every grid */
+svg.trng { display: block; margin: 0 auto; }
+td .trng { vertical-align: middle; }
 
 /* Top-shorted tickers: wide table scrolls horizontally */
 .table-scroll { overflow-x: auto; margin: 8px 0 4px; }
@@ -589,3 +592,25 @@ table[data-sortable] th[data-scol]:hover { color: var(--fg); background: rgba(37
 }
 .exp-all-btn:hover { color: #2563eb; border-color: #2563eb; }
 #chart-overlay .overlay-head .exp-btn { margin-right: 6px; }
+
+/* ============ PULSE Phase 2 (2026-10-05) ============ */
+.kpis { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.kpi { background: #ffffff; border: 1px solid #e5e7eb; border-radius: 6px; padding: 8px 10px; min-width: 0; box-shadow: 0 1px 2px rgba(15,23,42,.05); }
+.kpi .lbl { font-size: 10px; letter-spacing: 1.5px; color: #6b7280; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kpi .val { font-size: 20px; font-weight: 700; margin: 2px 0; color: #1a1a1a; font-variant-numeric: tabular-nums; }
+.kpi .chg { font-size: 11px; font-weight: 700; }
+.kpi .chg.up { color: #16a34a; } .kpi .chg.down { color: #dc2626; } .kpi .chg.flat { color: #6b7280; }
+.kpi svg.pspark { display: block; width: 100%; height: 30px; margin: 4px 0 2px; }
+.kpi .hz { display: flex; gap: 6px; font-size: 9px; color: #6b7280; flex-wrap: wrap; align-items: center; }
+.kpi .hz b { font-weight: 400; }
+.kpi .zbadge { font-size: 9px; border: 1px solid #e5e7eb; border-radius: 3px; padding: 0 4px; margin-left: auto; color: #6b7280; }
+.kpi-foot { grid-column: 1 / -1; font-size: 10px; padding: 2px 4px; }
+ul.talk { list-style: none; padding: 2px 0; margin: 0; }
+ul.talk li { padding: 7px 0 7px 16px; border-bottom: 1px dotted #e5e7eb; position: relative; font-size: 12.5px; line-height: 1.5; color: #1a1a1a; }
+ul.talk li:last-child { border-bottom: none; }
+ul.talk li::before { content: "▸"; position: absolute; left: 0; color: #2563eb; font-weight: 700; }
+ul.talk.big li { font-size: 16px; padding: 10px 0 10px 20px; }
+.grid2 { display: grid; grid-template-columns: 7fr 5fr; gap: 8px; }
+.grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+@media (max-width: 760px) { .grid2, .grid3 { grid-template-columns: 1fr; } }
+td.sym { color: #1d4ed8; font-weight: 600; }

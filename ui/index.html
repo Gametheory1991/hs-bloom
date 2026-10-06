@@ -39,23 +39,63 @@
   </script>
   <div id="health-strip" class="health-strip" title="per-feed health: green ok · amber recovered · red failing"></div>
 
-  <!-- ============ PULSE — the 60-second conference view ============ -->
-  <main class="grid" data-hub="pulse" data-sub="snapshot" style="grid-template-columns: 1fr 1fr 1fr;">
-    <section class="panel" id="panel-radar">
-      <div class="panel-title">MARKET RADAR</div>
-      <div class="panel-body"></div>
-      <div class="panel-foot muted"></div>
+  <!-- ============ PULSE — the 60-second conference view (Phase 2) ============ -->
+  <main class="grid" data-hub="pulse" data-sub="snapshot" style="grid-template-columns: 1fr;">
+    <section class="panel" id="panel-pulse-tiles">
+      <div class="panel-title">PULSE — KPI TILES <span class="muted" id="pulse-tiles-asof"></span></div>
+      <div class="panel-body"><div class="kpis" id="pulse-tiles"><p class="muted">Loading tiles…</p></div></div>
     </section>
-    <section class="panel" id="panel-news">
-      <div class="panel-title">TOP NEWS</div>
-      <div class="panel-body"></div>
-      <div class="panel-foot muted"></div>
+    <section class="panel" id="panel-pulse-range">
+      <div class="panel-title">RANGE CHECK — NOW vs HISTORY <span class="note">dotted Low→High · <span style="color:#2563eb">●</span> now · <span style="color:#f59e0b">◆</span> hist avg</span></div>
+      <div class="panel-body" id="pulse-rangecheck"><p class="muted">Loading…</p></div>
+      <div class="panel-foot muted">BLOOMBERG-STYLE RANGE COLUMNS · percentile + z-score · 1Y window</div>
     </section>
-    <section class="panel" id="panel-insights">
-      <div class="panel-title">ALERTS / NEWSLETTER</div>
-      <div class="panel-body"></div>
-      <div class="panel-foot muted"></div>
-    </section>
+    <div class="grid2">
+      <section class="panel" id="panel-pulse-talk">
+        <div class="panel-title">TALK TRACK — 60-SECOND BRIEF <span class="note">auto-built from live data</span></div>
+        <div class="panel-body" id="pulse-talktrack"><p class="muted">Building bullets…</p></div>
+        <div class="panel-foot muted">SOURCE: terminal API</div>
+      </section>
+      <section class="panel" id="panel-pulse-movers">
+        <div class="panel-title">TOP MOVERS — σ MOVES <span class="note">1D</span></div>
+        <div class="panel-body" id="pulse-movers"><p class="muted">Loading…</p></div>
+        <div class="panel-foot muted">FULL TABLE → MARKETS / MOVERS</div>
+      </section>
+    </div>
+    <div class="grid3">
+      <section class="panel" id="panel-pulse-econ">
+        <div class="panel-title">TODAY — ECON</div>
+        <div class="panel-body" id="pulse-econ"><p class="muted">Loading…</p></div>
+        <div class="panel-foot muted">FULL WEEK → MACRO / CALENDAR</div>
+      </section>
+      <section class="panel" id="panel-pulse-auctions">
+        <div class="panel-title">NEXT — UST AUCTIONS</div>
+        <div class="panel-body" id="pulse-auctions"><p class="muted">Loading…</p></div>
+        <div class="panel-foot muted">RESULTS → MACRO / AUCTIONS</div>
+      </section>
+      <section class="panel" id="panel-pulse-gauges">
+        <div class="panel-title">RISK GAUGES</div>
+        <div class="panel-body" id="pulse-gauges"><p class="muted">Loading…</p></div>
+        <div class="panel-foot muted">ENGINE → POSITIONING</div>
+      </section>
+    </div>
+    <div class="grid3">
+      <section class="panel" id="panel-radar">
+        <div class="panel-title">MARKET RADAR</div>
+        <div class="panel-body"></div>
+        <div class="panel-foot muted"></div>
+      </section>
+      <section class="panel" id="panel-news">
+        <div class="panel-title">TOP NEWS</div>
+        <div class="panel-body"></div>
+        <div class="panel-foot muted"></div>
+      </section>
+      <section class="panel" id="panel-insights">
+        <div class="panel-title">ALERTS / NEWSLETTER</div>
+        <div class="panel-body"></div>
+        <div class="panel-foot muted"></div>
+      </section>
+    </div>
   </main>
   <main class="grid hidden" data-hub="pulse" data-sub="talktrack" style="grid-template-columns: 1fr;">
     <section class="panel">

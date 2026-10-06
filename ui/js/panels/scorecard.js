@@ -3,6 +3,7 @@
 // Click a row for the full chart via the shared overlay.
 import { getScorecard } from "../api.js";
 import { openChart } from "../chart.js";
+import { rangeCells, RANGE_TH } from "../rangeviz.js";
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -54,10 +55,11 @@ export async function renderScorecard() {
     return `<tr class="clickable" data-series="${esc(r.id)}" data-name="${esc(r.name)}">` +
       `<td class="sym">${esc(r.name)}</td>` +
       `<td class="num">${fmtLast(r)}</td>${cells}` +
-      `<td class="${zClass(r.z_1y)} num">${r.z_1y == null ? "—" : (r.z_1y > 0 ? "+" : "") + r.z_1y.toFixed(2)}</td></tr>`;
+      `<td class="${zClass(r.z_1y)} num">${r.z_1y == null ? "—" : (r.z_1y > 0 ? "+" : "") + r.z_1y.toFixed(2)}</td>` +
+      `${rangeCells({ z: r.z_1y }, "trailing 1Y")}</tr>`;
   }).join("");
   body.innerHTML = `<table class="scorecard" data-sortable><tr><th>Series</th><th>Last</th><th>1D</th>` +
-    `<th>1M</th><th>3M</th><th>1Y</th><th>1Y z</th></tr>${trs}</table>`;
+    `<th>1M</th><th>3M</th><th>1Y</th><th>1Y z</th>${RANGE_TH}</tr>${trs}</table>`;
   body.querySelectorAll("tr.clickable").forEach((tr) =>
     tr.addEventListener("click", () => openChart(tr.dataset.series, tr.dataset.name)));
   const foot = document.querySelector("#panel-scorecard .panel-foot");

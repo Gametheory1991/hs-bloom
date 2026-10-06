@@ -11,6 +11,7 @@ import { renderTraceCharts, setTraceChartProduct } from "./trace_charts.js";
 import { renderTraceGrid } from "./trace_grid.js";
 import { refiWallSection, renderOasIndexes } from "./refi_wall.js";
 import { getSeries } from "../api.js";
+import { rangeCells, statsFromValues, RANGE_TH } from "../rangeviz.js";
 const big = (x) =>
   x == null ? "—" : x.toLocaleString("en-US", { maximumFractionDigits: 0 });
 const pct1 = (x) => (x == null ? "—" : `${(x * 100).toFixed(1)}%`);
@@ -316,12 +317,14 @@ async function renderBreadthSentiment() {
         ? (r1.now == null ? "—" : "$" + (r1.now / 1e3).toFixed(1) + "B")
         : (r1.now == null ? "—" : r1.now.toLocaleString("en-US", { maximumFractionDigits: 1 }) + " " + s.unit);
       const dc = (x) => `<td class="num">${bsDeltaCell(x.now, x.ref, s.kind)}</td>`;
+      const rs = statsFromValues(p.map((pt) => pt[1]));
       return `<tr><td><b>${s.label}</b>${s.note ? `<br><span class="muted">${s.note}</span>` : ""}</td>` +
         `<td class="num">${fmtNow}<br><span class="muted">${asof}</span></td>` +
-        dc(r1) + dc(r7) + dc(r30) + dc(r91) + dc(r365) + `</tr>`;
+        dc(r1) + dc(r7) + dc(r30) + dc(r91) + dc(r365) +
+        `${rangeCells(rs, "full history since Jan 2018")}</tr>`;
     }).join("");
     host.innerHTML =
-      `<table class="bs-deltas" data-sortable><tr><th>Indicator</th><th>Now</th><th>1D</th><th>1W</th><th>1M</th><th>1Q</th><th>1Y</th></tr>${trows}</table>` +
+      `<table class="bs-deltas" data-sortable><tr><th>Indicator</th><th>Now</th><th>1D</th><th>1W</th><th>1M</th><th>1Q</th><th>1Y</th>${RANGE_TH}</tr>${trows}</table>` +
       BS_CHART_DEFS.map((c) => `<h4>${c.title}</h4><div id="${c.el}" class="bs-chart"></div>` +
         (c.foot ? `<p class="muted">${c.foot}</p>` : "")).join("") +
       `<p class="muted">FINRA fixed-income breadth (advances/declines/52wk high-low) and sentiment ` +
