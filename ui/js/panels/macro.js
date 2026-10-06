@@ -25,7 +25,7 @@ export function renderMacro(panel) {
     <tr><th>When (local)</th><th>Ctry</th><th>Release</th><th>Prev</th><th>Cons</th><th>Act</th></tr>
     ${past.map(row).join("")}
     ${past.length && panel.releases.length
-      ? `<tr class="macro-divider"><td colspan="6">── UPCOMING ──</td></tr>` : ""}
+      ? `<tr class="macro-divider" data-sort-row="off"><td colspan="6">── UPCOMING ──</td></tr>` : ""}
     ${panel.releases.map((r, i) => row(r, past.length + i)).join("")}
   </table>`;
   body.querySelectorAll("tr.clickable").forEach((tr) => {

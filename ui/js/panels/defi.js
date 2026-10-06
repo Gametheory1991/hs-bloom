@@ -64,7 +64,7 @@ function renderVaults(panel) {
   const section = (tier, rows) => {
     const { wavg, med } = tierStats(rows);
     return `
-    <tr class="tier-head"><td colspan="7">${esc(tier).toUpperCase()}
+    <tr class="tier-head" data-sort-row="off"><td colspan="7">${esc(tier).toUpperCase()}
       <span class="tier-stats">TVL-WTD ${apy(wavg)} · MED ${apy(med)}</span></td></tr>
     ${rows.map((r) => `<tr>
       <td class="sym">${pool(r)}</td>

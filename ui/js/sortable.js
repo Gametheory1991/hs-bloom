@@ -98,6 +98,12 @@ function colIndexOf(cell) {
   return idx;
 }
 
+// A row that must never move during sorting: group labels, dividers,
+// loading/error placeholders. Mark with data-sort-row="off" or class "nosort".
+function isFixedRow(r) {
+  return r.dataset.sortRow === "off" || r.classList.contains("nosort");
+}
+
 function bodyRows(table, nHeaderRows) {
   const tbody = table.querySelector("tbody");
   if (tbody) return [...tbody.rows];
@@ -143,8 +149,14 @@ export function makeTableSortable(table) {
   }
   if (!cols.length) return;
 
-  // Remember default order.
-  brows.forEach((r, i) => (r.dataset.origIdx = i));
+  // Remember default order. Fixed rows (group labels, dividers) are pinned
+  // at their original positions; only data rows reorder among the rest.
+  const fixedIdx = new Set();
+  brows.forEach((r, i) => {
+    r.dataset.origIdx = i;
+    if (isFixedRow(r)) fixedIdx.add(i);
+  });
+  const dataRows = brows.filter((r) => !isFixedRow(r));
   let sortIdx = -1, sortDir = 0; // 0 = none, -1 = desc (high→low), 1 = asc
 
   const applySort = () => {
@@ -152,10 +164,10 @@ export function makeTableSortable(table) {
     const parent = brows[0].parentNode;
     let ordered;
     if (sortDir === 0) {
-      ordered = [...brows].sort((a, b) => a.dataset.origIdx - b.dataset.origIdx);
+      ordered = [...dataRows].sort((a, b) => a.dataset.origIdx - b.dataset.origIdx);
     } else {
       const col = cols.find((c) => c.idx === sortIdx);
-      ordered = [...brows].sort((a, b) => {
+      ordered = [...dataRows].sort((a, b) => {
         const va = parseSortVal(cellAt(a, col.idx)?.textContent, col.type);
         const vb = parseSortVal(cellAt(b, col.idx)?.textContent, col.type);
         // Missing values always sink, regardless of direction.
@@ -175,7 +187,14 @@ export function makeTableSortable(table) {
       col.th.appendChild(arrow);
       col.th.dataset.scol = sortDir === -1 ? "desc" : "asc";
     }
-    for (const r of ordered) parent.appendChild(r);
+    // Rebuild: fixed rows stay pinned at their original slots; data rows
+    // fill the remaining slots in sorted order.
+    let di = 0;
+    const final = [];
+    for (let i = 0; i < brows.length; i++) {
+      final.push(fixedIdx.has(i) ? brows[i] : ordered[di++]);
+    }
+    for (const r of final) parent.appendChild(r);
   };
 
   for (const col of cols) {

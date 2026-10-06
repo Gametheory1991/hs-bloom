@@ -38,9 +38,12 @@ export async function renderFlows() {
     const top = (f.changes ?? []).slice(0, 5).map((c) => {
       const d = c.delta_usd ?? 0;
       const dc = d === 0 ? "flat" : d > 0 ? "up" : "down";
+      const base = (c.value_usd ?? 0) - d;
+      const pct = base ? (d / base) * 100 : null;
+      const p = pct == null || !isFinite(pct) ? "—" : `${pct > 0 ? "+" : ""}${pct.toFixed(1)}%`;
       return `<tr><td class="sym">${esc(c.issuer || c.cusip)}</td>` +
         `<td class="muted">${KIND_LABEL[c.kind] ?? esc(c.kind)}</td>` +
-        `<td class="${dc}">${fmtUsd(d)}</td></tr>`;
+        `<td class="${dc}">${fmtUsd(d)} <span class="muted">(${p})</span></td></tr>`;
     }).join("");
     return `<section class="flow-card">
       <div class="flow-head">
@@ -49,7 +52,7 @@ export async function renderFlows() {
       </div>
       <div class="flow-meta muted">filed ${esc(f.filing_date)} vs ${esc(f.prev_filing_date)} ·
         ${f.n_new ?? 0} new · ${f.n_closed ?? 0} closed · ${f.n_increased ?? 0} adds · ${f.n_decreased ?? 0} trims</div>
-      <table data-sortable><tr><th>Position</th><th>Kind</th><th>Δ $</th></tr>${top}</table>
+      <table data-sortable><tr><th>Position</th><th>Kind</th><th>Δ $ (Δ %)</th></tr>${top}</table>
     </section>`;
   }).join("");
   const foot = document.querySelector("#panel-flows .panel-foot");

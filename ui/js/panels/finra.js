@@ -461,21 +461,97 @@ const STAR_ROWS = [
   ["star-abs-par", "star-abs-trades", "ABS", "star-abs"],
   ["star-clo-par", "star-clo-trades", "CLO", "star-clo"],
 ];
+// Nominal+% delta cell: "+$1.2B (+3.4%)" — matches trace_grid.js deltaCell.
+const starDeltaCell = (nom, pct, fmtNom) => {
+  if ((nom == null || !isFinite(nom)) && (pct == null || !isFinite(pct))) return "—";
+  const n = fmtNom(nom);
+  const p = pct1(pct);
+  if (n === "—") return p;
+  if (p === "—") return n;
+  return `${n} <span class="muted">(${p})</span>`;
+};
+const fmtNomB$ = (v) => v == null || !isFinite(v) ? "—" : `${v >= 0 ? "+" : "−"}$${Math.abs(v) >= 1e9 ? (Math.abs(v) / 1e9).toFixed(2) + "B" : (Math.abs(v) / 1e6).toFixed(1) + "M"}`;
+const fmtNomCt = (v) => v == null || !isFinite(v) ? "—" : `${v >= 0 ? "+" : "−"}${Math.round(Math.abs(v)).toLocaleString("en-US")}`;
+// Day-difference between ISO date strings.
+const starDayDiff = (a, b) => Math.round((Date.parse(b) - Date.parse(a)) / 86400000);
+// Compute nominal+% deltas vs N days back from daily {d, v} points.
+function starDeltas(pts) {
+  if (!pts || pts.length < 2) return null;
+  const cur = pts[pts.length - 1];
+  const refBack = (days) => {
+    for (let i = pts.length - 2; i >= 0; i--) {
+      if (starDayDiff(pts[i].d, cur.d) >= days) return pts[i];
+    }
+    return null;
+  };
+  const out = {};
+  for (const [k, days] of [["d1", 1], ["w1", 7], ["m1", 30], ["q1", 91], ["y1", 365], ["y3", 1095]]) {
+    const ref = refBack(days);
+    if (!ref || !ref.v) { out[k] = { nom: null, pct: null }; continue; }
+    out[k] = { nom: cur.v - ref.v, pct: (cur.v - ref.v) / ref.v };
+  }
+  return { cur: cur.v, asof: cur.d, ...out };
+}
 function starSection(s) {
   if (!s || !s.latest) return `<h3>STRUCTURED PRODUCT ACTIVITY — STAR</h3><p class="muted">No STAR data yet — first pull pending.</p>`;
-  const L = s.latest;
-  const rows = STAR_ROWS.map(([parId, trId, label, chartId]) => {
-    const par = L[parId], tr = trId ? L[trId] : null;
-    return `<tr data-star-chart="${chartId}" title="Click to view ${label} chart">` +
-      `<td><b>${label}</b></td>` +
-      `<td class="num">${par == null ? "—" : "$" + (par / 1e9).toFixed(2) + "B"}</td>` +
-      `<td class="num">${tr == null ? "—" : Math.round(tr).toLocaleString("en-US")}</td></tr>`;
-  }).join("");
+  // Placeholder — async fill below once daily series load.
   return `<h3>STRUCTURED PRODUCT ACTIVITY — STAR <span class="muted">daily · as of ${s.as_of ?? "—"} · click a row for its trend chart</span></h3>
-    <table class="star-table" data-sortable><tr><th>Product</th><th>$ Volume</th><th>Trades</th></tr>${rows}</table>
+    <div class="seg" id="star-metric-toggle" role="tablist"><button data-m="vol" class="on">$ Volume</button><button data-m="trades">Trades</button></div>
+    <table class="star-table" data-sortable><thead><tr><th>Product</th><th>Latest</th><th>1D Δ</th><th>1W Δ</th><th>1M Δ</th><th>1Q Δ</th><th>1Y Δ</th><th>3Y Δ</th>${RANGE_TH}</tr></thead>
+    <tbody id="star-tbody"><tr><td colspan="10" class="muted">Loading daily history…</td></tr></tbody></table>
     <p class="muted">FINRA-ICE Data Services Structured Trading Activity Reports — the public equivalent of the ` +
     `login-walled ICE Vantage structured aggregates. Daily TBA/specified/CMO/CMBS/ABS/CLO activity by issuer and ` +
     `investment grade. Full trend lines in the TRACE chart above and the grid below.</p>`;
+}
+async function fillStarSection() {
+  const tbody = document.getElementById("star-tbody");
+  if (!tbody) return;
+  const toggle = document.getElementById("star-metric-toggle");
+  let metric = "vol";
+  const render = async () => {
+    tbody.innerHTML = `<tr><td colspan="10" class="muted">Loading daily history…</td></tr>`;
+    const rows = await Promise.all(STAR_ROWS.map(async ([parId, trId, label, chartId]) => {
+      const sid = metric === "vol" ? parId : trId;
+      if (!sid) return null;
+      try {
+        const s = await getSeries("cycle:" + sid, "max");
+        const pts = (s.points ?? []).map((p) => ({ d: p[0], v: p[1] })).sort((a, b) => a.d < b.d ? -1 : 1);
+        const st = starDeltas(pts);
+        if (!st) return `<tr data-sort-row="off"><td><b>${label}</b></td><td colspan="9" class="muted">no history</td></tr>`;
+        const fmtNom = metric === "vol" ? fmtNomB$ : fmtNomCt;
+        const fmtVal = metric === "vol"
+          ? (v) => "$" + (v / 1e9).toFixed(2) + "B"
+          : (v) => Math.round(v).toLocaleString("en-US");
+        const stats = statsFromValues(pts.map((p) => p.v));
+        const dc = (k) => `<td class="num">${starDeltaCell(st[k].nom, st[k].pct, fmtNom)}</td>`;
+        return `<tr data-star-chart="${chartId}" title="Click to view ${label} chart">` +
+          `<td><b>${label}</b></td><td class="num"><b>${fmtVal(st.cur)}</b> <span class="muted">${st.asof}</span></td>` +
+          dc("d1") + dc("w1") + dc("m1") + dc("q1") + dc("y1") + dc("y3") +
+          rangeCells(stats, "full history") + `</tr>`;
+      } catch { return `<tr data-sort-row="off"><td><b>${label}</b></td><td colspan="9" class="muted">load failed</td></tr>`; }
+    }));
+    tbody.innerHTML = rows.filter(Boolean).join("");
+    // Row click-to-chart (rows are re-created, so re-wire here).
+    tbody.querySelectorAll("tr[data-star-chart]").forEach((tr) => {
+      tr.style.cursor = "pointer";
+      tr.addEventListener("click", () => {
+        document.getElementById("trace-view-grid")?.click();
+        setTraceChartProduct(tr.dataset.starChart);
+        document.getElementById("trace-chart-wrap")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    });
+  };
+  if (toggle) {
+    toggle.querySelectorAll("button").forEach((b) => {
+      b.addEventListener("click", () => {
+        if (b.dataset.m === metric) return;
+        metric = b.dataset.m;
+        toggle.querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b));
+        render();
+      });
+    });
+  }
+  await render();
 }
 
 export function renderFinra(p) {
@@ -516,13 +592,5 @@ export function renderFinra(p) {
   };
   chartBtn.addEventListener("click", () => setView("chart"));
   gridBtn.addEventListener("click", () => setView("grid"));
-  // STAR row click-to-chart
-  body.querySelectorAll("tr[data-star-chart]").forEach((tr) => {
-    tr.style.cursor = "pointer";
-    tr.addEventListener("click", () => {
-      setView("chart");
-      setTraceChartProduct(tr.dataset.starChart);
-      chartWrap.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
-  });
+  fillStarSection().catch(() => {});
 }

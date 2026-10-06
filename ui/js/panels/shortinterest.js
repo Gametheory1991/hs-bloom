@@ -16,25 +16,44 @@ const esc = (s) =>
 
 const state = { regshoRange: "1y", volPlot: null, totalPlot: null, regshoReq: 0, totalReq: 0 };
 
+// Nominal+% delta: "+1.2M (+3.4%)".
+const dCellSh = (nom, pct) => {
+  if (nom == null && (pct == null || !isFinite(pct))) return "—";
+  const n = nom == null ? "—" : `${nom >= 0 ? "+" : "−"}${Math.abs(Math.round(nom)).toLocaleString("en-US")}`;
+  const p = pct == null || !isFinite(pct) ? "—" : `${pct > 0 ? "+" : ""}${(pct * 100).toFixed(1)}%`;
+  if (n === "—") return p;
+  if (p === "—") return n;
+  return `${n} <span class="muted">(${p})</span>`;
+};
+// 1D delta vs previous point from daily {d,v} history.
+function d1Delta(pts) {
+  if (!pts || pts.length < 2) return { nom: null, pct: null };
+  const cur = pts[pts.length - 1], prev = pts[pts.length - 2];
+  if (!prev.v) return { nom: null, pct: null };
+  return { nom: cur.v - prev.v, pct: (cur.v - prev.v) / prev.v };
+}
+
 function regshoSection(r) {
   if (!r)
     return `<h3>SHORT VOLUME — REG SHO DAILY</h3><p class="muted">No Reg SHO data yet.</p>`;
   const rows = Object.entries(r.markets ?? {})
     .map(
       ([k, m]) =>
-        `<tr><td>${esc(m.label ?? k)}</td><td>${big(m.short)}</td>` +
-        `<td>${big(m.total)}</td><td>${pct1(m.ratio)}</td></tr>`
+        `<tr data-mkt="${k}"><td>${esc(m.label ?? k)}</td><td>${big(m.short)}</td>` +
+        `<td>${big(m.total)}</td><td>${pct1(m.ratio)}</td>` +
+        `<td class="num" data-d1short>…</td><td class="num" data-d1ratio>…</td></tr>`
     )
     .join("");
   const top = (r.top50 ?? [])
     .map(
       (t) =>
-        `<tr><td><b>${esc(t.symbol)}</b></td><td>${big(t.short_volume)}</td>` +
-        `<td>${big(t.total_volume)}</td><td>${pct1(t.short_ratio)}</td></tr>`
+        `<tr data-sym="${esc(t.symbol)}"><td><b>${esc(t.symbol)}</b></td><td>${big(t.short_volume)}</td>` +
+        `<td>${big(t.total_volume)}</td><td>${pct1(t.short_ratio)}</td>` +
+        `<td class="num" data-d1svol>…</td><td class="num" data-d1sratio>…</td></tr>`
     )
     .join("");
   return `<h3>SHORT VOLUME — REG SHO DAILY <span class="muted">prior trading day · as of ${esc(r.as_of ?? "—")}</span></h3>
-    <table data-sortable><tr><th>Market</th><th>Short vol (sh)</th><th>Total vol (sh)</th><th>Short ratio</th></tr>${rows}</table>
+    <table data-sortable><tr><th>Market</th><th>Short vol (sh)</th><th>Total vol (sh)</th><th>Short ratio</th><th>1D Δ short vol</th><th>1D Δ ratio</th></tr>${rows}</table>
     <div id="si-regsho-chart-wrap">
       <div class="seg" id="si-regsho-range">
         <button data-range="1y" class="on">1Y</button><button data-range="max">Max</button>
@@ -43,7 +62,47 @@ function regshoSection(r) {
       <div id="si-regsho-stats" class="muted"></div>
     </div>
     <h3>TOP SHORTED TICKERS <span class="muted">by daily short volume · ${esc(r.as_of ?? "—")}</span></h3>
-    <table data-sortable><tr><th>Symbol</th><th>Short vol (sh)</th><th>Total vol (sh)</th><th>Short ratio</th></tr>${top}</table>`;
+    <table data-sortable><tr><th>Symbol</th><th>Short vol (sh)</th><th>Total vol (sh)</th><th>Short ratio</th><th>1D Δ vol</th><th>1D Δ ratio</th></tr>${top}</table>`;
+}
+// Fill 1D deltas for Reg SHO markets + top tickers (async, after render).
+async function fillRegshoDeltas() {
+  const mktMap = { cnms: "cnms", fnyx: "fnyx", fnsq: "fnsq" };
+  document.querySelectorAll("#panel-shortinterest tr[data-mkt]").forEach(async (tr) => {
+    const k = (mktMap[tr.dataset.mkt] || tr.dataset.mkt).toLowerCase();
+    try {
+      const [sv, sr] = await Promise.all([
+        getSeries(`regsho-${k}-shortvol`, "1m").catch(() => null),
+        getSeries(`regsho-${k}-shortratio`, "1m").catch(() => null),
+      ]);
+      const dS = d1Delta((sv?.points ?? []).map((p) => ({ d: p[0], v: p[1] })));
+      const dR = d1Delta((sr?.points ?? []).map((p) => ({ d: p[0], v: p[1] })));
+      const c1 = tr.querySelector("[data-d1short]"), c2 = tr.querySelector("[data-d1ratio]");
+      if (c1) c1.innerHTML = dCellSh(dS.nom, dS.pct);
+      if (c2) c2.innerHTML = dCellSh(dR.nom == null ? null : dR.nom * 100, dR.pct);
+    } catch { /* leave placeholder */ }
+  });
+  document.querySelectorAll("#panel-shortinterest tr[data-sym]").forEach(async (tr) => {
+    const sym = tr.dataset.sym;
+    try {
+      const [sv, sr] = await Promise.all([
+        getSeries(`regsho-top-${sym}-shortvol`, "1m").catch(() => null),
+        getSeries(`regsho-top-${sym}-totalvol`, "1m").catch(() => null),
+      ]);
+      const sp = (sv?.points ?? []).map((p) => ({ d: p[0], v: p[1] }));
+      const tp = (sr?.points ?? []).map((p) => ({ d: p[0], v: p[1] }));
+      const dS = d1Delta(sp);
+      // ratio delta: short/total at cur vs prev
+      let dR = { nom: null, pct: null };
+      if (sp.length >= 2 && tp.length >= 2) {
+        const rc = sp[sp.length - 1].v / (tp[tp.length - 1].v || 1);
+        const rp = sp[sp.length - 2].v / (tp[tp.length - 2].v || 1);
+        dR = { nom: (rc - rp) * 100, pct: rp ? (rc - rp) / rp : null };
+      }
+      const c1 = tr.querySelector("[data-d1svol]"), c2 = tr.querySelector("[data-d1sratio]");
+      if (c1) c1.innerHTML = dCellSh(dS.nom, dS.pct);
+      if (c2) c2.innerHTML = dCellSh(dR.nom, dR.pct == null ? null : dR.pct);
+    } catch { /* leave placeholder */ }
+  });
 }
 
 function thresholdSection(t) {
@@ -69,11 +128,13 @@ function shortInterestSection(s) {
     return `<h3>SHORT INTEREST — FINRA SETTLEMENT</h3><p class="muted">No short-interest data yet.</p>`;
   const rows = Object.entries(s.tickers ?? {})
     .sort((a, b) => (b[1].short ?? 0) - (a[1].short ?? 0))
-    .map(
-      ([sym, v]) =>
-        `<tr><td><b>${esc(sym)}</b></td><td>${big(v.short)}</td>` +
-        `<td>${chg1(v.chg_pct)}</td><td>${big(v.adv)}</td><td>${v.dtc ?? "—"}</td></tr>`
-    )
+    .map(([sym, v]) => {
+      const nom = v.short != null && v.prev != null ? v.short - v.prev : null;
+      const n = nom == null ? "—" : `${nom > 0 ? "+" : ""}${big(Math.abs(nom))}`;
+      const p = v.chg_pct == null ? "—" : `${v.chg_pct > 0 ? "+" : ""}${(v.chg_pct * 100).toFixed(1)}%`;
+      return `<tr><td><b>${esc(sym)}</b></td><td>${big(v.short)}</td>` +
+        `<td>${n} <span class="muted">(${p})</span></td><td>${big(v.adv)}</td><td>${v.dtc ?? "—"}</td></tr>`;
+    })
     .join("");
   return `<h3>SHORT INTEREST — FINRA SETTLEMENT <span class="muted">as of ${esc(s.as_of ?? "—")}</span></h3>
     <p class="muted">Biweekly settlement (15th and last business day of month), published ~8 business days later. Levels, not flow — compare with Reg SHO daily flow above.</p>
@@ -198,4 +259,5 @@ export function renderShortInterest(p) {
   });
   drawRegshoChart();
   drawTotalChart();
+  fillRegshoDeltas();
 }
