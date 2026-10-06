@@ -8,8 +8,12 @@ from collector.store import Store
 
 
 def _normalize_row(row: dict) -> dict | None:
-    symbol = str(row.get("symbol", "")).strip().upper()
-    name = str(row.get("name", "")).strip()
+    raw_symbol = row.get("symbol")
+    raw_name = row.get("name")
+    if not isinstance(raw_symbol, str) or not isinstance(raw_name, str):
+        return None
+    symbol = raw_symbol.strip().upper()
+    name = raw_name.strip()
     url = str(row.get("url", "")).strip()
     if not symbol or not name:
         return None

@@ -169,6 +169,7 @@ def test_insights_endpoint_defaults_when_digest_missing(tmp_path):
 def test_etfs_endpoints(tmp_path):
     client, store = make_client(tmp_path)
     store.put_doc("etf_catalog", {"rows": [
+        None,
         {"symbol": "SPY", "name": "SPDR S&P 500 ETF Trust", "url": "u1"},
         {"symbol": "IVV", "name": "iShares Core S&P 500 ETF", "url": "u2"},
     ]}, source="etfdb")
@@ -180,6 +181,7 @@ def test_etfs_endpoints(tmp_path):
     paged = client.get("/api/etfs?limit=1").json()
     assert paged["count"] == 2
     assert paged["returned_count"] == 1
+    assert paged["rows"][0]["symbol"] == "SPY"
     filtered = client.get("/api/etfs?q=ishares&limit=1").json()
     assert filtered["count"] == 1
     assert filtered["returned_count"] == 1

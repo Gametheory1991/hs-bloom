@@ -14,6 +14,8 @@ async def test_fetch_etf_catalog_normalizes_dedupes_and_stores(tmp_path):
         {"symbol": "SPY", "name": "duplicate", "url": "ignore"},
         {"symbol": "ivv", "name": "iShares Core S&P 500 ETF", "url": "https://etfdb.com/etf/IVV/"},
         {"symbol": "", "name": "bad"},
+        {"symbol": None, "name": "missing symbol"},
+        {"symbol": "BAD", "name": None},
     ])
 
     async def fake_get_text(url, params=None, headers=None):  # noqa: ANN001

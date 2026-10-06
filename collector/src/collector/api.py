@@ -117,14 +117,13 @@ def create_app(store: Store, cfg: Config) -> FastAPI:
         all_rows = doc.payload.get("rows", []) if doc else []
         if not isinstance(all_rows, list):
             all_rows = []
+        all_rows = [r for r in all_rows if isinstance(r, dict)]
         if limit is not None and limit <= 0:
             raise HTTPException(status_code=400, detail="limit must be > 0")
         query = (q or "").strip().lower()
         if query:
             rows = []
             for r in all_rows:
-                if not isinstance(r, dict):
-                    continue
                 blob = str(r.get("search", "")).lower()
                 if not blob:
                     blob = f"{str(r.get('symbol', '')).lower()} {str(r.get('name', '')).lower()}".strip()
@@ -136,7 +135,7 @@ def create_app(store: Store, cfg: Config) -> FastAPI:
         else:
             total = len(all_rows)
             rows = all_rows if limit is None else all_rows[:limit]
-        rows = [_public_etf_row(r) for r in rows if isinstance(r, dict)]
+        rows = [_public_etf_row(r) for r in rows]
         return {
             "rows": rows,
             "count": total,
