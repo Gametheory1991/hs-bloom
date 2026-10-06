@@ -19,6 +19,8 @@ export const HUBS = [
     subs: [["trace", "TRACE Volume"], ["factbook", "Fact Book"], ["maps", "Maps"], ["desks", "Desks"]] },
   { id: "desk", label: "DESK",
     subs: [["alerts", "Alerts"], ["briefcheck", "Brief Check"], ["analyst", "Analyst"]] },
+  { id: "regwatch", label: "REG WATCH",
+    subs: [["news", "News Feed"], ["rules", "Rulemaking Tracker"], ["topics", "Topic Watch"]] },
 ];
 
 // Legacy tab id -> "hub/sub" redirect target.

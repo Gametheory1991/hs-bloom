@@ -237,6 +237,18 @@ def _doc_panel(store: Store, key: str, list_key: str) -> dict:
     return {list_key: doc.payload[list_key], "updated_at": doc.updated_at, "source": doc.source}
 
 
+def _regwatch_panel(store: Store) -> dict:
+    """REG WATCH tab: regulatory news items + rulemaking tracker + topic rollup."""
+    doc = store.doc("regwatch")
+    if doc is None:
+        return {"items": [], "rules": [], "topics": {}, "feed_status": {},
+                "updated_at": None, "source": None}
+    p = doc.payload
+    return {"items": p.get("items", []), "rules": p.get("rules", []),
+            "topics": p.get("topics", {}), "feed_status": p.get("feed_status", {}),
+            "updated_at": doc.updated_at, "source": doc.source}
+
+
 def _country_risk_panel(store: Store) -> dict:
     """RISK MAP tab data: per-country scores from the country_risk doc."""
     doc = store.doc("country_risk")
@@ -759,6 +771,7 @@ def build_dashboard(
                       "updated_at": bonds_doc.updated_at if bonds_doc else None,
                       "source": bonds_doc.source if bonds_doc else None},
             "news": _doc_panel(store, "news", "items"),
+            "regwatch": _regwatch_panel(store),
             "defi": _defi_panel(store),
             "midnight": _doc_panel(store, "midnight_curve", "rows"),
             "morpho": _doc_panel(store, "morpho_markets", "rows"),

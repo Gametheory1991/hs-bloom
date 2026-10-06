@@ -28,6 +28,7 @@ cadences:          # seconds between fetcher runs
   voldash: 86400    # vol dashboard compute; daily (no external HTTP)
   home_radar: 86400 # market radar compute; daily (no external HTTP)
   hyperscaler: 604800 # hyperscaler desk; weekly (6 SEC submissions + 424B2 fetches)
+  regwatch: 3600     # REG WATCH: agency RSS + Federal Register rulemaking + topic tagging; hourly
 
   ai_capex: 604800   # AI buildout universe XBRL capex/financials; weekly (quarterly data)
   ai_graph: 604800   # AI money-flow knowledge graph; weekly (zero HTTP, overlays ai_capex)

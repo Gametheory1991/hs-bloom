@@ -42,6 +42,7 @@ from collector.fetchers.midnight import fetch_midnight
 from collector.fetchers.morpho import fetch_morpho
 from collector.fetchers.movers import fetch_movers
 from collector.fetchers.news import fetch_news
+from collector.fetchers.regwatch import fetch_regwatch
 from collector.fetchers.ofr import fetch_ofr
 from collector.fetchers.refs import fetch_refs
 from collector.fetchers.risk import refresh_risk
@@ -415,6 +416,12 @@ def register_jobs(
         # until all source docs exist. Daily.
         "debt_cube": (cfg.cadences.get("debt_cube", 86400), partial(refresh_debt_cube, store),
                  start + timedelta(seconds=10800)),
+        # REG WATCH: regulatory news + surveillance — agency RSS feeds (SEC,
+        # CFTC, FINRA, Fed, OCC, FDIC, FSB, OFR), Federal Register rulemaking
+        # tracker, Gemini one-line summaries, topic tagging. Hourly; one dead
+        # feed never breaks the run. .get() guard like the rest.
+        "regwatch": (cfg.cadences.get("regwatch", 3600), partial(fetch_regwatch, store, get_text),
+                 start + timedelta(seconds=5400)),
         "newsletter": (cfg.cadences["insights"], partial(deliver_newsletter, store, smtp_cfg), start + timedelta(seconds=5)),
     }
     # Boot catch-up (see _catchup_first_runs): overdue staggered jobs run
