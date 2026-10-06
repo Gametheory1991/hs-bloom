@@ -1,13 +1,29 @@
 """Risk/prediction engine: compute-only composites from stored history.
 
 No HTTP. Reads series from the store, writes five composite signals plus a
-`risk_summary` doc consumed by /api/insights. Every input is optional:
+`risk_summary` doc consumed by /api/insights, and (via refresh_ust_xcheck) the
+three UST positioning cross-check series below. Every input is optional:
 missing inputs are skipped (never zero-filled) and each composite degrades
 to a documented status instead of crashing.
 
 METHODOLOGY
 -----------
 All composites are 0-100 (higher = more stress/risk) unless noted.
+
+0. UST positioning cross-check (not a 0-100 composite; four derived series):
+   - xcheck-ust-net-ofr: OFR qualifying-HF net UST exposure = long minus
+     short (quarterly), dates present in both legs.
+   - xcheck-ust-net-cftc: sum of CFTC TFF leveraged-money nets across 2Y/5Y/
+     10Y/30Y (weekly, long-minus-short per contract), weeks present in all
+     four tenors.
+   - xcheck-ust-oi: sum of CFTC TFF Treasury-futures open interest across
+     2Y/5Y/10Y/30Y (weekly), weeks present in all four tenors.
+   - xcheck-ust-agree: weekly count (0-3) of legs confirming an unwind.
+     Leg 1 = OFR QoQ short-UST delta < -$1B (shorts shrinking). Leg 2 =
+     CFTC 13-week aggregate-net delta > +1,000 contracts (net rising toward
+     zero). Leg 3 = aggregate-OI 13-week delta < -100,000 contracts
+     (positions closed, not rolled). Moves under the noise floors confirm
+     nothing. Min 2 OFR quarters and 14 weeks of CFTC/OI history.
 
 1. Basis-trade stress — mean of available sub-scores (each 0-100):
    - sofr_iorb_spread: percentile rank of latest (SOFR - IORB) vs its own
@@ -141,6 +157,26 @@ RISK_CTA = {t: f"risk:cta_z_{t}" for t in ("2y", "5y", "10y", "30y")}
 RISK_REGIME = "risk:regime_score"
 RISK_RECESSION = "risk:recession_prob"
 DOC_SUMMARY = "risk_summary"
+
+# ---- UST positioning cross-check: OFR (quarterly) vs CFTC TFF (weekly) ----
+# Reads the sibling ofr job's keys plus K_CTA_TFF above; writes cycle: keys so
+# the dashboard resolves them as ordinary external cycle series (no source key
+# needed in config). Full-history recompute each run; idempotent.
+K_OFR_UST_LONG = "ofr:FPF-ASSETCLASS_LTREASURY_SUM"
+K_OFR_UST_SHORT = "ofr:FPF-ASSETCLASS_STREASURY_SUM"
+# Treasury-futures open interest per tenor (sibling cycle.py cftc_oi series)
+K_OI = {t: f"cycle:oi-ust-{t}" for t in ("2y", "5y", "10y", "30y")}
+XCHECK_OFR_NET = "cycle:xcheck-ust-net-ofr"     # OFR net UST exposure $ (long - short)
+XCHECK_CFTC_NET = "cycle:xcheck-ust-net-cftc"   # CFTC TFF lev-money net, 2Y+5Y+10Y+30Y (contracts)
+XCHECK_OI = "cycle:xcheck-ust-oi"               # CFTC TFF aggregate UST futures OI (contracts)
+XCHECK_AGREE = "cycle:xcheck-ust-agree"         # confirming legs, 0-3
+# Noise floors: moves smaller than these score as flat (0). OFR QoQ short-UST
+# moves run in the tens of $B; CFTC weekly aggregate moves run in the 10k
+# contracts; aggregate OI 13-week moves run in the millions of contracts.
+_XCHECK_OFR_EPS = 1e9
+_XCHECK_CFTC_EPS = 1_000.0
+_XCHECK_OI_EPS = 100_000.0
+_XCHECK_CFTC_WEEKS = 13  # 13-week trend window on the weekly CFTC aggregate
 
 SOURCE_LABEL = "risk-engine"
 
@@ -430,6 +466,125 @@ def recession_prob(store: Store) -> dict:
 
 
 # --------------------------------------------------------------------------
+# UST positioning cross-check — OFR (quarterly) vs CFTC TFF (weekly)
+# --------------------------------------------------------------------------
+# The basis trade (long cash UST funded in repo, short UST futures) shows up
+# as simultaneously large long-UST and short-UST exposures on hedge-fund
+# balance sheets. OFR's Form PF aggregates give the quarterly balance-sheet
+# view; CFTC TFF leveraged-money nets give the weekly futures view. When both
+# agree the short leg is shrinking, the unwind call is corroborated.
+#
+# Conventions: OFR trend = sign of quarter-over-quarter change in SHORT UST
+# exposure (negative delta = shorts shrinking = "unwinding" = +1). CFTC nets
+# are long-minus-short (negative = net short), so a POSITIVE 13-week delta
+# (net rising toward zero = shorts shrinking) is also "unwinding".
+# OI leg: a NEGATIVE 13-week delta (open interest falling) = +1 — positions
+# being closed, not rolled.
+
+def derive_ust_nets(
+    long_pts: dict[date, float],
+    short_pts: dict[date, float],
+    cftc_by_tenor: dict[str, dict[date, float]],
+) -> tuple[list[tuple[date, float]], list[tuple[date, float]]]:
+    """OFR net UST exposure (long - short) and the CFTC TFF aggregate net.
+
+    OFR net covers dates present in BOTH long and short series. The CFTC
+    aggregate covers weeks present in ALL FOUR tenor series, so a missing
+    tenor never silently shifts the level.
+    """
+    both = sorted(set(long_pts) & set(short_pts))
+    net_ofr = [(d, long_pts[d] - short_pts[d]) for d in both]
+    tenor_dates = [set(p) for p in cftc_by_tenor.values() if p]
+    common = sorted(set.intersection(*tenor_dates)) if tenor_dates else []
+    net_cftc = [(d, sum(p[d] for p in cftc_by_tenor.values())) for d in common]
+    return net_ofr, net_cftc
+
+
+def derive_ust_oi(
+    oi_by_tenor: dict[str, dict[date, float]],
+) -> list[tuple[date, float]]:
+    """Aggregate Treasury-futures open interest across the four tenors.
+
+    Covers weeks present in ALL FOUR tenor series so a missing tenor never
+    silently shifts the level. Falling aggregate OI = positions being closed,
+    not rolled — the third unwind-confirming leg.
+    """
+    tenor_dates = [set(p) for p in oi_by_tenor.values() if p]
+    common = sorted(set.intersection(*tenor_dates)) if tenor_dates else []
+    return [(d, sum(p[d] for p in oi_by_tenor.values())) for d in common]
+
+
+def derive_ust_agreement(
+    net_ofr: list[tuple[date, float]],
+    short_pts: dict[date, float],
+    net_cftc: list[tuple[date, float]],
+    net_oi: list[tuple[date, float]],
+) -> list[tuple[date, float]]:
+    """Weekly trend-agreement history: COUNT (0-3) of legs confirming an
+    unwind. Leg 1 = OFR quarterly short-UST exposure shrinking (QoQ delta <
+    -eps at the latest quarter on/before the week). Leg 2 = CFTC 13-week
+    aggregate-net delta > +eps (net rising toward zero = shorts shrinking).
+    Leg 3 = aggregate-OI 13-week delta < -eps (positions closed, not rolled).
+    Moves under the noise floors score as flat and confirm nothing. Weeks
+    with insufficient history are skipped."""
+    if (len(net_cftc) <= _XCHECK_CFTC_WEEKS or len(short_pts) < 2
+            or len(net_oi) < 2):
+        return []
+    short_hist = sorted(short_pts.items())
+    ofr_dates = [d for d, _ in short_hist]
+    out: list[tuple[date, float]] = []
+    for i in range(_XCHECK_CFTC_WEEKS, len(net_cftc)):
+        w = net_cftc[i][0]
+        # latest OFR quarter on/before this week, plus its predecessor
+        qi = -1
+        for j, qd in enumerate(ofr_dates):
+            if qd <= w:
+                qi = j
+            else:
+                break
+        if qi < 1:
+            continue
+        legs = 0
+        # leg 1: OFR quarterly short-UST exposure shrinking
+        if short_hist[qi][1] - short_hist[qi - 1][1] < -_XCHECK_OFR_EPS:
+            legs += 1
+        # leg 2: CFTC 13-week aggregate net rising toward zero
+        if net_cftc[i][1] - net_cftc[i - _XCHECK_CFTC_WEEKS][1] > _XCHECK_CFTC_EPS:
+            legs += 1
+        # leg 3: aggregate OI falling over ~13 weeks (closed, not rolled)
+        oi_now = _latest_before(net_oi, w)
+        oi_then = _latest_before(net_oi, w - timedelta(weeks=_XCHECK_CFTC_WEEKS))
+        if (oi_now is not None and oi_then is not None
+                and oi_now - oi_then < -_XCHECK_OI_EPS):
+            legs += 1
+        out.append((w, float(legs)))
+    return out
+
+
+def refresh_ust_xcheck(store: Store) -> None:
+    """Compute-only: full-history OFR/CFTC/OI UST cross-check. Never raises —
+    missing inputs simply yield no points, per the module contract."""
+    try:
+        long_pts = store.points(K_OFR_UST_LONG)
+        short_pts = store.points(K_OFR_UST_SHORT)
+        cftc = {t: store.points(k) for t, k in K_CTA_TFF.items()}
+        oi = {t: store.points(k) for t, k in K_OI.items()}
+        net_ofr, net_cftc = derive_ust_nets(long_pts, short_pts, cftc)
+        net_oi = derive_ust_oi(oi)
+        if net_ofr:
+            store.upsert_points(XCHECK_OFR_NET, net_ofr)
+        if net_cftc:
+            store.upsert_points(XCHECK_CFTC_NET, net_cftc)
+        if net_oi:
+            store.upsert_points(XCHECK_OI, net_oi)
+        agree = derive_ust_agreement(net_ofr, short_pts, net_cftc, net_oi)
+        if agree:
+            store.upsert_points(XCHECK_AGREE, agree)
+    except Exception as exc:  # noqa: BLE001 — cross-check must never break risk
+        log.warning("ust xcheck skipped: %s", exc)
+
+
+# --------------------------------------------------------------------------
 # 6. summary + verdict
 # --------------------------------------------------------------------------
 
@@ -561,6 +716,11 @@ async def refresh_risk(store: Store) -> str:
         store.upsert_points(RISK_REGIME, [(today, float(summary["regime_score"]))])
     if comp["recession_prob"]["value"] is not None:
         store.upsert_points(RISK_RECESSION, [(today, comp["recession_prob"]["value"])])
+
+    # UST positioning cross-check (OFR vs CFTC TFF): compute-only, never raises,
+    # full-history idempotent recompute — runs inside the daily risk cadence,
+    # which starts 5 min after the data jobs (incl. cftc_pos) each day.
+    refresh_ust_xcheck(store)
 
     store.put_doc(DOC_SUMMARY, summary, source=SOURCE_LABEL)
 
