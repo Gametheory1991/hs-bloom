@@ -231,6 +231,40 @@ def test_universe_classes():
     assert CLASS_LABELS["fi-treasury"] == "FI: Treasury"
     assert CLASS_LABELS["leveraged"] == "Leveraged/Inverse"
     assert CLASS_LABELS["ai"] == "AI"
+    # Harry 2026-10-06: floaters/ABS/CMBS sub-classes, BDCs, digital rename
+    assert by_t["TFLO"] == "fi-floater"
+    assert by_t["USFR"] == "fi-floater"
+    assert by_t["FLOT"] == "fi-floater"
+    assert by_t["FLRN"] == "fi-floater"
+    assert by_t["JABS"] == "fi-abs"
+    assert by_t["CMBS"] == "fi-cmbs"
+    for t in ["ARCC", "MAIN", "HTGC", "GBDC", "BXSL", "OCSL", "PSEC",
+              "NMFC", "TCPC"]:
+        assert by_t[t] == "bdc", t
+    assert CLASS_LABELS["crypto"] == "Bitcoin & Digital Assets"
+    assert CLASS_LABELS["bdc"] == "BDCs"
+    assert CLASS_LABELS["fi-floater"] == "FI: Floaters"
+    assert CLASS_LABELS["fi-abs"] == "FI: ABS"
+    assert CLASS_LABELS["fi-cmbs"] == "FI: CMBS"
+
+
+def test_crypto_equity_set():
+    from collector.fetchers.ishares_etf import CRYPTO_EQUITY
+    assert CRYPTO_EQUITY == {"BKCH", "WGMI", "BITQ", "DAPP", "BLOK", "BITO"}
+    by_t = dict(ETF_UNIVERSE)
+    for t in CRYPTO_EQUITY:
+        assert by_t[t] == "crypto", t
+
+
+def test_parse_fmp_quote():
+    from collector.fetchers.ishares_etf import parse_fmp_quote
+    q = parse_fmp_quote([{"symbol": "ARCC", "name": "Ares Capital Corp",
+                          "price": 21.5, "marketCap": 12345678900}])
+    assert q["mcap"] == 12345678900
+    assert q["price"] == 21.5
+    assert q["name"] == "Ares Capital Corp"
+    assert parse_fmp_quote([]) is None
+    assert parse_fmp_quote([{"symbol": "X"}]) is None  # no marketCap
 
 
 @pytest.mark.asyncio

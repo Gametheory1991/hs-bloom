@@ -729,3 +729,17 @@ td.sym { color: #1d4ed8; font-weight: 600; }
 /* Sparkline legend: tiny "● Now ◆ Avg" key inside Range column headers. */
 .range-legend { display: inline-block; font-size: 9px; font-weight: 400; color: #64748b; white-space: nowrap; }
 th .range-legend { margin-top: 2px; }
+
+/* ---- ETF breakdown bar charts (Harry 2026-10-06) ---- */
+.bd-chart { display: flex; flex-direction: column; gap: 3px; margin: 6px 0 14px; }
+.bd-row { display: flex; align-items: center; gap: 8px; padding: 3px 6px; border-radius: 4px; }
+.bd-row:hover { background: #f1f5f9; }
+.bd-row.bd-active { background: #dbeafe; }
+.bd-label { flex: 0 0 180px; font-size: 12px; }
+.bd-barwrap { flex: 1 1 auto; height: 14px; background: #f1f5f9; border-radius: 3px; overflow: hidden; }
+.bd-bar { display: block; height: 100%; border-radius: 3px; }
+.bd-val { flex: 0 0 130px; text-align: right; font-size: 12px; }
+@media (max-width: 640px) {
+  .bd-label { flex-basis: 120px; }
+  .bd-val { flex-basis: 90px; }
+}

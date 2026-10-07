@@ -115,7 +115,11 @@ async function leagueRow(t, f) {
     : `<td class="num"${heatFlow(v)} title="${esc(note)}"><b>${signedMoney(v)}</b>${note ? `<span class="muted">${esc(note)}</span>` : ""}</td>`;
   const retCell = (v) => v == null ? `<td class="num muted">—</td>`
     : `<td class="num"${heatStyle({ z: v === 0 ? 0 : (v > 0 ? 1 : -1) })}><b>${pct(v)}</b></td>`;
-  return `<tr><td class="sym">${symNameHtml(t)}</td>` +
+  const subTag = f.class === "crypto" && f.sub
+    ? ` <span class="muted" style="font-size:10px" title="${f.sub === "spot" ? "Holds the underlying coin" : "Crypto-adjacent equities / futures"}">${f.sub === "spot" ? "SPOT" : "EQUITY"}</span>` : "";
+  const bdcTag = f.class === "bdc"
+    ? ` <span class="muted" style="font-size:10px" title="Market cap (not AUM)">MCAP</span>` : "";
+  return `<tr><td class="sym">${symNameHtml(t)}${subTag}${bdcTag}</td>` +
     `<td class="num"><b>${price == null ? "—" : "$" + price.toFixed(2)}</b></td>` +
     `<td class="num">${nav == null ? "—" : "$" + nav.toFixed(2)}</td>` +
     (disprem == null ? `<td class="num muted">—</td>`
@@ -154,20 +158,200 @@ let etfClass = "all"; // asset-class filter
 
 const CLASS_ORDER = ["equity", "fi-treasury", "fi-ig", "fi-hy", "fi-mbs",
   "fi-muni", "fi-tips", "fi-loans", "fi-conv", "fi-agg", "fi-intl",
-  "privcredit", "commodity", "crypto", "realestate", "leveraged", "ai", "other"];
+  "fi-floater", "fi-abs", "fi-cmbs",
+  "privcredit", "bdc", "commodity", "crypto", "realestate", "leveraged", "ai", "other"];
 const CLASS_LABELS_UI = {
   equity: "Equities",
   "fi-treasury": "FI: Treasury", "fi-ig": "FI: IG", "fi-hy": "FI: High Yield",
   "fi-mbs": "FI: MBS", "fi-muni": "FI: Munis", "fi-tips": "FI: TIPS",
   "fi-loans": "FI: Loans/CLO", "fi-conv": "FI: Conv/Pfd",
   "fi-agg": "FI: Aggregate", "fi-intl": "FI: International",
-  privcredit: "Private Credit", commodity: "Commodities", crypto: "Crypto",
+  "fi-floater": "FI: Floaters", "fi-abs": "FI: ABS", "fi-cmbs": "FI: CMBS",
+  privcredit: "Private Credit", bdc: "BDCs",
+  commodity: "Commodities", crypto: "Bitcoin & Digital",
   realestate: "Real Estate", leveraged: "Leveraged/Inverse", ai: "AI",
   other: "Other",
 };
 const CLASS_DESC = {
   leveraged: "Specialized ETFs that use financial derivatives to amplify or reverse the daily returns of an underlying index, sector, or single stock.",
+  crypto: "Spot-holding ETFs (IBIT, FBTC, ETHA…) own the underlying coin; crypto-equity ETFs (miners, exchanges, futures like BITO) track crypto-adjacent stocks. Tagged SPOT / EQUITY.",
+  bdc: "Business Development Companies — publicly traded lenders to middle-market firms. Equity-like with high distribution yields, tracked here for income comparison. Size shown is market cap, not AUM; no creations/redemptions.",
 };
+
+// ---------------------------------------------------------------------------
+// Breakdown charts (Harry 2026-10-06): nominal $ bars + % share toggle,
+// click a bar to filter the league table.
+// ---------------------------------------------------------------------------
+let breakdownMode = "nominal"; // "nominal" | "pct"
+let breakdownFilter = null;    // {kind, key, label, tickers[]} | null
+
+// Money-market ETFs carved out of FI for the asset-class breakdown.
+const MM_TICKERS = new Set(["SHV", "BIL", "SGOV", "TBIL", "USFR"]);
+
+const FI_CLASSES = ["fi-treasury", "fi-ig", "fi-hy", "fi-mbs", "fi-muni",
+  "fi-tips", "fi-loans", "fi-conv", "fi-agg", "fi-intl",
+  "fi-floater", "fi-abs", "fi-cmbs"];
+
+// Duration buckets for fixed-income tickers (Harry 2026-10-06).
+const DUR_SHORT = new Set(["SHY", "SHV", "SGOV", "TBIL", "BIL", "VGSH",
+  "SPSB", "VCSH", "IGSB", "SHYG", "SJNK", "STIP", "VTIP", "SUB", "SHM",
+  "FLOT", "TFLO", "FLRN", "USFR", "JABS",
+  "BKLN", "SRLN", "JAAA", "CLOX", "CLOI", "JBBB", "AAA"]);
+const DUR_LONG = new Set(["TLT", "VGLT", "SCHQ", "SPTL", "EDV", "ZROZ",
+  "TYD", "UST", "LQD", "LQDH", "ANGL", "PFF", "PGX", "PFXF", "HYD",
+  "EMB", "VWOB", "PCY"]);
+// Belly = FI tickers not in DUR_SHORT / DUR_LONG.
+
+// Sentiment buckets (Harry 2026-10-06).
+const LEV_LONG = new Set(["TQQQ", "SPXL", "UPRO", "TNA", "QLD", "TECL",
+  "FNGU", "SOXL", "LABU", "NUGT", "JNUG", "FAS", "EDC", "YINN", "TMF",
+  "BULZ", "TSLL", "NVDL"]);
+const INVERSE = new Set(["SQQQ", "SPXS", "SDS", "TZA", "QID", "TECS",
+  "FNGD", "SOXS", "LABD", "DUST", "JDST", "FAZ", "EDZ", "YANG", "TMV",
+  "TBT", "BERZ", "SVXY"]);
+const VIX_FEAR = new Set(["UVXY"]);
+// Unleveraged = everything else.
+
+// Sector map for equity ETFs (Harry 2026-10-06).
+const SECTOR_MAP = { XLE: "Energy", XLF: "Financials", XLK: "Technology" };
+
+// Market-cap buckets (Harry 2026-10-06).
+const CAP_SMALL = new Set(["IWM", "IJR", "TNA", "TZA"]);
+const CAP_MID = new Set(["IJH"]);
+const CAP_LARGE = new Set(["SPY", "VOO", "IVV", "DIA", "QQQ", "VTI",
+  "XLK", "XLF", "XLE", "IVW", "IVE", "IWD", "IWF", "QUAL", "USMV", "MTUM",
+  "VEA", "IEFA", "IDEV", "ACWI", "ITOT", "IXUS", "EFA", "VWO", "IEMG",
+  "EEM", "EMXC", "SPXL", "SPXS", "UPRO", "SDS", "TQQQ", "SQQQ", "QLD",
+  "QID", "TECL", "TECS", "FNGU", "FNGD"]);
+
+function buildBreakdowns(funds) {
+  const tickers = Object.keys(funds);
+  const cls = (t) => funds[t].class || "other";
+  const inTickers = (set) => tickers.filter((t) => set.has(t));
+
+  // 1. Asset class
+  const assetBuckets = [
+    { key: "equity", label: "Equity",
+      tickers: tickers.filter((t) => cls(t) === "equity") },
+    { key: "fi", label: "Fixed Income",
+      tickers: tickers.filter((t) => FI_CLASSES.includes(cls(t)) && !MM_TICKERS.has(t)) },
+    { key: "mm", label: "Money Market", tickers: inTickers(MM_TICKERS) },
+    { key: "digital", label: "Bitcoin & Digital",
+      tickers: tickers.filter((t) => cls(t) === "crypto") },
+    { key: "privcredit", label: "Private Credit",
+      tickers: tickers.filter((t) => cls(t) === "privcredit") },
+    { key: "bdc", label: "BDCs",
+      tickers: tickers.filter((t) => cls(t) === "bdc") },
+    { key: "commodity", label: "Commodities",
+      tickers: tickers.filter((t) => cls(t) === "commodity") },
+    { key: "realestate", label: "Real Estate",
+      tickers: tickers.filter((t) => cls(t) === "realestate") },
+    { key: "leveraged", label: "Leveraged/Inverse",
+      tickers: tickers.filter((t) => cls(t) === "leveraged") },
+    { key: "ai", label: "AI/Thematic",
+      tickers: tickers.filter((t) => cls(t) === "ai") },
+  ];
+
+  // 2. Duration (fixed income only)
+  const fiTickers = tickers.filter((t) => FI_CLASSES.includes(cls(t)));
+  const durationBuckets = [
+    { key: "short", label: "Short (0–3Y / floating)",
+      tickers: fiTickers.filter((t) => DUR_SHORT.has(t)) },
+    { key: "belly", label: "Belly (3–10Y)",
+      tickers: fiTickers.filter((t) => !DUR_SHORT.has(t) && !DUR_LONG.has(t)) },
+    { key: "long", label: "Long (10Y+)",
+      tickers: fiTickers.filter((t) => DUR_LONG.has(t)) },
+  ];
+
+  // 3. Sentiment
+  const sentimentBuckets = [
+    { key: "levlong", label: "Leveraged Long",
+      tickers: inTickers(LEV_LONG), color: "#2e7d32" },
+    { key: "inverse", label: "Inverse / Short",
+      tickers: inTickers(INVERSE), color: "#c62828" },
+    { key: "vix", label: "Volatility (VIX fear gauge)",
+      tickers: inTickers(VIX_FEAR), color: "#ef6c00" },
+    { key: "unlev", label: "Unleveraged",
+      tickers: tickers.filter((t) => !LEV_LONG.has(t) && !INVERSE.has(t) && !VIX_FEAR.has(t)),
+      color: "#5b7fa6" },
+  ];
+
+  // 4. Sectors (equity ETFs)
+  const eqTickers = tickers.filter((t) => cls(t) === "equity");
+  const sectorBuckets = [
+    { key: "tech", label: "Technology",
+      tickers: eqTickers.filter((t) => SECTOR_MAP[t] === "Technology") },
+    { key: "fin", label: "Financials",
+      tickers: eqTickers.filter((t) => SECTOR_MAP[t] === "Financials") },
+    { key: "energy", label: "Energy",
+      tickers: eqTickers.filter((t) => SECTOR_MAP[t] === "Energy") },
+    { key: "broad", label: "Broad Market",
+      tickers: eqTickers.filter((t) => !SECTOR_MAP[t]) },
+  ];
+
+  // 5. Market cap
+  const capBuckets = [
+    { key: "large", label: "Large Cap", tickers: inTickers(CAP_LARGE) },
+    { key: "mid", label: "Mid Cap", tickers: inTickers(CAP_MID) },
+    { key: "small", label: "Small Cap (Russell)",
+      tickers: inTickers(CAP_SMALL) },
+    { key: "other", label: "Other / Blended",
+      tickers: tickers.filter((t) => !CAP_LARGE.has(t) && !CAP_MID.has(t) && !CAP_SMALL.has(t)) },
+  ];
+
+  return [
+    { kind: "asset", title: "BY ASSET CLASS",
+      note: "Money Market carved out of short Treasury bills",
+      buckets: assetBuckets },
+    { kind: "duration", title: "BY DURATION — FIXED INCOME",
+      note: "Short = 0–3Y + all floaters/CLOs · Belly = 3–10Y · Long = 10Y+",
+      buckets: durationBuckets },
+    { kind: "sentiment", title: "BY SENTIMENT",
+      note: "Inverse AUM rising = bearish positioning · UVXY = fear gauge (high VIX = negative)",
+      buckets: sentimentBuckets },
+    { kind: "sector", title: "BY SECTOR — EQUITIES",
+      note: "Sector SPDRs mapped; broad-market ETFs grouped",
+      buckets: sectorBuckets },
+    { kind: "cap", title: "BY MARKET CAP",
+      note: "Small = Russell 2000 + small-cap leveraged",
+      buckets: capBuckets },
+  ];
+}
+
+function breakdownBarChart(bd, funds) {
+  const rows = bd.buckets.map((b) => {
+    let aum = 0, n = 0;
+    for (const t of b.tickers) {
+      const f = funds[t];
+      if (f && f.aum) { aum += f.aum; n++; }
+    }
+    return { ...b, aum, n };
+  }).filter((r) => r.n > 0);
+  const total = rows.reduce((a, r) => a + r.aum, 0);
+  const max = Math.max(...rows.map((r) => r.aum), 1);
+  const isPct = breakdownMode === "pct";
+  const bars = rows
+    .sort((a, b) => b.aum - a.aum)
+    .map((r) => {
+      const val = isPct ? (total ? (r.aum / total) * 100 : 0) : r.aum;
+      const valTxt = isPct ? val.toFixed(1) + "%" : money(r.aum);
+      const w = Math.max(2, (r.aum / max) * 100);
+      const active = breakdownFilter && breakdownFilter.kind === bd.kind &&
+        breakdownFilter.key === r.key;
+      const color = r.color || "#3b7dd8";
+      return `<div class="bd-row${active ? " bd-active" : ""}" data-bd-kind="${bd.kind}" data-bd-key="${esc(r.key)}" style="cursor:pointer" title="Click to filter league table to ${esc(r.label)}">` +
+        `<span class="bd-label">${esc(r.label)} <span class="muted">${r.n}</span></span>` +
+        `<span class="bd-barwrap"><span class="bd-bar" style="width:${w.toFixed(1)}%;background:${color}"></span></span>` +
+        `<span class="bd-val num"><b>${valTxt}</b>${isPct ? "" : ` <span class="muted">${total ? ((r.aum / total) * 100).toFixed(1) : "0.0"}%</span>`}</span></div>`;
+    }).join("");
+  const toggle = `<span class="btnrow" style="display:inline-flex;margin-left:8px">` +
+    `<button type="button" data-bd-mode="nominal" class="${!isPct ? "active" : ""}">$</button>` +
+    `<button type="button" data-bd-mode="pct" class="${isPct ? "active" : ""}">%</button></span>`;
+  const clear = breakdownFilter && breakdownFilter.kind === bd.kind
+    ? ` <button type="button" data-bd-clear="${bd.kind}" class="active">clear ✕</button>` : "";
+  return `<div class="panel-subhead"><span>${bd.title} <span class="muted">${esc(bd.note)}</span></span>${toggle}${clear}</div>` +
+    `<div class="bd-chart">${bars || `<div class="muted">No data</div>`}</div>`;
+}
 
 export async function renderEtfFlows(doc) {
   const body = document.querySelector("#panel-etfflows .panel-body");
@@ -195,6 +379,14 @@ export async function renderEtfFlows(doc) {
     ? `<div class="muted">Pending issuer-direct coverage (${pending.length}): ${pending.map(esc).join(", ")} — shown once their feeds land.</div>`
     : "";
 
+  const shownBase = etfClass === "all" ? tickers
+    : tickers.filter((t) => (funds[t].class || "other") === etfClass);
+  const shown = breakdownFilter
+    ? shownBase.filter((t) => breakdownFilter.tickers.includes(t))
+    : shownBase;
+  const bdFilterNote = breakdownFilter
+    ? ` <span class="muted">· filtered: ${esc(breakdownFilter.label)} <button type="button" data-bd-clearall="1" style="margin-left:4px">clear ✕</button></span>` : "";
+
   body.innerHTML =
     `<div class="panel-subhead"><span>ETF FLOWS — AUM, PRICE, NAV & CREATIONS/REDEMPTIONS <span class="muted">as of ${esc(d.asof ?? "—")} · iShares T+1 · FMP · CoinLaw weekly (crypto) · Yahoo prices</span></span></div>` +
     filterRow + clsDesc + pendingNote +
@@ -202,7 +394,9 @@ export async function renderEtfFlows(doc) {
     `<div id="etf-chart"><div class="muted">Loading…</div></div>` +
     `<div class="panel-subhead"><span>CATEGORY SUMMARY <span class="muted">avg expense · avg yield · total AUM · 1W flows</span></span></div>` +
     `<div style="overflow-x:auto" id="etf-catsummary"></div>` +
-    `<div class="panel-subhead"><span>LEAGUE TABLE <span class="muted">${etfClass === "all" ? "all classes" : CLASS_LABELS_UI[etfClass] ?? etfClass} · flows = Δshares × NAV (derived) or reported weekly (CoinLaw) · heat = inflow blue / outflow red</span></span></div>` +
+    `<div class="panel-subhead"><span>BREAKDOWN <span class="muted">AUM by bucket · click a bar to filter the league table</span></span></div>` +
+    `<div id="etf-breakdown"></div>` +
+    `<div class="panel-subhead"><span>LEAGUE TABLE <span class="muted">${etfClass === "all" ? "all classes" : CLASS_LABELS_UI[etfClass] ?? etfClass} · flows = Δshares × NAV (derived) or reported weekly (CoinLaw) · heat = inflow blue / outflow red</span>${bdFilterNote}</span></div>` +
     `<div style="overflow-x:auto"><table class="etftable" data-sortable><thead><tr>` +
     `<th>ETF</th><th>Price</th><th>NAV</th><th>Disc/Prem</th><th>1D Flow</th><th>1W Flow</th><th>1M Flow</th>` +
     `<th>1M Ret</th><th>3M Ret</th><th>1Y Ret</th><th>AUM</th><th>Expense</th><th>Div Yield</th>` +
@@ -212,9 +406,8 @@ export async function renderEtfFlows(doc) {
 
   body.querySelectorAll("[data-etf-cls]").forEach((b) =>
     b.addEventListener("click", () => { etfClass = b.dataset.etfCls; renderEtfFlows(doc); }));
-
-  const shown = etfClass === "all" ? tickers
-    : tickers.filter((t) => (funds[t].class || "other") === etfClass);
+  body.querySelectorAll("[data-bd-clearall]").forEach((b) =>
+    b.addEventListener("click", () => { breakdownFilter = null; renderEtfFlows(doc); }));
 
   const per = await Promise.all(shown.map(async (t) => ({ t, flows: await fundFlows(t) })));
 
@@ -282,6 +475,40 @@ export async function renderEtfFlows(doc) {
         renderEtfFlows(doc);
       }));
   }
+
+  // Breakdown charts (Harry 2026-10-06)
+  const breakdowns = buildBreakdowns(funds);
+  const bdEl = document.getElementById("etf-breakdown");
+  const renderBreakdowns = () => {
+    if (!bdEl) return;
+    bdEl.innerHTML = breakdowns.map((bd) => breakdownBarChart(bd, funds)).join("");
+    bdEl.querySelectorAll("[data-bd-mode]").forEach((b) =>
+      b.addEventListener("click", () => {
+        breakdownMode = b.dataset.bdMode; renderBreakdowns();
+      }));
+    bdEl.querySelectorAll("[data-bd-clear]").forEach((b) =>
+      b.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        if (breakdownFilter && breakdownFilter.kind === b.dataset.bdClear) {
+          breakdownFilter = null; renderEtfFlows(doc);
+        }
+      }));
+    bdEl.querySelectorAll(".bd-row[data-bd-kind]").forEach((r) =>
+      r.addEventListener("click", () => {
+        const kind = r.dataset.bdKind, key = r.dataset.bdKey;
+        const bd = breakdowns.find((x) => x.kind === kind);
+        const b = bd && bd.buckets.find((x) => x.key === key);
+        if (!b) return;
+        if (breakdownFilter && breakdownFilter.kind === kind &&
+            breakdownFilter.key === key) {
+          breakdownFilter = null;
+        } else {
+          breakdownFilter = { kind, key, label: b.label, tickers: b.tickers };
+        }
+        renderEtfFlows(doc);
+      }));
+  };
+  renderBreakdowns();
 
   // class rollup for the chart section (existing behavior)
   const clsAgg = {};

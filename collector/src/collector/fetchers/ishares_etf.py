@@ -100,8 +100,13 @@ ETF_UNIVERSE: list[tuple[str, str]] = [
     ("VGIT", "fi-treasury"), ("VGLT", "fi-treasury"), ("SCHR", "fi-treasury"),
     ("SCHQ", "fi-treasury"), ("SPTL", "fi-treasury"), ("EDV", "fi-treasury"),
     ("ZROZ", "fi-treasury"), ("TYD", "fi-treasury"), ("UST", "fi-treasury"),
-    ("TBIL", "fi-treasury"), ("TFLO", "fi-treasury"), ("VGSH", "fi-treasury"),
-    ("BIL", "fi-treasury"), ("USFR", "fi-treasury"),
+    ("TBIL", "fi-treasury"), ("VGSH", "fi-treasury"),
+    ("BIL", "fi-treasury"),
+    # Floaters (Harry 2026-10-06): floating-rate Treasury/IG notes
+    ("TFLO", "fi-floater"), ("USFR", "fi-floater"), ("FLOT", "fi-floater"),
+    ("FLRN", "fi-floater"),
+    # ABS / CMBS (Harry 2026-10-06)
+    ("JABS", "fi-abs"), ("CMBS", "fi-cmbs"),
     # IG corporate
     ("LQD", "fi-ig"), ("VCIT", "fi-ig"), ("VCSH", "fi-ig"),
     ("SPIB", "fi-ig"), ("SPSB", "fi-ig"), ("IGSB", "fi-ig"),
@@ -145,6 +150,16 @@ ETF_UNIVERSE: list[tuple[str, str]] = [
     ("ETHE", "crypto"), ("ETH", "crypto"), ("FETH", "crypto"),
     ("ETHW", "crypto"), ("ETHV", "crypto"), ("EZET", "crypto"),
     ("TETH", "crypto"), ("QETH", "crypto"),
+    # Crypto-equity ETFs (Harry 2026-10-06): miners, exchanges, futures --
+    # tagged sub="equity" to distinguish from spot-holding ETFs (sub="spot")
+    ("BKCH", "crypto"), ("WGMI", "crypto"), ("BITQ", "crypto"),
+    ("DAPP", "crypto"), ("BLOK", "crypto"), ("BITO", "crypto"),
+    # BDCs (Harry 2026-10-06): publicly traded business development
+    # companies -- equity-like, high distribution yields. Tracked here for
+    # income comparison; figures are market cap, not AUM (source fmp-mcap).
+    ("ARCC", "bdc"), ("MAIN", "bdc"), ("HTGC", "bdc"), ("GBDC", "bdc"),
+    ("BXSL", "bdc"), ("OCSL", "bdc"), ("PSEC", "bdc"), ("NMFC", "bdc"),
+    ("TCPC", "bdc"),
     # Leveraged / inverse (Harry 2026-10-06): specialized ETFs using
     # derivatives to amplify or reverse daily returns of an index, sector,
     # or single stock.
@@ -172,15 +187,30 @@ CLASS_LABELS = {
     "fi-hy": "FI: High Yield", "fi-mbs": "FI: MBS", "fi-muni": "FI: Munis",
     "fi-tips": "FI: TIPS", "fi-loans": "FI: Loans/CLO",
     "fi-conv": "FI: Conv/Preferred", "fi-agg": "FI: Aggregate",
-    "fi-intl": "FI: International",
-    "commodity": "Commodities", "crypto": "Crypto",
-    "privcredit": "Private Credit", "realestate": "Real Estate",
+    "fi-intl": "FI: International", "fi-floater": "FI: Floaters",
+    "fi-abs": "FI: ABS", "fi-cmbs": "FI: CMBS",
+    "commodity": "Commodities", "crypto": "Bitcoin & Digital Assets",
+    "privcredit": "Private Credit", "bdc": "BDCs",
+    "realestate": "Real Estate",
     "leveraged": "Leveraged/Inverse", "ai": "AI",
 }
+
+# Crypto-equity ETFs (miners, exchanges, futures) vs spot-holding ETFs.
+# Used to tag sub="equity"/"spot" in the fund dict.
+CRYPTO_EQUITY = {"BKCH", "WGMI", "BITQ", "DAPP", "BLOK", "BITO"}
 
 LEVERAGED_DESC = ("Specialized ETFs that use financial derivatives to amplify "
                   "or reverse the daily returns of an underlying index, "
                   "sector, or single stock.")
+
+CRYPTO_DESC = ("Spot-holding ETFs (IBIT, FBTC, ETHA…) own the underlying "
+               "coin; crypto-equity ETFs (miners, exchanges, futures like "
+               "BITO) track crypto-adjacent stocks. Tagged SPOT / EQUITY "
+               "in the table.")
+BDC_DESC = ("Business Development Companies — publicly traded lenders to "
+            "middle-market firms. Equity-like with high distribution yields, "
+            "tracked here for income comparison. Size shown is market cap, "
+            "not AUM; no creations/redemptions.")
 
 
 def _f(x) -> float | None:
@@ -267,6 +297,22 @@ def parse_fmp_info(payload) -> dict | None:
         "shares": aum / nav if nav else None,
         "expense": _f(row.get("expenseRatio")),
         "asof": row.get("date") or row.get("updated"),
+    }
+
+
+def parse_fmp_quote(payload) -> dict | None:
+    """FMP /stable/quote -> {name, price, mcap}. Used for BDCs (stocks, not
+    ETFs): market cap stands in for AUM (flagged source="fmp-mcap")."""
+    row = payload[0] if isinstance(payload, list) and payload else payload
+    if not isinstance(row, dict):
+        return None
+    mcap = _f(row.get("marketCap"))
+    if not mcap:
+        return None
+    return {
+        "name": row.get("name") or row.get("companyName"),
+        "price": _f(row.get("price")),
+        "mcap": mcap,
     }
 
 
@@ -366,8 +412,10 @@ async def fetch_ishares_etf(store, get_text: GetText) -> str:
             # stays honestly pending
             pending.append(ticker)
             continue
-        funds[ticker] = {**rec, "ticker": ticker, "class": cls,
-                         "source": source}
+        fund = {**rec, "ticker": ticker, "class": cls, "source": source}
+        if cls == "crypto":
+            fund["sub"] = ("equity" if ticker in CRYPTO_EQUITY else "spot")
+        funds[ticker] = fund
         if source == "ishares":
             n_ishares += 1
         else:
@@ -393,31 +441,48 @@ async def fetch_ishares_etf(store, get_text: GetText) -> str:
     # FMP fallback (Harry 2026-10-06): free FMP_API_KEY, 250 calls/day.
     # Covers whatever iShares + CoinLaw missed (non-iShares equity/bond/
     # commodity ETFs). Skipped entirely when the key is unset.
-    n_fmp = 0
+    n_fmp = n_fmp_mcap = 0
     fmp_key = os.environ.get("FMP_API_KEY")
     if fmp_key and pending:
         for ticker in list(pending):
             rec = None
+            cls = cls_by_ticker.get(ticker, "equity")
+            source = "fmp"
             try:
-                payload = json.loads(await get_text(
-                    f"{FMP_BASE}/etf/info",
-                    params={"symbol": ticker, "apikey": fmp_key}))
-                rec = parse_fmp_info(payload)
-                if rec and rec.get("aum") and not rec.get("nav"):
-                    # etf/info had AUM but no NAV -- quote price as proxy
-                    await asyncio.sleep(FMP_DELAY)
-                    px = await _fmp_quote_price(get_text, fmp_key, ticker)
-                    if px:
-                        rec["nav"] = px
-                        rec["shares"] = rec["aum"] / px
+                if cls == "bdc":
+                    # BDCs are stocks: FMP quote -> market cap as AUM proxy
+                    payload = json.loads(await get_text(
+                        f"{FMP_BASE}/quote",
+                        params={"symbol": ticker, "apikey": fmp_key}))
+                    q = parse_fmp_quote(payload)
+                    if q:
+                        rec = {"name": q["name"], "aum": q["mcap"],
+                               "nav": None, "shares": None,
+                               "asof": today.isoformat()}
+                        source = "fmp-mcap"
+                else:
+                    payload = json.loads(await get_text(
+                        f"{FMP_BASE}/etf/info",
+                        params={"symbol": ticker, "apikey": fmp_key}))
+                    rec = parse_fmp_info(payload)
+                    if rec and rec.get("aum") and not rec.get("nav"):
+                        # etf/info had AUM but no NAV -- quote price as proxy
+                        await asyncio.sleep(FMP_DELAY)
+                        px = await _fmp_quote_price(get_text, fmp_key, ticker)
+                        if px:
+                            rec["nav"] = px
+                            rec["shares"] = rec["aum"] / px
             except Exception as exc:  # noqa: BLE001
                 # error message has the query (key) stripped by http.get_text
                 log.warning("ishares_etf: fmp %s failed: %s", ticker, exc)
             if rec and rec.get("aum"):
                 pending.remove(ticker)
-                funds[ticker] = {**rec, "ticker": ticker,
-                                 "class": cls_by_ticker.get(ticker, "equity"),
-                                 "source": "fmp"}
+                fund = {**rec, "ticker": ticker, "class": cls,
+                        "source": source}
+                if cls == "crypto":
+                    fund["sub"] = ("equity" if ticker in CRYPTO_EQUITY
+                                   else "spot")
+                funds[ticker] = fund
                 store.upsert_points(f"cycle:etf-{ticker}-aum",
                                     [(today, rec["aum"])])
                 if rec.get("nav") is not None:
@@ -426,7 +491,10 @@ async def fetch_ishares_etf(store, get_text: GetText) -> str:
                 if rec.get("shares") is not None:
                     store.upsert_points(f"cycle:etf-{ticker}-shares",
                                         [(today, rec["shares"])])
-                n_fmp += 1
+                if source == "fmp-mcap":
+                    n_fmp_mcap += 1
+                else:
+                    n_fmp += 1
             await asyncio.sleep(FMP_DELAY)
     elif pending:
         log.warning("ishares_etf: FMP_API_KEY not set; %d funds pending",
@@ -470,8 +538,9 @@ async def fetch_ishares_etf(store, get_text: GetText) -> str:
                            "non-iShares ETFs; CoinLaw (CC BY 4.0, "
                            "https://coinlaw.io/crypto-etf-holdings-tracker/) "
                            "covers non-iShares crypto ETFs with weekly "
-                           "reported flows. Prices + TTM yields via Yahoo "
-                           "chart API (keyless, 1Y history). Expense: "
+                           "reported flows. BDCs via FMP quote (market cap "
+                           "as size, no NAV/flows). Prices + TTM yields via "
+                           "Yahoo chart API (keyless, 1Y history). Expense: "
                            "iShares fees / FMP expenseRatio. Flows = "
                            "Δshares × NAV, computed from consecutive "
                            "snapshots. Disc/Prem = (price − NAV)/NAV. "
@@ -479,5 +548,5 @@ async def fetch_ishares_etf(store, get_text: GetText) -> str:
                            "(Yahoo v7 quote is entitlement-walled)."},
                   source="ishares/fmp/coinlaw/yahoo")
     return (f"etfflows: {len(funds)}/{len(ETF_UNIVERSE)} funds "
-            f"({n_ishares} ishares, {n_fmp} fmp, {n_coinlaw} coinlaw, "
-            f"{len(pending)} pending)")
+            f"({n_ishares} ishares, {n_fmp} fmp, {n_fmp_mcap} fmp-mcap, "
+            f"{n_coinlaw} coinlaw, {len(pending)} pending)")

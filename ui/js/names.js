@@ -365,6 +365,28 @@ export const NAMES = {
   ROBT: { name: "First Trust Nasdaq Artificial Intelligence & Robotics ETF", desc: "AI and robotics", kind: "etf" },
   ROBO: { name: "Robo Global Robotics & Automation ETF", desc: "Robotics and automation", kind: "etf" },
   XAIX: { name: "Xtrackers Artificial Intelligence & Big Data ETF", desc: "AI and big data companies", kind: "etf" },
+  // Floaters / ABS / CMBS (Harry 2026-10-06)
+  FLOT: { name: "iShares Floating Rate Bond ETF", desc: "Floating-rate investment-grade notes", kind: "etf" },
+  FLRN: { name: "SPDR Bloomberg Investment Grade Floating Rate ETF", desc: "Floating-rate IG corporate notes", kind: "etf" },
+  JABS: { name: "Janus Henderson ABS ETF", desc: "Asset-backed securities", kind: "etf" },
+  CMBS: { name: "iShares CMBS ETF", desc: "Commercial mortgage-backed securities", kind: "etf" },
+  // Crypto-equity ETFs (Harry 2026-10-06): miners, exchanges, futures
+  BKCH: { name: "Global X Blockchain ETF", desc: "Blockchain technology companies", kind: "etf" },
+  WGMI: { name: "Valkyrie Bitcoin Miners ETF", desc: "Bitcoin mining companies", kind: "etf" },
+  BITQ: { name: "Bitwise Crypto Industry Innovators ETF", desc: "Crypto industry companies", kind: "etf" },
+  DAPP: { name: "VanEck Digital Transformation ETF", desc: "Digital asset ecosystem companies", kind: "etf" },
+  BLOK: { name: "Amplify Transformational Data Sharing ETF", desc: "Blockchain technology companies", kind: "etf" },
+  BITO: { name: "ProShares Bitcoin Strategy ETF", desc: "Bitcoin futures (not spot)", kind: "etf" },
+  // BDCs (Harry 2026-10-06): publicly traded business development companies
+  ARCC: { name: "Ares Capital Corporation", desc: "BDC — middle-market lending", kind: "stock" },
+  MAIN: { name: "Main Street Capital Corporation", desc: "BDC — lower middle-market lending", kind: "stock" },
+  HTGC: { name: "Hercules Capital", desc: "BDC — venture/tech lending", kind: "stock" },
+  GBDC: { name: "Golub Capital BDC", desc: "BDC — middle-market lending", kind: "stock" },
+  BXSL: { name: "Blackstone Secured Lending Fund", desc: "BDC — senior secured loans", kind: "stock" },
+  OCSL: { name: "Oaktree Specialty Lending Corp", desc: "BDC — middle-market lending", kind: "stock" },
+  PSEC: { name: "Prospect Capital Corporation", desc: "BDC — middle-market lending", kind: "stock" },
+  NMFC: { name: "New Mountain Finance Corp", desc: "BDC — defensive growth lending", kind: "stock" },
+  TCPC: { name: "BlackRock TCP Capital Corp", desc: "BDC — middle-market lending", kind: "stock" },
 };
 
 // Back-compat tuple map for equityhub's tickerMeta (name, sector).
