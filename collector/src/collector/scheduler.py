@@ -92,7 +92,7 @@ from collector.fetchers.polymarket import fetch_polymarket
 from collector.fetchers.kalshi import fetch_kalshi
 from collector.fetchers.pred_edge import fetch_pred_edge
 from collector.fetchers.zyfai import fetch_defi
-from collector.http import GetBytes, GetText, PostJson, PostText
+from collector.http import GetBytes, GetText, PostJson, PostText, get_text_curl
 from collector.http import post_text as _default_post_text
 from collector.newsletter import SmtpCfg, deliver_newsletter
 from collector.runner import run_fetcher
@@ -457,7 +457,7 @@ def register_jobs(
                  start + timedelta(seconds=9600)),
         # batch 13: FRED Z.1 holdings-by-holder (keyless FRED CSV; quarterly
         # levels in $mn, idempotent upserts). Monthly poll; quarterly data.
-        "z1_holdings": (cfg.cadences.get("z1_holdings", 2592000), partial(fetch_z1_holdings, store, get_text),
+        "z1_holdings": (cfg.cadences.get("z1_holdings", 2592000), partial(fetch_z1_holdings, store, get_text_curl),
                  start + timedelta(seconds=9900)),
         # batch 13: MSPD Tables 1 + 3 (keyless Fiscal Data API; ~1 MB/month
         # CUSIP detail). Monthly poll; ~5-week publication lag.
