@@ -246,7 +246,8 @@ def _doc_panel(store: Store, key: str, list_key: str) -> dict:
     doc = store.doc(key)
     if doc is None:
         return {list_key: [], "updated_at": None, "source": None}
-    return {list_key: doc.payload[list_key], "updated_at": doc.updated_at, "source": doc.source}
+        payload = doc.payload if isinstance(doc.payload, dict) else {} 
+    return {list_key: payload.get(list_key, []), "updated_at": doc.updated_at, "source": doc.source}
 
 
 def _regwatch_panel(store: Store) -> dict:
