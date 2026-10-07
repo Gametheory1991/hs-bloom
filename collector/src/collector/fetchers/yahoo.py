@@ -6,11 +6,38 @@ bare `curl/x.y` default is throttled.
 """
 from __future__ import annotations
 
+import asyncio
 import json
+import time
 import urllib.parse
 from datetime import date, datetime, timezone
 
 from collector.http import GetText
+
+
+# Yahoo's unpublished rate limits 429 under burst load (seen at boot when the
+# equity + cycle jobs fire near-simultaneously). Enforce a minimum gap between
+# requests process-wide. Locks are cached per event loop so tests (fresh loop
+# per asyncio.run) never trip "bound to a different event loop".
+YAHOO_MIN_GAP = 0.5  # seconds; tests may monkeypatch to 0
+_yahoo_next_at = 0.0
+_yahoo_locks: dict[asyncio.AbstractEventLoop, asyncio.Lock] = {}
+
+
+async def _pace_yahoo() -> None:
+    loop = asyncio.get_running_loop()
+    lock = _yahoo_locks.get(loop)
+    if lock is None:
+        lock = asyncio.Lock()
+        _yahoo_locks[loop] = lock
+        for dead in [lp for lp in _yahoo_locks if lp.is_closed()]:
+            del _yahoo_locks[dead]
+    async with lock:
+        global _yahoo_next_at
+        now = time.monotonic()
+        if now < _yahoo_next_at:
+            await asyncio.sleep(_yahoo_next_at - now)
+        _yahoo_next_at = time.monotonic() + YAHOO_MIN_GAP
 
 
 class Quote:  # simple carrier: closes + a possibly-fresher last
@@ -50,6 +77,7 @@ def parse_chart(text: str) -> Quote:
 
 
 async def fetch_chart(symbol: str, get_text: GetText, range_: str = "1y") -> Quote:
+    await _pace_yahoo()
     url = f"https://query1.finance.yahoo.com/v8/finance/chart/{urllib.parse.quote(symbol)}"
     return parse_chart(await get_text(url, params={"range": range_, "interval": "1d"}))
 
