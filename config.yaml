@@ -46,6 +46,7 @@ cadences:          # seconds between fetcher runs
   finra_factbook: 2592000  # FINRA TRACE Fact Book quarterly workbooks (corp/agency/sec XLSX); monthly poll, quarterly release
   finra_factbook_annual: 31536000  # FINRA Fact Book annual Transaction/Issue/Participant workbooks; yearly poll, annual release
   finra_ats: 604800      # FINRA ATS Transparency (dark pools): keyless monthly blocksSummary + weekly ATS_W_* (OAuth2 keyed; graceful skip)
+  finra_otc: 86400      # FINRA OTC Market (otce.finra.org): keyless api.finra.org; daily list/threshold/halts + monthly/annual stats, full history then incremental
   ofr_stfm: 86400      # OFR Short-Term Funding Monitor (SOFR, cleared repo, MMF, dealer fails/financing); daily
   ofr_tff: 86400       # OFR Traders in Financial Futures (153 mnemonics, weekly since 2013); daily-max per OFR guidance
   frb_ddp: 604800      # FRB SLOOS (quarterly) + Commercial Paper (weekly) via FRED (DDP retiring); weekly poll, idempotent

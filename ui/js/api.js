@@ -23,6 +23,7 @@ export const getAuctions = () => getJson("/api/auctions");
 export const getEconCalendar = () => getJson("/api/econ-calendar");
 export const getAlertConfig = () => getJson("/api/alerts/config");
 export const getUsage = (days = 30) => getJson(`/api/usage?days=${days}`);
+export const getOtcTop100 = (month = "") => getJson(`/api/otc/top100${month ? `?month=${month}` : ""}`);
 export const putAlertConfig = (body) => fetch("/api/alerts/config", {
   method: "PUT", headers: { "Content-Type": "application/json" },
   body: JSON.stringify(body),

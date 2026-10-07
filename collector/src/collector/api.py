@@ -71,6 +71,24 @@ def create_app(store: Store, cfg: Config) -> FastAPI:
         return build_dashboard(store, cfg.indexes, now=datetime.now(timezone.utc),
                                cycle_series=cfg.cycle_series, cycle_tabs=cfg.cycle_tabs)
 
+    @app.get("/api/otc/top100")
+    def otc_top100(month: str = ""):
+        """Top-100 OTC issues for a given month (YYYY-MM). Defaults to latest."""
+        import re as _re
+        if month and not _re.fullmatch(r"\d{4}-\d{2}", month):
+            raise HTTPException(status_code=400, detail="month must be YYYY-MM")
+        if not month:
+            try:
+                months = sorted({d.strftime("%Y-%m")
+                                 for d in store.points("cycle:otc-top100-total-shares")})
+                month = months[-1] if months else ""
+            except Exception:  # noqa: BLE001
+                month = ""
+        doc = store.doc(f"otc-top100-{month}") if month else None
+        if doc is None:
+            raise HTTPException(status_code=404, detail=f"no top-100 data for {month}")
+        return {"month": month, **(doc.payload or {})}
+
     @app.get("/api/series/{series_id}")
     def series(series_id: str, range: Literal["1y", "5y", "10y", "max"] = "10y") -> dict:
         scfg = series_by_id.get(series_id)
@@ -139,6 +157,25 @@ def create_app(store: Store, cfg: Config) -> FastAPI:
             _kind = series_id.rsplit("-", 1)[-1]
             _mu = {"shares": "sh", "trades": "trades",
                    "sharepct": "%"}.get(_kind, "")
+            name = series_id[4:].replace("-", " ").upper()
+            unit = _mu
+        elif series_id.startswith("otc:"):
+            # FINRA OTC Market (keyless api.finra.org; written by the
+            # finra_otc job). Dynamic like ats- — not in cycle_by_id.
+            # otc:monthly-total-shares, otc:monthly-total-dollarvol,
+            # otc:monthly-total-trades, otc:top100-total-shares,
+            # otc:top100-total-dollarvol, otc:yearly-<mkt>-<sec>-<metric>,
+            # otc:monthly-<mkt>-<sec>-<metric>.
+            if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9\\-]{0,63}", series_id):
+                raise HTTPException(status_code=404,
+                                    detail=f"unknown series: {series_id}")
+            points = store.points(f"cycle:{series_id}")
+            _kind = series_id.rsplit("-", 1)[-1].lower()
+            _mu = {"shares": "sh", "dollarvol": "$", "trades": "trades",
+                   "totalsharevolume": "sh", "totaldollarvolume": "$",
+                   "totaltransactioncount": "trades", "totalissuecount": "#",
+                   "totalissuetradedcount": "#", "averagesharevolume": "sh",
+                   "averagedollarvolume": "$", "averageprice": "$"}.get(_kind, "")
             name = series_id[4:].replace("-", " ").upper()
             unit = _mu
         elif series_id.startswith("regsho-top-") and (

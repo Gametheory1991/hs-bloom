@@ -64,6 +64,7 @@ from collector.fetchers.finra_ids_star import fetch_finra_ids_star
 from collector.fetchers.nyfed_cmdi import fetch_nyfed_cmdi
 from collector.fetchers.finra_factbook import fetch_finra_factbook, fetch_finra_factbook_annual
 from collector.fetchers.finra_ats import fetch_finra_ats
+from collector.fetchers.finra_otc import fetch_finra_otc
 from collector.fetchers.ofr_stfm import fetch_ofr_stfm
 from collector.fetchers.frb_ddp import fetch_frb_ddp
 from collector.fetchers.sec_ncen import fetch_sec_ncen
@@ -418,6 +419,11 @@ def register_jobs(
         # other FINRA jobs.
         "finra_ats": (cfg.cadences.get("finra_ats", 604800), partial(fetch_finra_ats, store),
                  start + timedelta(seconds=8700)),
+        # FINRA OTC Market (otce.finra.org) — keyless api.finra.org.
+        # Daily list / threshold / halts are daily; statistics monthly.
+        # Full history on first run, then incremental.
+        "finra_otc": (cfg.cadences.get("finra_otc", 86400), partial(fetch_finra_otc, store),
+                 start + timedelta(seconds=8730)),
         # batch 13: OFR Short-Term Funding Monitor (keyless API; SOFR daily,
         # cleared repo daily-prelim, MMF monthly, dealer fails/RP/RRP weekly).
         # Daily job; series stored as-is via upsert.

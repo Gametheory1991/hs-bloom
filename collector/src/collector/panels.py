@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 from collector.changes import apply_transform, bp_move, pct_change, ref_close
 from collector.config import CycleSeriesCfg, CycleTabCfg, IndexCfg
@@ -436,6 +436,94 @@ def _tape_panel(store: Store) -> dict:
             "note": p.get("note"), "tape_labels": p.get("tape_labels", {}),
             "metric_labels": p.get("metric_labels", {}),
             "updated_at": doc.updated_at, "source": doc.source}
+
+
+def _otc_panel(store: Store) -> dict:
+    """FINRA OTC Market (keyless api.finra.org, group otcMarket).
+
+    Top-100 issues by month, monthly/annual market statistics, daily-list
+    corporate-action feed, threshold securities, current trading halts,
+    symbol directory. Powers the EQUITY "OTC Market" sub-tab.
+    Degrades gracefully when the fetcher hasn't run yet.
+    """
+    empty = {"as_of": None, "top100": None, "top100_months": [],
+             "monthly_totals": {"shares": [], "dollarvol": [], "trades": []},
+             "yearly": [], "dailylist": None, "threshold": None,
+             "halts": None, "secmaster_count": 0, "mplist_count": 0,
+             "updated_at": None, "source": None}
+    status = store.doc("finra_otc")
+    if status is None:
+        return empty
+
+    def _hist(sid: str) -> list:
+        try:
+            pts = store.points(f"cycle:{sid}")
+        except Exception:  # noqa: BLE001
+            return []
+        return [{"d": d.isoformat(), "v": v} for d, v in sorted(pts.items())]
+
+    # latest top-100 month from the totals series
+    top100_months = []
+    try:
+        for d in store.points("cycle:otc-top100-total-shares"):
+            top100_months.append(d.strftime("%Y-%m"))
+    except Exception:  # noqa: BLE001
+        pass
+    top100_months = sorted(set(top100_months))
+    top100 = None
+    if top100_months:
+        doc = store.doc(f"otc-top100-{top100_months[-1]}")
+        if doc is not None:
+            top100 = doc.payload
+
+    # latest daily-list / threshold docs (walk back up to 10 days)
+    dailylist = threshold = None
+    dl_date = th_date = None
+    for i in range(10):
+        ds = (date.today() - timedelta(days=i)).isoformat()
+        if dailylist is None:
+            doc = store.doc(f"otc-dailylist-{ds}")
+            if doc is not None and (doc.payload or {}).get("count"):
+                dailylist, dl_date = doc.payload, ds
+        if threshold is None:
+            doc = store.doc(f"otc-threshold-{ds}")
+            if doc is not None and (doc.payload or {}).get("rows"):
+                threshold, th_date = doc.payload, ds
+        if dailylist and threshold:
+            break
+
+    halts_doc = store.doc("otc-halts-current")
+    sm_doc = store.doc("otc-secmaster")
+    mp_doc = store.doc("otc-mplist")
+
+    # yearly stats: All OTC / All type totals
+    yearly = []
+    try:
+        pts = store.points("cycle:otc-yearly-all-otc-all-type-totalShareVolume")
+        pts_dv = store.points("cycle:otc-yearly-all-otc-all-type-totalDollarVolume")
+        pts_tr = store.points("cycle:otc-yearly-all-otc-all-type-totalTransactionCount")
+        for d in sorted(pts):
+            yearly.append({"y": d.year, "shares": pts[d],
+                           "dollarvol": pts_dv.get(d), "trades": pts_tr.get(d)})
+    except Exception:  # noqa: BLE001
+        pass
+
+    return {
+        "as_of": (status.payload or {}).get("updated"),
+        "top100": top100, "top100_months": top100_months,
+        "monthly_totals": {
+            "shares": _hist("otc-monthly-total-shares"),
+            "dollarvol": _hist("otc-monthly-total-dollarvol"),
+            "trades": _hist("otc-monthly-total-trades"),
+        },
+        "yearly": yearly,
+        "dailylist": ({"date": dl_date, **dailylist} if dailylist else None),
+        "threshold": ({"date": th_date, **threshold} if threshold else None),
+        "halts": halts_doc.payload if halts_doc else None,
+        "secmaster_count": (sm_doc.payload or {}).get("count", 0) if sm_doc else 0,
+        "mplist_count": len((mp_doc.payload or {}).get("rows", [])) if mp_doc else 0,
+        "updated_at": status.updated_at, "source": status.source,
+    }
 
 
 def _radar_panel(store: Store) -> dict:
@@ -981,6 +1069,7 @@ def build_dashboard(
             "finnhub": _finnhub_panel(store),
             "predict": _predict_panel(store),
             "finra": _finra_panel(store),
+            "otc": _otc_panel(store),
             "shortinterest": _shortinterest_panel(store),
             "factbook": _factbook_panel(store),
         },

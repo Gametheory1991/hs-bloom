@@ -24,7 +24,8 @@ export const HUBS = [
     subs: [["news", "News Feed"], ["rules", "Rulemaking Tracker"], ["topics", "Topic Watch"]] },
   { id: "equity", label: "EQUITY",
     subs: [["overview", "Overview"], ["shortvol", "Short Volume"], ["margin", "Margin Debt"],
-           ["shortint", "Short Interest"], ["tape", "Tape Volume"], ["ats", "ATS Transparency"]] },
+           ["shortint", "Short Interest"], ["tape", "Tape Volume"], ["ats", "ATS Transparency"],
+           ["otc", "OTC Market"]] },
 ];
 
 // Legacy tab id -> "hub/sub" redirect target.

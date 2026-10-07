@@ -31,6 +31,7 @@ import { renderStar } from "./panels/star.js";
 import { renderShortVol, renderMargin, renderShortInt } from "./panels/equityhub.js";
 import { renderTape } from "./panels/tape.js";
 import { renderATS } from "./panels/ats.js";
+import { renderOTC } from "./panels/otc.js";
 import { initSortableObserver } from "./sortable.js";
 import { initExportObserver } from "./export.js";
 import { renderKoi } from "./panels/koi_scorecard.js";
@@ -48,7 +49,7 @@ import { renderDebtCube } from "./panels/debtcube.js";
 import { renderRegwatchNews, renderRegwatchRules, renderRegwatchTopics } from "./panels/regwatch.js";
 
 const POLL_MS = 60_000;
-const STALE_MINUTES = { equity: 20, bonds: 130, macro: 390, auctions: 2880, news: 40, defi: 35, midnight: 35, refs: 35, insights: 70, riskmap: 2880, xcorr: 2880, gse: 86400, vol: 2880, movers: 10080, radar: 2880, hyper: 10080, tsv: 10080, usaspending: 20160, finnhub: 2880, worldbank: 20160, coingecko: 2880, predict: 120, finra: 2880, star: 2880, shortvol: 2880, margin: 43200, shortint: 2880, tape: 2880, ats: 10080, tff: 2880, factbook: 43200, regwatch: 120, usage: 60 };  // ~2x cadence
+const STALE_MINUTES = { equity: 20, bonds: 130, macro: 390, auctions: 2880, news: 40, defi: 35, midnight: 35, refs: 35, insights: 70, riskmap: 2880, xcorr: 2880, gse: 86400, vol: 2880, movers: 10080, radar: 2880, hyper: 10080, tsv: 10080, usaspending: 20160, finnhub: 2880, worldbank: 20160, coingecko: 2880, predict: 120, finra: 2880, star: 2880, shortvol: 2880, margin: 43200, shortint: 2880, tape: 2880, ats: 10080, otc: 2880, tff: 2880, factbook: 43200, regwatch: 120, usage: 60 };  // ~2x cadence
 
 const EMPTY = { rows: [], updated_at: null, source: null };
 
@@ -78,6 +79,7 @@ const PANEL_ENTRIES = [
   ["SHORT INTEREST — FINRA SETTLEMENT", "equity/shortint"],
   ["TAPE VOLUME — VENUE × TAPE", "equity/tape"],
   ["ATS TRANSPARENCY — DARK POOLS", "equity/ats"],
+  ["OTC MARKET — FINRA OVER-THE-COUNTER", "equity/otc"],
   ["TAPE VOLUME — VENUE × TAPE", "equity/tape"],
   ["KOI — FINRA/TRACE Y/Y SCORECARD", "structure/trace"],
   ["RISK MAP — WORLD", "structure/maps"], ["COVERAGE MAPS — UNIVERSE & MONEY FLOW", "structure/maps"],
@@ -184,6 +186,7 @@ async function tick() {
     renderShortInt(p.shortinterest ?? {});
     renderTape(p.tape ?? { dates: [] });
     renderATS(p.finra?.ats ?? null);
+    renderOTC(p.otc ?? { as_of: null });
     renderRegwatchNews(p.regwatch ?? {});
     renderRegwatchRules(p.regwatch ?? {});
     renderRegwatchTopics(p.regwatch ?? {});
@@ -205,6 +208,7 @@ async function tick() {
     foot("shortint", "shortint", p.shortinterest ?? {});
     foot("tape", "tape", p.tape ?? { updated_at: null, source: null });
     foot("ats", "ats", p.finra?.ats ?? { updated_at: null, source: null });
+    foot("otc", "otc", p.otc ?? { updated_at: null, source: null });
     foot("regwatch-news", "regwatch", p.regwatch ?? {});
     foot("regwatch-rules", "regwatch", p.regwatch ?? {});
     foot("regwatch-topics", "regwatch", p.regwatch ?? {});
