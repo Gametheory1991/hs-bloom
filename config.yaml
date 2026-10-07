@@ -64,8 +64,6 @@ cadences:          # seconds between fetcher runs
   tsv_watch: 604800      # TSV regulatory scan (SEC press + Federal Register); weekly
   bank_capex: 604800     # bank/fixed-income universe XBRL fundamentals; weekly (quarterly data)
   bank_graph: 604800     # bank/fixed-income money-flow graph; weekly (zero HTTP, overlays bank_capex)
-  bank_capex: 604800     # bank/fixed-income universe XBRL fundamentals; weekly (quarterly data)
-  bank_graph: 604800     # bank/fixed-income money-flow graph; weekly (zero HTTP, overlays bank_capex)
   tech_capex: 604800     # technology universe XBRL fundamentals; weekly (quarterly data)
   tech_graph: 604800     # technology money-flow graph; weekly (zero HTTP, overlays tech_capex)
   vendor_capex: 604800   # vendor universe XBRL fundamentals; weekly (quarterly data)
