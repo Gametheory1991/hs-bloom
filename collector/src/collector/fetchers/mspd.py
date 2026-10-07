@@ -128,7 +128,12 @@ def parse_table1(payload: dict | str) -> tuple[str, list[dict]]:
 def total_public_debt_outstanding(table1_rows: list[dict]) -> float:
     """Total Public Debt Outstanding ($mn) from Table 1 summary rows."""
     for r in table1_rows:
-        if r.get("security_class", "").lower() == "total public debt outstanding":
+        # Fiscal Data puts total-row labels in security_type_desc with
+        # security_class_desc == '_', not in security_class_desc.
+        if (
+            r.get("security_class", "").lower() == "total public debt outstanding"
+            or r.get("security_type", "").lower() == "total public debt outstanding"
+        ):
             return r["total_mn"]
     raise RuntimeError("mspd_table_1 payload missing 'Total Public Debt Outstanding' row")
 
