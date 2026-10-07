@@ -60,6 +60,7 @@ from collector.fetchers.finra_short import fetch_finra_short
 from collector.fetchers.finra_regsho import fetch_finra_regsho
 from collector.fetchers.ticker_stats import fetch_ticker_stats
 from collector.fetchers.finra_ids_star import fetch_finra_ids_star
+from collector.fetchers.nyfed_cmdi import fetch_nyfed_cmdi
 from collector.fetchers.finra_factbook import fetch_finra_factbook, fetch_finra_factbook_annual
 from collector.fetchers.ofr_stfm import fetch_ofr_stfm
 from collector.fetchers.frb_ddp import fetch_frb_ddp
@@ -78,6 +79,10 @@ from collector.fetchers.worldbank import fetch_worldbank
 from collector.fetchers.usaspending import fetch_usaspending
 from collector.fetchers.coingecko import fetch_coingecko
 from collector.fetchers.defillama_rwa import fetch_defillama_rwa
+from collector.fetchers.cboe_options import fetch_cboe_options
+from collector.fetchers.ishares_etf import fetch_ishares_etf
+from collector.fetchers.sec_xbrl_etf import fetch_sec_xbrl_etf
+from collector.fetchers.nasdaq_tape import fetch_nasdaq_tape
 from collector.fetchers.openfigi import fetch_openfigi
 from collector.fetchers.finnhub import fetch_finnhub
 from collector.fetchers.polymarket import fetch_polymarket
@@ -319,6 +324,28 @@ def register_jobs(
         # tokenized-asset market caps by class. Keyless; ~25 batched calls.
         "defillama_rwa": (cfg.cadences.get("defillama_rwa", 86400), partial(fetch_defillama_rwa, store, get_text),
                  start + timedelta(seconds=5250)),
+        # CBOE delayed options chains (14 symbols) — aggregates + unusual
+        # activity only, never full chains. Keyless; Yahoo v7 fallback.
+        # Daily cadence, runs after the equity close job.
+        "cboe_options": (cfg.cadences.get("cboe_options", 86400), partial(fetch_cboe_options, store, get_text),
+                 start + timedelta(seconds=5550)),
+        # ETF AUM/NAV/shares: iShares screener (T+1, keyless) + Yahoo
+        # fallback for non-iShares funds. Flows derived at query time.
+        "ishares_etf": (cfg.cadences.get("ishares_etf", 86400), partial(fetch_ishares_etf, store, get_text),
+                 start + timedelta(seconds=5850)),
+        # SEC XBRL quarterly backfill for crypto-ETF shares/AUM/NAV history
+        # (daily feeds only give snapshots). Weekly cadence; descriptive
+        # contact UA required by SEC fair-access rules.
+        "sec_xbrl_etf": (cfg.cadences.get("sec_xbrl_etf", 604800), partial(fetch_sec_xbrl_etf, store, get_text,
+                 (cfg.sec_data.user_agent if cfg.sec_data else
+                  "os-bloom/1.0 contact harrysugamakc@gmail.com")),
+                 start + timedelta(seconds=6150)),
+        # NasdaqTrader Full Volume Summary — tape/exchange volume (shares,
+        # trades, dollar vol; keyless CSVs, 30 trading days). Every run
+        # upserts the full 30-day window; the DB accumulates from there
+        # (Harry 2026-10-06: pull all historical available). Daily after close.
+        "nasdaq_tape": (cfg.cadences.get("nasdaq_tape", 86400), partial(fetch_nasdaq_tape, store, get_text),
+                 start + timedelta(seconds=6000)),
         # batch 11: OpenFIGI symbology enrichment — needs OPENFIGI_API_KEY
         # (free registration); skips cleanly without it, never fails.
         "openfigi": (cfg.cadences.get("openfigi", 604800), partial(fetch_openfigi, store, post_json),
@@ -387,6 +414,10 @@ def register_jobs(
         # Daily job; series stored as-is via upsert.
         "ofr_stfm": (cfg.cadences.get("ofr_stfm", 86400), partial(fetch_ofr_stfm, cfg.ofr_stfm, store, get_text),
                  start + timedelta(seconds=8400)),
+        # NY Fed Corporate Bond Market Distress Index — weekly xlsx (keyless,
+        # browser UA). Stores cycle:cmdi-market/ig/hy; full history on first run.
+        "nyfed_cmdi": (cfg.cadences.get("nyfed_cmdi", 604800), partial(fetch_nyfed_cmdi, store, get_bytes),
+                 start + timedelta(seconds=8700)),
         # batch 13: FRB SLOOS + Commercial Paper (Board source via FRED — the
         # DDP is retiring Nov 2026). Weekly poll, idempotent upserts.
         "frb_ddp": (cfg.cadences.get("frb_ddp", 604800), partial(fetch_frb_ddp, cfg.frb_ddp, store, fred_api_key, get_text),

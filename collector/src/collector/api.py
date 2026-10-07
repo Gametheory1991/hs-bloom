@@ -101,6 +101,29 @@ def create_app(store: Store, cfg: Config) -> FastAPI:
                    "indirect_pct": "%", "direct_pct": "%", "dealer_pct": "%",
                    "offering": "$"}.get(_m, "")
             name, unit = f"{series_id[len('auction:'):]}".replace(":", " "), _mu
+        elif series_id.startswith("opt:"):
+            # Options aggregates: opt:{SYM}:{metric} — gex ($B), pc_oi,
+            # pc_vol (ratios), atm_iv (%), maxpain ($). Written daily by the
+            # cboe_options job as cycle:opt-{SYM}-{metric}.
+            _om = series_id.split(":", 2)
+            key = f"cycle:opt-{_om[1]}-{_om[2]}" if len(_om) == 3 else None
+            if not key:
+                raise HTTPException(status_code=404, detail=f"unknown series: {series_id}")
+            points = store.points(key)
+            _mu = {"gex": "$B", "pc_oi": "ratio", "pc_vol": "ratio",
+                   "atm_iv": "%", "maxpain": "$"}.get(_om[2], "")
+            name, unit = f"{_om[1]} {_om[2]}".replace("_", " "), _mu
+        elif series_id.startswith("etf:"):
+            # ETF snapshots: etf:{TICKER}:{metric} — aum ($), nav ($),
+            # shares (sh). Written daily by the ishares_etf job.
+            _em = series_id.split(":", 2)
+            key = f"cycle:etf-{_em[1]}-{_em[2]}" if len(_em) == 3 else None
+            if not key:
+                raise HTTPException(status_code=404, detail=f"unknown series: {series_id}")
+            points = store.points(key)
+            _mu = {"aum": "$", "nav": "$", "shares": "sh",
+                   "flow7d": "$"}.get(_em[2], "")
+            name, unit = f"{_em[1]} {_em[2]}", _mu
         elif series_id.startswith("regsho-top-") and (
                 series_id.endswith("-shortvol") or series_id.endswith("-totalvol")):
             # Dynamic per-ticker Reg SHO history (backfilled 2Y, 518 days).

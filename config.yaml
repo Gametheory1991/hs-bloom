@@ -20,6 +20,7 @@ cadences:          # seconds between fetcher runs
   thirteenf: 604800 # SEC 13F-HR watchlist; quarterly filings, weekly poll
   auctions: 86400   # Treasury auction surveillance; daily (each run pages ~18 months)
   dealer: 604800    # NY Fed primary dealer stats; weekly (released Wednesdays)
+  nyfed_cmdi: 604800 # NY Fed Corporate Bond Market Distress Index; weekly (Friday EOW rows)
   risk: 86400       # risk/prediction engine; daily compute job (no external HTTP)
   country_risk: 86400 # world risk map scoring; daily compute job (no external HTTP)
   gse: 2592000      # Fannie/Freddie monthly volume summaries; ~25d release lag, job probes 4 month-ends
@@ -131,6 +132,8 @@ series:            # macro click-through charts; transform per changes.apply_tra
   - { id: us-pce-yoy,       name: "US PCE YoY %",            fred: PCEPI,              unit: "%",   transform: yoy }
   - { id: us-nfp,           name: "US Non-Farm Payrolls Δk", fred: PAYEMS,             unit: "k",   transform: diff }
   - { id: us-unemployment,  name: "US Unemployment %",       fred: UNRATE,             unit: "%",   transform: none }
+  - { id: us-sahm,          name: "Sahm Rule (recession)",   fred: SAHMREALTIME,       unit: "pp",  transform: none }
+  - { id: us-cpi-mom,       name: "US CPI MoM %",            fred: CPIAUCSL,           unit: "%",   transform: pct_prev }
   - { id: us-gdp,           name: "US Real GDP QoQ SAAR %",  fred: A191RL1Q225SBEA,    unit: "%",   transform: none }
   - { id: us-retail,        name: "US Retail Sales MoM %",   fred: RSAFS,              unit: "%",   transform: pct_prev }
   - { id: us-fed-rate,      name: "Fed Funds Target Upper %",fred: DFEDTARU,           unit: "%",   transform: none }
@@ -1125,6 +1128,23 @@ cycle_series:      # market-cycle series (spec 2026-08-24); exactly one source k
   - { id: "rwa-tvl-class-gold",        name: "RWA TVL: gold $",            unit: "$", external: true }
   - { id: "rwa-tvl-class-stocks",      name: "RWA TVL: stocks $",          unit: "$", external: true }
   - { id: "rwa-tvl-class-realestate",  name: "RWA TVL: real estate $",     unit: "$", external: true }
+  # NY Fed Corporate Bond Market Distress Index (nyfed_cmdi fetcher, weekly)
+  - { id: "cmdi-market", name: "CMDI — Market", unit: idx, external: true }
+  - { id: "cmdi-ig",     name: "CMDI — IG",     unit: idx, external: true }
+  - { id: "cmdi-hy",     name: "CMDI — HY",     unit: idx, external: true }
+  # NasdaqTrader Full Volume Summary — tape/exchange volume (nasdaq_tape, daily)
+  - { id: "tape-shares-all-a",     name: "Tape vol shares — Tape A",      unit: "sh", external: true }
+  - { id: "tape-shares-all-b",     name: "Tape vol shares — Tape B",      unit: "sh", external: true }
+  - { id: "tape-shares-all-c",     name: "Tape vol shares — Tape C",      unit: "sh", external: true }
+  - { id: "tape-shares-all-total", name: "Tape vol shares — Total",       unit: "sh", external: true }
+  - { id: "tape-trades-all-a",     name: "Tape vol trades — Tape A",      unit: "count", external: true }
+  - { id: "tape-trades-all-b",     name: "Tape vol trades — Tape B",      unit: "count", external: true }
+  - { id: "tape-trades-all-c",     name: "Tape vol trades — Tape C",      unit: "count", external: true }
+  - { id: "tape-trades-all-total", name: "Tape vol trades — Total",       unit: "count", external: true }
+  - { id: "tape-dollar-all-a",     name: "Tape vol $ — Tape A",           unit: "$",   external: true }
+  - { id: "tape-dollar-all-b",     name: "Tape vol $ — Tape B",           unit: "$",   external: true }
+  - { id: "tape-dollar-all-c",     name: "Tape vol $ — Tape C",           unit: "$",   external: true }
+  - { id: "tape-dollar-all-total", name: "Tape vol $ — Total",            unit: "$",   external: true }
   - { id: "coingecko:cardano:price",  name: "Cardano $",   unit: "USD", external: true }
   - { id: "coingecko:tron:price",     name: "Tron $",     unit: "USD", external: true }
   - { id: "coingecko:usd-coin:price", name: "USDC $",     unit: "USD", external: true }

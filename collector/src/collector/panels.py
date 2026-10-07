@@ -372,6 +372,54 @@ def _voldash_panel(store: Store) -> dict:
             "updated_at": doc.updated_at, "source": doc.source}
 
 
+def _options_panel(store: Store) -> dict:
+    """CBOE delayed options aggregates + unusual activity (doc 'options')."""
+    doc = store.doc("options")
+    if doc is None:
+        return {"asof": None, "symbols": {}, "note": None,
+                "updated_at": None, "source": None}
+    p = doc.payload or {}
+    return {"asof": p.get("asof"), "symbols": p.get("symbols", {}),
+            "note": p.get("note"), "updated_at": doc.updated_at,
+            "source": doc.source}
+
+
+def _etfflows_panel(store: Store) -> dict:
+    """ETF AUM/NAV/shares snapshot league table (doc 'etfflows')."""
+    doc = store.doc("etfflows")
+    if doc is None:
+        return {"asof": None, "funds": {}, "classes": {},
+                "note": None, "updated_at": None, "source": None}
+    p = doc.payload or {}
+    return {"asof": p.get("asof"), "funds": p.get("funds", {}),
+            "classes": p.get("classes", {}), "note": p.get("note"),
+            "pending": p.get("pending", []),
+            "updated_at": doc.updated_at, "source": doc.source}
+
+
+def _tape_panel(store: Store) -> dict:
+    """NasdaqTrader tape/exchange volume (doc 'tape').
+
+    Rolling daily history per venue per metric (shares/trades/dollar)
+    plus market-wide aggregates — powers the EQUITY Tape Volume grid
+    in one fetch instead of a 250-series fan-out.
+    """
+    doc = store.doc("tape")
+    if doc is None:
+        return {"as_of": None, "dates": [], "history_days": 0,
+                "venues": {}, "market": {}, "note": None,
+                "tape_labels": {}, "metric_labels": {},
+                "updated_at": None, "source": None}
+    p = doc.payload or {}
+    return {"as_of": p.get("as_of"), "dates": p.get("dates", []),
+            "history_days": p.get("history_days", 0),
+            "max_source_days": p.get("max_source_days", 30),
+            "venues": p.get("venues", {}), "market": p.get("market", {}),
+            "note": p.get("note"), "tape_labels": p.get("tape_labels", {}),
+            "metric_labels": p.get("metric_labels", {}),
+            "updated_at": doc.updated_at, "source": doc.source}
+
+
 def _radar_panel(store: Store) -> dict:
     """Market radar: multi-indicator percentile snapshot for the HOME tab."""
     doc = store.doc("home_radar")
@@ -786,6 +834,9 @@ def build_dashboard(
             "xcorr": _xcorr_panel(store),
             "movers": _movers_panel(store),
             "voldash": _voldash_panel(store),
+            "options": _options_panel(store),
+            "etfflows": _etfflows_panel(store),
+            "tape": _tape_panel(store),
             "radar": _radar_panel(store),
             "hyper": _hyper_panel(store),
             "ai_flow": _universe_panel(store, "ai_buildout"),

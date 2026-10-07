@@ -52,6 +52,11 @@
       <div class="panel-body" id="pulse-rangecheck"><p class="muted">Loading…</p></div>
       <div class="panel-foot muted">BLOOMBERG-STYLE RANGE COLUMNS · percentile + z-score · 1Y window</div>
     </section>
+    <section class="panel" id="panel-pulse-stress">
+      <div class="panel-title">MACRO STRESS — SPREADS · INFLATION · JOBS · HOUSING · DISTRESS <span class="note">sources: FRED + NY Fed CMDI</span></div>
+      <div class="panel-body"><div class="kpis" id="pulse-stress"><p class="muted">Loading…</p></div></div>
+      <div class="panel-foot muted">CCC OAS daily · CPI/jobs monthly · 30Y mtg weekly · CMDI weekly (NY Fed) · higher CMDI = more distress</div>
+    </section>
     <div class="grid2">
       <section class="panel" id="panel-pulse-talk">
         <div class="panel-title">TALK TRACK — 60-SECOND BRIEF <span class="note">auto-built from live data</span></div>
@@ -99,16 +104,11 @@
       </section>
     </div>
   </main>
-  <main class="grid hidden" data-hub="pulse" data-sub="talktrack" style="grid-template-columns: 1fr;">
-    <section class="panel">
-      <div class="panel-title">TALK TRACK</div>
-      <div class="panel-body"><p class="muted">Phase 2 — auto-built 60-second briefing bullets, generated from the snapshot tiles. Read straight off the phone.</p></div>
-    </section>
-  </main>
-  <main class="grid hidden" data-hub="pulse" data-sub="deck" style="grid-template-columns: 1fr;">
-    <section class="panel">
-      <div class="panel-title">DECK MODE</div>
-      <div class="panel-body"><p class="muted">Phase 2 — light-theme one-pager with print CSS. Screenshot straight into the deck.</p></div>
+  <main class="grid hidden" data-hub="pulse" data-sub="scorecard" style="grid-template-columns: 1fr;">
+    <section class="panel" id="panel-scorecard">
+      <div class="panel-title">SCORECARD — 1D/1M/3M/1Y + 1Y Z</div>
+      <div class="panel-body"></div>
+      <div class="panel-foot muted"></div>
     </section>
   </main>
 
@@ -180,13 +180,6 @@
     </section>
   </main>
   <main class="grid grid-cycle hidden" data-hub="markets" data-sub="etfs" id="cycle-etf"></main>
-  <main class="grid hidden" data-hub="markets" data-sub="scorecard" style="grid-template-columns: 1fr;">
-    <section class="panel" id="panel-scorecard">
-      <div class="panel-title">SCORECARD — 1D/1M/3M/1Y + 1Y Z</div>
-      <div class="panel-body"></div>
-      <div class="panel-foot muted"></div>
-    </section>
-  </main>
   <main class="grid grid-defi hidden" data-hub="markets" data-sub="digital">
     <section class="panel" id="panel-defi">
       <div class="panel-title"><span id="defi-view-title">CURATED VAULTS — USDC</span><span class="view-toggle"><button type="button" data-view="vaults" class="active" aria-pressed="true">VAULTS</button><button type="button" data-view="markets" aria-pressed="false">MARKETS</button><button type="button" data-view="crypto" aria-pressed="false">CRYPTO</button><button type="button" data-view="rwa" aria-pressed="false">RWA</button></span></div>
@@ -204,6 +197,13 @@
         <div class="panel-body"></div>
         <div class="panel-foot muted"></div>
       </div>
+    </section>
+  </main>
+  <main class="grid hidden" data-hub="markets" data-sub="options" style="grid-template-columns: 1fr;">
+    <section class="panel" id="panel-options">
+      <div class="panel-title">OPTIONS — GAMMA & FLOW</div>
+      <div class="panel-body"></div>
+      <div class="panel-foot muted"></div>
     </section>
   </main>
 
@@ -280,6 +280,13 @@
       <div class="panel-foot muted"></div>
     </section>
   </main>
+  <main class="grid hidden" data-hub="structure" data-sub="etfflows" style="grid-template-columns: 1fr;">
+    <section class="panel" id="panel-etfflows">
+      <div class="panel-title">ETF FLOWS — AUM & CREATIONS/REDEMPTIONS</div>
+      <div class="panel-body"></div>
+      <div class="panel-foot muted"></div>
+    </section>
+  </main>
 
   <!-- ============ DESK ============ -->
   <main class="grid hidden" data-hub="desk" data-sub="alerts" style="grid-template-columns: 1fr;">
@@ -309,6 +316,18 @@
       <div class="panel-title">USAGE ANALYTICS</div>
       <div class="panel-body"></div>
       <div class="panel-foot muted"></div>
+    </section>
+  </main>
+  <main class="grid hidden" data-hub="desk" data-sub="talktrack" style="grid-template-columns: 1fr;">
+    <section class="panel">
+      <div class="panel-title">TALK TRACK</div>
+      <div class="panel-body"><p class="muted">Phase 2 — auto-built 60-second briefing bullets, generated from the snapshot tiles. Read straight off the phone.</p></div>
+    </section>
+  </main>
+  <main class="grid hidden" data-hub="desk" data-sub="deck" style="grid-template-columns: 1fr;">
+    <section class="panel">
+      <div class="panel-title">DECK MODE</div>
+      <div class="panel-body"><p class="muted">Phase 2 — light-theme one-pager with print CSS. Screenshot straight into the deck.</p></div>
     </section>
   </main>
 
@@ -360,6 +379,13 @@
   <main class="grid hidden" data-hub="equity" data-sub="shortint" style="grid-template-columns: 1fr;">
     <section class="panel" id="panel-shortint">
       <div class="panel-title">SHORT INTEREST — FINRA SETTLEMENT</div>
+      <div class="panel-body"></div>
+      <div class="panel-foot muted"></div>
+    </section>
+  </main>
+  <main class="grid hidden" data-hub="equity" data-sub="tape" style="grid-template-columns: 1fr;">
+    <section class="panel" id="panel-tape">
+      <div class="panel-title">TAPE VOLUME — NASDAQTRADER VENUE × TAPE</div>
       <div class="panel-body"></div>
       <div class="panel-foot muted"></div>
     </section>

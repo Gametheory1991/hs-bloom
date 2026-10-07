@@ -6,25 +6,25 @@ import { track } from "./usage.js";
 
 export const HUBS = [
   { id: "pulse", label: "PULSE",
-    subs: [["snapshot", "Snapshot"], ["talktrack", "Talk Track"], ["deck", "Deck Mode"]] },
+    subs: [["snapshot", "Snapshot"], ["scorecard", "Scorecard"]] },
   { id: "macro", label: "MACRO",
     subs: [["calendar", "Calendar"], ["central", "Central Banks"], ["auctions", "UST Auctions"],
            ["bonds", "World Bonds"], ["credit", "Credit"], ["cycle", "Cycle"]] },
   { id: "markets", label: "MARKETS",
     subs: [["equities", "Equities"], ["volcorr", "Vol & Corr"], ["futures", "Futures"],
-           ["etfs", "ETFs"], ["scorecard", "Scorecard"], ["digital", "Digital"]] },
+           ["etfs", "ETFs"], ["digital", "Digital"], ["options", "Options"]] },
   { id: "positioning", label: "POSITIONING",
     subs: [["positions", "Positions"], ["flows", "13F Flows"], ["predict", "Predict"]] },
   { id: "structure", label: "FLOW",
-    subs: [["trace", "TRACE Volume"], ["star", "STAR"], ["factbook", "Fact Book"], ["maps", "Maps"], ["desks", "Desks"]] },
+    subs: [["trace", "TRACE Volume"], ["star", "STAR"], ["factbook", "Fact Book"], ["maps", "Maps"], ["desks", "Desks"], ["etfflows", "ETF Flows"]] },
   { id: "desk", label: "DESK",
     subs: [["alerts", "Alerts"], ["briefcheck", "Brief Check"], ["analyst", "Analyst"],
-           ["usage", "Usage"]] },
+           ["usage", "Usage"], ["talktrack", "Talk Track"], ["deck", "Deck Mode"]] },
   { id: "regwatch", label: "REG WATCH",
     subs: [["news", "News Feed"], ["rules", "Rulemaking Tracker"], ["topics", "Topic Watch"]] },
   { id: "equity", label: "EQUITY",
     subs: [["overview", "Overview"], ["shortvol", "Short Volume"], ["margin", "Margin Debt"],
-           ["shortint", "Short Interest"]] },
+           ["shortint", "Short Interest"], ["tape", "Tape Volume"]] },
 ];
 
 // Legacy tab id -> "hub/sub" redirect target.
@@ -33,7 +33,7 @@ const LEGACY = {
   econ: "macro/cycle", credit: "macro/credit", profit: "macro/cycle",
   pos: "positioning/positions", map: "structure/maps", xcorr: "markets/volcorr",
   vol: "markets/volcorr", movers: "markets/equities", hyper: "structure/desks",
-  futures: "markets/futures", flows: "positioning/flows", scorecard: "markets/scorecard",
+  futures: "markets/futures", flows: "positioning/flows", scorecard: "pulse/scorecard",
   etf: "markets/etfs", central: "macro/central", predict: "positioning/predict",
   finra: "structure/trace",
 };
@@ -43,6 +43,9 @@ const hubById = (id) => HUBS.find((h) => h.id === id);
 // Moved hub/sub routes -> new home (location.replace, no history entry).
 const MOVED = {
   "positioning/shorts": "equity/shortvol",
+  "markets/scorecard": "pulse/scorecard",
+  "pulse/talktrack": "desk/talktrack",
+  "pulse/deck": "desk/deck",
 };
 
 export function currentRoute() {

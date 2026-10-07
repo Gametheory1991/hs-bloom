@@ -47,6 +47,8 @@ def test_register_jobs_creates_all_jobs_with_config_cadences(tmp_path):
         "tech_capex", "tech_graph", "vendor_capex", "vendor_graph",
         "etf_capex", "etf_graph", "crypto_capex", "crypto_graph",
         "regwatch",
+        "cboe_options", "ishares_etf",
+        "nyfed_cmdi", "nasdaq_tape", "sec_xbrl_etf",
     }
     assert jobs["equity"].trigger.interval.total_seconds() == 300
     assert jobs["news"].trigger.interval.total_seconds() == 600
@@ -78,6 +80,9 @@ def test_register_jobs_creates_all_jobs_with_config_cadences(tmp_path):
     assert jobs["vendor_graph"].trigger.interval.total_seconds() == 604800
     assert jobs["crypto_capex"].trigger.interval.total_seconds() == 604800
     assert jobs["crypto_graph"].trigger.interval.total_seconds() == 604800
+    assert jobs["cboe_options"].trigger.interval.total_seconds() == 86400
+    assert jobs["ishares_etf"].trigger.interval.total_seconds() == 86400
+    assert jobs["sec_xbrl_etf"].trigger.interval.total_seconds() == 604800
     assert all(j.misfire_grace_time == 30 for j in jobs.values())
 
 
@@ -88,4 +93,4 @@ def test_main_builds_app(tmp_path, monkeypatch):
 
     app, scheduler = build()
     assert app.title == "os-bloom collector"
-    assert len(scheduler.get_jobs()) == 76  # +1 defillama_rwa (was 75: +1 regwatch (was 74: +1 finra_breadth, +1 finra_corp, +1 finra_regsho, +1 finra_capped, +1 finra_ids_star, +1 ticker_stats, +2 bank universe, +4 tech/vendor universes, +2 etf universe, +2 crypto universe, +2 factbook, +9 batch13 (ofr_stfm, frb_ddp, sec_ncen, sec_nport, sec_pfs, z1_holdings, mspd, soma_cusip, debt_cube))
+    assert len(scheduler.get_jobs()) == 81  # +1 sec_xbrl_etf, +1 nasdaq_tape (was 79: +3 cboe_options, ishares_etf, nyfed_cmdi (was 76: +1 defillama_rwa (was 75: +1 regwatch (was 74: +1 finra_breadth, +1 finra_corp, +1 finra_regsho, +1 finra_capped, +1 finra_ids_star, +1 ticker_stats, +2 bank universe, +4 tech/vendor universes, +2 etf universe, +2 crypto universe, +2 factbook, +9 batch13 (ofr_stfm, frb_ddp, sec_ncen, sec_nport, sec_pfs, z1_holdings, mspd, soma_cusip, debt_cube))))

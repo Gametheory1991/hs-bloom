@@ -88,7 +88,8 @@ async function tileData(t, scoreRows) {
   const row = scoreRows.find((r) => r.id === t.sid || r.series === t.sid);
   let pts = [];
   try {
-    const s = await getSeries(t.sid, "3m");
+    // "1y": /api/series only accepts 1y/5y/10y/max (3m 422s on prod).
+    const s = await getSeries(t.sid, "1y");
     pts = (s.points ?? []).slice().sort((a, b) => (a[0] < b[0] ? -1 : 1));
   } catch { /* sparkline degrades gracefully */ }
   const last30 = pts.slice(-30);
@@ -338,7 +339,8 @@ export async function renderPulse() {
   const tilesEl = document.getElementById("pulse-tiles");
   const rangeEl = document.getElementById("pulse-rangecheck");
   const talkEl = document.getElementById("pulse-talktrack");
-  if (!tilesEl && !rangeEl && !talkEl) return; // PULSE DOM not present
+  const stressEl = document.getElementById("pulse-stress");
+  if (!tilesEl && !rangeEl && !talkEl && !stressEl) return; // PULSE DOM not present
 
   let dash = {};
   let scoreRows = [];
@@ -383,10 +385,16 @@ export async function renderPulse() {
     if (req !== pulseReq) return;
   }
 
+  // Macro stress strip (CCC OAS · CPI · jobs · 30Y mtg · Sahm · CMDI)
+  if (stressEl) {
+    stressEl.innerHTML = await stressStripHtml();
+    if (req !== pulseReq) return;
+  }
+
   // Talk track (both snapshot panel and talktrack subtab)
   const talkHtml = `<ul class="talk">${talkBullets(dash, vol)}</ul>`;
   if (talkEl) talkEl.innerHTML = talkHtml;
-  const talkTab = document.querySelector('[data-hub="pulse"][data-sub="talktrack"] .panel-body');
+  const talkTab = document.querySelector('[data-hub="desk"][data-sub="talktrack"] .panel-body');
   if (talkTab) talkTab.innerHTML = `<ul class="talk big">${talkBullets(dash, vol)}</ul>` +
     `<p class="muted">Auto-built from live terminal data · ${esc(new Date().toLocaleString("en-US", { timeZone: "America/New_York" }))} ET</p>`;
   if (req !== pulseReq) return;
@@ -470,6 +478,152 @@ function auctionsHtml(auc) {
     return `<tr><td class="num">${esc((a.date ?? "").slice(5) || "—")}</td>` +
       `<td class="sym">${esc(a.tenor ?? a.security ?? "—")}</td><td class="num">${amtTxt}</td></tr>`;
   }).join("") + `</table>`;
+}
+
+// ---- MACRO STRESS strip: CCC OAS · CPI · jobs · 30Y mtg · Sahm · CMDI ----
+// Each cell fetches its /api/series directly (works for macro: and cycle: ids)
+// and computes latest / horizon deltas / 1Y percentile / z-score client-side.
+const stressPctRank = (vals, v) => {
+  if (!vals.length) return null;
+  const s = [...vals].sort((a, b) => a - b);
+  return (s.filter((x) => x < v).length / s.length) * 100;
+};
+const stressZ = (vals, v) => {
+  const n = vals.length;
+  if (n < 2) return null;
+  const m = vals.reduce((a, b) => a + b, 0) / n;
+  const sd = Math.sqrt(vals.reduce((a, b) => a + (b - m) ** 2, 0) / (n - 1));
+  return sd > 0 ? (v - m) / sd : null;
+};
+const stressDelta = (pts, days) => {
+  if (!pts || pts.length < 2) return null;
+  const last = pts[pts.length - 1];
+  const target = Date.parse(last[0]) - days * 864e5;
+  let ref = null;
+  for (const [d, v] of pts) { if (Date.parse(d) <= target) ref = v; }
+  return ref == null ? null : last[1] - ref;
+};
+const stressPts = async (id) => {
+  try {
+    const s = await getSeries(id, "1y");
+    return (s.points ?? []).slice().sort((a, b) => (a[0] < b[0] ? -1 : 1));
+  } catch { return null; }
+};
+const stressAsOf = (d, freq) => {
+  if (!d) return "—";
+  if (freq === "monthly") return `${MONTH_ABBR[+d.slice(5, 7) - 1]} ${d.slice(0, 4)}`;
+  return d.slice(5).replace("-", "/");
+};
+
+// Generic single-series stress tile. horizons: [[label, days], ...] with the
+// first horizon as the headline change.
+function stressTile({ label, pts, freq, valFmt, dFmt, horizons, sub = "", note = "", src = "FRED" }) {
+  if (!pts || !pts.length) {
+    return `<div class="kpi"><div class="lbl">${esc(label)}</div><div class="val">—</div>` +
+      `<div class="muted">pending first data pull</div></div>`;
+  }
+  const last = pts[pts.length - 1];
+  const v = last[1], asof = last[0];
+  const vals = pts.map((p) => p[1]);
+  const pct = stressPctRank(vals, v), z = stressZ(vals, v);
+  const d0 = stressDelta(pts, horizons[0][1]);
+  const cls = d0 == null ? "flat" : d0 > 0 ? "up" : d0 < 0 ? "down" : "flat";
+  const hz = horizons.map(([h, days]) => {
+    const d = stressDelta(pts, days);
+    return `<span><b>${h}</b> ${d == null ? "—" : dFmt(d)}</span>`;
+  }).join("");
+  const zTxt = z == null ? "—" : `${z > 0 ? "+" : ""}${z.toFixed(1)}`;
+  return `<div class="kpi"><div class="lbl">${esc(label)}</div>` +
+    `<div class="val">${valFmt(v)}</div>` +
+    `<div class="chg ${cls}">${d0 == null ? "—" : dFmt(d0)} <span class="note">${horizons[0][0]}</span></div>` +
+    `${sub ? `<div class="muted" style="font-size:10px">${sub}</div>` : ""}` +
+    `${sparkSvg(pts.slice(-90), cls === "up" ? true : cls === "down" ? false : null)}` +
+    `<div class="hz">${hz}<span class="zbadge">z ${zTxt}</span>` +
+    `<span class="zbadge" title="percentile of current value vs 1Y history">p${pct == null ? "—" : pct.toFixed(0)}</span></div>` +
+    `<div class="muted" style="font-size:9px;margin-top:2px">${esc(stressAsOf(asof, freq))} · ${freq}${note ? ` · ${esc(note)}` : ""} · ${esc(src)}</div></div>`;
+}
+
+const bpFmt = (v) => `${Math.round(v * 100).toLocaleString("en-US")}bp`;
+const bpD = (d) => `${d >= 0 ? "+" : ""}${Math.round(d * 100)}bp`;
+
+async function stressStripHtml() {
+  const [ccc, cpiY, cpiM, nfp, unrate, mtg, sahm, cmdiM, cmdiI, cmdiH] = await Promise.all([
+    stressPts("ccc-oas"), stressPts("us-cpi-yoy"), stressPts("us-cpi-mom"),
+    stressPts("us-nfp"), stressPts("us-unemployment"), stressPts("us-mortgage-30y"),
+    stressPts("us-sahm"), stressPts("cmdi-market"), stressPts("cmdi-ig"), stressPts("cmdi-hy"),
+  ]);
+  const cells = [];
+
+  // 1. CCC OAS — daily spread, same style as the HY OAS tile
+  cells.push(stressTile({
+    label: "CCC OAS", pts: ccc, freq: "daily", valFmt: bpFmt, dFmt: bpD,
+    horizons: [["1D", 1], ["1W", 7], ["1M", 30]], note: "ICE BofA CCC & Lower OAS",
+  }));
+
+  // 2. CPI — YoY headline + MoM sub-line, monthly
+  if (cpiY?.length) {
+    const y = cpiY[cpiY.length - 1][1];
+    const m = cpiM?.length ? cpiM[cpiM.length - 1][1] : null;
+    cells.push(stressTile({
+      label: "CPI", pts: cpiY, freq: "monthly",
+      valFmt: (v) => `${v.toFixed(1)}% YoY`, dFmt: (d) => `${d >= 0 ? "+" : ""}${d.toFixed(1)}pp`,
+      horizons: [["1M", 31], ["3M", 93], ["1Y", 365]],
+      sub: m == null ? "" : `MoM ${m >= 0 ? "+" : ""}${m.toFixed(2)}%`,
+    }));
+  } else {
+    cells.push(stressTile({ label: "CPI", pts: null, freq: "monthly" }));
+  }
+
+  // 3. Jobs — NFP MoM (k) headline + unemployment sub-line
+  if (nfp?.length) {
+    const u = unrate?.length ? unrate[unrate.length - 1][1] : null;
+    const k = (v) => `${v >= 0 ? "+" : ""}${Math.round(v)}k`;
+    cells.push(stressTile({
+      label: "NFP", pts: nfp, freq: "monthly", valFmt: k, dFmt: (d) => `${d >= 0 ? "+" : ""}${Math.round(d)}k`,
+      horizons: [["1M", 31], ["3M", 93], ["1Y", 365]],
+      sub: u == null ? "PAYEMS Δk" : `PAYEMS Δk · U-rate ${u.toFixed(1)}%`,
+    }));
+  } else {
+    cells.push(stressTile({ label: "NFP", pts: null, freq: "monthly" }));
+  }
+
+  // 4. 30Y mortgage — weekly
+  cells.push(stressTile({
+    label: "30Y MTG", pts: mtg, freq: "weekly",
+    valFmt: (v) => `${v.toFixed(2)}%`, dFmt: bpD,
+    horizons: [["1W", 7], ["1M", 30], ["3M", 91]], note: "FRED MORTGAGE30US",
+  }));
+
+  // 5. Sahm Rule — monthly, 0.50 recession trigger
+  if (sahm?.length) {
+    const v = sahm[sahm.length - 1][1];
+    const cls = v >= 0.5 ? "up strong" : v >= 0.4 ? "up" : "flat";
+    cells.push(`<div class="kpi"><div class="lbl">SAHM RULE</div>` +
+      `<div class="val">${v.toFixed(2)}</div>` +
+      `<div class="chg ${cls}">${v >= 0.5 ? "TRIGGERED" : "below trigger"} <span class="note">trigger 0.50</span></div>` +
+      `${sparkSvg(sahm.slice(-60), null)}` +
+      `<div class="muted" style="font-size:9px;margin-top:2px">${esc(stressAsOf(sahm[sahm.length - 1][0], "monthly"))} · monthly · FRED SAHMREALTIME</div></div>`);
+  } else {
+    cells.push(stressTile({ label: "SAHM RULE", pts: null, freq: "monthly" }));
+  }
+
+  // 6. CMDI — NY Fed distress index, weekly; higher = more distress
+  if (cmdiM?.length) {
+    const v = cmdiM[cmdiM.length - 1][1];
+    const ig = cmdiI?.length ? cmdiI[cmdiI.length - 1][1] : null;
+    const hy = cmdiH?.length ? cmdiH[cmdiH.length - 1][1] : null;
+    cells.push(stressTile({
+      label: "CMDI", pts: cmdiM, freq: "weekly",
+      valFmt: (x) => x.toFixed(2), dFmt: (d) => `${d >= 0 ? "+" : ""}${d.toFixed(2)}`,
+      horizons: [["1W", 7], ["1M", 30], ["3M", 91]],
+      sub: `Market${ig != null ? ` · IG ${ig.toFixed(2)}` : ""}${hy != null ? ` · HY ${hy.toFixed(2)}` : ""}`,
+      note: "higher = more distress", src: "NY Fed",
+    }));
+  } else {
+    cells.push(stressTile({ label: "CMDI", pts: null, freq: "weekly" }));
+  }
+
+  return cells.join("");
 }
 
 // Risk gauges: regime + key z-scores as 0-100 dials
