@@ -39,6 +39,8 @@ class FakeConn:
         s = " ".join(sql.split())
         if s.startswith("CREATE TABLE"):
             return FakeCursor([])
+        if s.startswith("CREATE INDEX"):
+            return FakeCursor([])
         if s.startswith("INSERT INTO series_points"):
             sid, d, v = args
             self.points[(sid, d)] = v
