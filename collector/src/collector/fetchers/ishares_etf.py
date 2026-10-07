@@ -1,19 +1,29 @@
-"""ETF AUM / NAV / shares-outstanding — iShares product screener primary,
-FMP (Financial Modeling Prep) fallback, CoinLaw crypto-ETF CSV fallback.
+"""ETF AUM / NAV / shares-outstanding / price / expense / yield -- iShares
+product screener primary, FMP (Financial Modeling Prep) fallback, CoinLaw
+crypto-ETF CSV fallback, Yahoo chart API for prices + TTM distributions.
 
 Primary (keyless, daily T+1):
   https://www.ishares.com/us/product-screener/product-screener-v3.1.jsn?...
 526 funds keyed by portfolioId; ticker in `localExchangeTicker`;
-NAV in `navAmount.r`, total net assets in `totalNetAssets.r`.
+NAV in `navAmount.r`, total net assets in `totalNetAssets.r`,
+expense in `fees.r`, TTM yield in `twelveMonTrlYield.r`.
+
+Fallback chain: iShares screener -> FMP /stable/etf/info (needs the free
+FMP_API_KEY env var; 250 calls/day) -> CoinLaw crypto-ETF tracker CSV
+(crypto only). etf.com was evaluated 2026-10-06 and is bot-walled
+(HTTP 403 via Cloudflare even with full browser headers) -- not used, do
+not try to circumvent. Yahoo v7 quote died 2026-10-06 (HTTP 401
+entitlement wall) and was removed; the Yahoo *chart* API (v8) still works
+keyless and supplies 1Y daily closes + dividend events.
 
 Fallback chain: iShares screener -> FMP /stable/etf/info (needs the free
 FMP_API_KEY env var; 250 calls/day, ~28/day used) -> CoinLaw crypto-ETF
 tracker CSV (crypto only). etf.com was evaluated 2026-10-06 and is
-bot-walled (HTTP 403 via Cloudflare even with full browser headers) —
+bot-walled (HTTP 403 via Cloudflare even with full browser headers) --
 not used, do not try to circumvent. Yahoo v7 quote died 2026-10-06
 (HTTP 401 entitlement wall) and was removed.
 
-CoinLaw (keyless, weekly cadence, CC BY 4.0 — attribution in doc note):
+CoinLaw (keyless, weekly cadence, CC BY 4.0 -- attribution in doc note):
   https://coinlaw.io/crypto-etf-holdings-tracker/?desk_export=csv
 22 funds / 12 issuers; columns include Ticker, Issuer, Asset,
 "AUM (USD millions)", "Net flow, week (USD millions)". Flows are reported
@@ -27,14 +37,15 @@ from consecutive daily snapshots (series below), so history accumulates
 from the first run.
 
 Stored per ticker per day:
-  cycle:etf-{TICKER}-aum     total net assets, $
-  cycle:etf-{TICKER}-nav     NAV per share, $ (iShares/Yahoo only)
-  cycle:etf-{TICKER}-shares  shares outstanding (iShares/Yahoo only)
-  cycle:etf-{TICKER}-flow7d  reported weekly net flow, $ (CoinLaw only)
+  cycle:etf-{TICKER}-aum       total net assets, $
+  cycle:etf-{TICKER}-nav       NAV per share, $ (iShares/FMP only)
+  cycle:etf-{TICKER}-shares    shares outstanding (iShares/FMP only)
+  cycle:etf-{TICKER}-price     daily closes, 1Y history (Yahoo chart, keyless)
+  cycle:etf-{TICKER}-expense   net expense ratio, % (iShares fees / FMP)
+  cycle:etf-{TICKER}-divyield  TTM distribution yield, %
+                              (iShares twelveMonTrlYield, else Yahoo divs)
+  cycle:etf-{TICKER}-flow7d    reported weekly net flow, $ (CoinLaw only)
 plus a doc "etfflows" with the latest snapshot league table.
-
-Yahoo fallback (v7 quote): marketCap ~= AUM, sharesOutstanding, NAV ~=
-marketCap / sharesOutstanding. Flagged source=yahoo.
 """
 from __future__ import annotations
 
@@ -50,7 +61,7 @@ from collector.http import GetText
 
 log = logging.getLogger(__name__)
 
-# FMP (Financial Modeling Prep) fallback — free key in FMP_API_KEY env var,
+# FMP (Financial Modeling Prep) fallback -- free key in FMP_API_KEY env var,
 # 250 calls/day. Covers the non-iShares, non-crypto gap (State Street /
 # Vanguard / Invesco / Janus Henderson / PIMCO / WisdomTree / USCF funds).
 FMP_BASE = "https://financialmodelingprep.com/stable"
@@ -61,17 +72,17 @@ ISHARES_URL = ("https://www.ishares.com/us/product-screener/"
                "?dcrPath=/templatedata/config/product-screener-v3/data/en/"
                "us-ishares/ishares-product-screener-backend-config"
                "&siteEntryPassthrough=true&loc=en_us")
-# etf.com is bot-walled (Cloudflare 403) — intentionally not used.
+# etf.com is bot-walled (Cloudflare 403) -- intentionally not used.
 COINLAW_CSV = ("https://coinlaw.io/crypto-etf-holdings-tracker/"
                "?desk_export=csv")
 # NOTE 2026-10-06: Yahoo v7 quote (marketCap/sharesOutstanding) now returns
-# HTTP 401 "Unauthorized" even with browser UA + cookies + crumb — Yahoo put
+# HTTP 401 "Unauthorized" even with browser UA + cookies + crumb -- Yahoo put
 # it behind an entitlement wall. The fallback was removed; non-iShares,
 # non-CoinLaw funds are reported as pending until issuer-direct APIs land
 # (State Street, Vanguard, Invesco, Janus Henderson, PIMCO, WisdomTree,
 # USCF). See doc payload "pending".
 
-# (ticker, asset class). Non-iShares names fall back to Yahoo automatically
+# (ticker, asset class). Non-iShares names fall back to FMP automatically
 # when the screener has no match.
 ETF_UNIVERSE: list[tuple[str, str]] = [
     ("IVV", "equity"), ("IWM", "equity"), ("IJH", "equity"), ("IJR", "equity"),
@@ -79,23 +90,54 @@ ETF_UNIVERSE: list[tuple[str, str]] = [
     ("ACWI", "equity"), ("ITOT", "equity"),
     ("IXUS", "equity"), ("IEFA", "equity"), ("IVW", "equity"), ("IVE", "equity"),
     ("IWD", "equity"), ("IWF", "equity"), ("QUAL", "equity"), ("USMV", "equity"),
-    ("MTUM", "equity"),
-    # US fixed income (Harry 2026-10-06 expansion)
-    ("AGG", "fixedincome"), ("TLT", "fixedincome"), ("IEF", "fixedincome"),
-    ("SHY", "fixedincome"), ("TIP", "fixedincome"), ("LQD", "fixedincome"),
-    ("HYG", "fixedincome"), ("JNK", "fixedincome"), ("EMB", "fixedincome"),
-    ("MBB", "fixedincome"), ("IUSB", "fixedincome"), ("SHYG", "fixedincome"),
-    ("IGSB", "fixedincome"), ("SUB", "fixedincome"), ("MUB", "fixedincome"),
-    ("CWB", "fixedincome"), ("PFF", "fixedincome"),
-    ("SHV", "fixedincome"), ("SGOV", "fixedincome"),
-    # private credit / CLO ETFs (Harry 2026-10-06 expansion)
-    ("JAAA", "privcredit"), ("CLOX", "privcredit"), ("CLOI", "privcredit"),
-    ("JBBB", "privcredit"), ("BINC", "privcredit"), ("BBDC", "privcredit"),
+    ("MTUM", "equity"), ("EMXC", "equity"), ("IDEV", "equity"),
+    ("SPY", "equity"), ("QQQ", "equity"), ("DIA", "equity"), ("VTI", "equity"),
+    ("VOO", "equity"), ("VEA", "equity"), ("VWO", "equity"),
+    ("XLE", "equity"), ("XLF", "equity"), ("XLK", "equity"),
+    # US fixed income -- Treasury sub-class (Harry 2026-10-06 expansion)
+    ("TLT", "fi-treasury"), ("IEF", "fi-treasury"), ("SHY", "fi-treasury"),
+    ("SHV", "fi-treasury"), ("SGOV", "fi-treasury"), ("GOVT", "fi-treasury"),
+    ("VGIT", "fi-treasury"), ("VGLT", "fi-treasury"), ("SCHR", "fi-treasury"),
+    ("SCHQ", "fi-treasury"), ("SPTL", "fi-treasury"), ("EDV", "fi-treasury"),
+    ("ZROZ", "fi-treasury"), ("TYD", "fi-treasury"), ("UST", "fi-treasury"),
+    ("TBIL", "fi-treasury"), ("TFLO", "fi-treasury"), ("VGSH", "fi-treasury"),
+    ("BIL", "fi-treasury"), ("USFR", "fi-treasury"),
+    # IG corporate
+    ("LQD", "fi-ig"), ("VCIT", "fi-ig"), ("VCSH", "fi-ig"),
+    ("SPIB", "fi-ig"), ("SPSB", "fi-ig"), ("IGSB", "fi-ig"),
+    ("IGIB", "fi-ig"), ("USIG", "fi-ig"), ("LQDH", "fi-ig"),
+    # High yield
+    ("HYG", "fi-hy"), ("JNK", "fi-hy"), ("SJNK", "fi-hy"), ("HYLB", "fi-hy"),
+    ("USHY", "fi-hy"), ("SHYG", "fi-hy"), ("ANGL", "fi-hy"),
+    # MBS
+    ("MBB", "fi-mbs"), ("VMBS", "fi-mbs"), ("SPMB", "fi-mbs"),
+    # Munis
+    ("MUB", "fi-muni"), ("VTEB", "fi-muni"), ("SUB", "fi-muni"),
+    ("SHM", "fi-muni"), ("TFI", "fi-muni"), ("HYD", "fi-muni"),
+    # TIPS
+    ("TIP", "fi-tips"), ("SCHP", "fi-tips"), ("VTIP", "fi-tips"),
+    ("STIP", "fi-tips"),
+    # Bank loans / CLO
+    ("BKLN", "fi-loans"), ("SRLN", "fi-loans"), ("JAAA", "fi-loans"),
+    ("CLOX", "fi-loans"), ("CLOI", "fi-loans"), ("JBBB", "fi-loans"),
+    ("AAA", "fi-loans"),
+    # Convertibles / preferreds
+    ("CWB", "fi-conv"), ("PFF", "fi-conv"), ("PGX", "fi-conv"),
+    ("PFXF", "fi-conv"),
+    # Aggregate
+    ("AGG", "fi-agg"), ("BND", "fi-agg"), ("SCHZ", "fi-agg"),
+    ("SPAB", "fi-agg"), ("IUSB", "fi-agg"),
+    # International bonds
+    ("BNDX", "fi-intl"), ("IAGG", "fi-intl"), ("EMB", "fi-intl"),
+    ("VWOB", "fi-intl"), ("PCY", "fi-intl"),
+    # private credit ETFs (Harry 2026-10-06 expansion)
+    ("BINC", "privcredit"), ("BBDC", "privcredit"),
     ("VNQ", "realestate"), ("REET", "realestate"),
     ("IAU", "commodity"), ("SLV", "commodity"),
+    ("GLD", "commodity"), ("USO", "commodity"), ("UNG", "commodity"),
     ("IBIT", "crypto"), ("ETHA", "crypto"),
-    # non-iShares crypto ETFs: Yahoo fallback first, then CoinLaw CSV
-    # (weekly reported flows). Grayscale minis trade as BTC/ETH.
+    # non-iShares crypto ETFs: FMP first, then CoinLaw CSV (weekly reported
+    # flows). Grayscale minis trade as BTC/ETH.
     ("FBTC", "crypto"), ("GBTC", "crypto"), ("BITB", "crypto"),
     ("ARKB", "crypto"), ("BTC", "crypto"), ("HODL", "crypto"),
     ("BRRR", "crypto"), ("EZBC", "crypto"), ("BTCO", "crypto"),
@@ -103,23 +145,42 @@ ETF_UNIVERSE: list[tuple[str, str]] = [
     ("ETHE", "crypto"), ("ETH", "crypto"), ("FETH", "crypto"),
     ("ETHW", "crypto"), ("ETHV", "crypto"), ("EZET", "crypto"),
     ("TETH", "crypto"), ("QETH", "crypto"),
-    ("EMXC", "equity"), ("IDEV", "equity"),
-    # non-iShares: Yahoo fallback (State Street / Vanguard / Invesco /
-    # WisdomTree / Janus Henderson / PIMCO)
-    ("SPY", "equity"), ("QQQ", "equity"), ("DIA", "equity"), ("VTI", "equity"),
-    ("VOO", "equity"), ("VEA", "equity"), ("VWO", "equity"),
-    ("BND", "fixedincome"), ("VCIT", "fixedincome"), ("VCSH", "fixedincome"),
-    ("VGSH", "fixedincome"), ("BKLN", "fixedincome"), ("BIL", "fixedincome"),
-    ("USFR", "fixedincome"),
-    ("GLD", "commodity"), ("USO", "commodity"), ("UNG", "commodity"),
-    ("XLE", "equity"), ("XLF", "equity"), ("XLK", "equity"),
+    # Leveraged / inverse (Harry 2026-10-06): specialized ETFs using
+    # derivatives to amplify or reverse daily returns of an index, sector,
+    # or single stock.
+    ("TQQQ", "leveraged"), ("SQQQ", "leveraged"), ("TNA", "leveraged"),
+    ("TZA", "leveraged"), ("SPXL", "leveraged"), ("SPXS", "leveraged"),
+    ("UPRO", "leveraged"), ("SDS", "leveraged"), ("QLD", "leveraged"),
+    ("QID", "leveraged"), ("UVXY", "leveraged"), ("SVXY", "leveraged"),
+    ("TMF", "leveraged"), ("TMV", "leveraged"), ("TBT", "leveraged"),
+    ("SOXL", "leveraged"), ("SOXS", "leveraged"), ("LABU", "leveraged"),
+    ("LABD", "leveraged"), ("NUGT", "leveraged"), ("DUST", "leveraged"),
+    ("JNUG", "leveraged"), ("JDST", "leveraged"), ("FAS", "leveraged"),
+    ("FAZ", "leveraged"), ("EDC", "leveraged"), ("EDZ", "leveraged"),
+    ("YINN", "leveraged"), ("YANG", "leveraged"), ("TECL", "leveraged"),
+    ("TECS", "leveraged"), ("FNGU", "leveraged"), ("FNGD", "leveraged"),
+    ("BULZ", "leveraged"), ("BERZ", "leveraged"), ("TSLL", "leveraged"),
+    ("NVDL", "leveraged"),
+    # AI-themed (Harry 2026-10-06; IRBO verified delisted 2026-10-06)
+    ("BOTZ", "ai"), ("AIQ", "ai"), ("WTAI", "ai"), ("THNQ", "ai"),
+    ("ROBT", "ai"), ("ROBO", "ai"), ("XAIX", "ai"),
 ]
 
 CLASS_LABELS = {
-    "equity": "Equities", "fixedincome": "Fixed Income",
+    "equity": "Equities",
+    "fi-treasury": "FI: Treasury", "fi-ig": "FI: Investment Grade",
+    "fi-hy": "FI: High Yield", "fi-mbs": "FI: MBS", "fi-muni": "FI: Munis",
+    "fi-tips": "FI: TIPS", "fi-loans": "FI: Loans/CLO",
+    "fi-conv": "FI: Conv/Preferred", "fi-agg": "FI: Aggregate",
+    "fi-intl": "FI: International",
     "commodity": "Commodities", "crypto": "Crypto",
     "privcredit": "Private Credit", "realestate": "Real Estate",
+    "leveraged": "Leveraged/Inverse", "ai": "AI",
 }
+
+LEVERAGED_DESC = ("Specialized ETFs that use financial derivatives to amplify "
+                  "or reverse the daily returns of an underlying index, "
+                  "sector, or single stock.")
 
 
 def _f(x) -> float | None:
@@ -137,7 +198,7 @@ def _r(v) -> float | None:
 
 
 def parse_ishares(text: str) -> dict[str, dict]:
-    """Screener JSON -> {ticker: {name, nav, aum, asof}}."""
+    """Screener JSON -> {ticker: {name, nav, aum, expense, divyield, asof}}."""
     data = json.loads(text)
     out: dict[str, dict] = {}
     for rec in data.values():
@@ -154,6 +215,8 @@ def parse_ishares(text: str) -> dict[str, dict]:
         out[str(t).upper()] = {
             "name": rec.get("fundName"), "nav": nav, "aum": aum,
             "shares": aum / nav, "asof": asof,
+            "expense": _r(rec.get("fees")),  # net expense ratio, %
+            "divyield": _r(rec.get("twelveMonTrlYield")),  # TTM dist yield, %
         }
     return out
 
@@ -186,9 +249,9 @@ def parse_coinlaw(text: str) -> dict[str, dict]:
 
 
 def parse_fmp_info(payload) -> dict | None:
-    """FMP /stable/etf/info -> {name, aum, nav, shares}. Response is a
-    list with one dict. Field names per FMP docs: `aum` confirmed;
-    NAV tried as navPrice/nav/netAssetValue (defensive — first live
+    """FMP /stable/etf/info -> {name, aum, nav, shares, expense}. Response is
+    a list with one dict. Field names per FMP docs: `aum` confirmed;
+    NAV tried as navPrice/nav/netAssetValue (defensive -- first live
     production run will confirm which one FMP serves)."""
     row = payload[0] if isinstance(payload, list) and payload else payload
     if not isinstance(row, dict):
@@ -202,6 +265,7 @@ def parse_fmp_info(payload) -> dict | None:
         "name": row.get("name") or row.get("companyName"),
         "aum": aum, "nav": nav,
         "shares": aum / nav if nav else None,
+        "expense": _f(row.get("expenseRatio")),
         "asof": row.get("date") or row.get("updated"),
     }
 
@@ -218,6 +282,45 @@ async def _fmp_quote_price(get_text: GetText, key: str,
         return None
 
 
+YAHOO_DELAY = 0.25  # polite pacing for ~170 keyless chart calls
+
+
+async def _yahoo_price_div(get_text: GetText,
+                           ticker: str) -> tuple[list, float | None]:
+    """Yahoo chart API (keyless): 1Y daily closes + TTM distribution yield.
+
+    Returns (closes [(date, price)], ttm_yield_pct). Yield = sum of cash
+    distributions in the trailing 365d / latest close."""
+    import urllib.parse
+    from datetime import datetime, timezone, timedelta
+    url = ("https://query1.finance.yahoo.com/v8/finance/chart/"
+           + urllib.parse.quote(ticker))
+    raw = await get_text(url, params={"range": "1y", "interval": "1d",
+                                      "events": "div"})
+    result = (json.loads(raw).get("chart", {}).get("result") or [None])[0]
+    if not result:
+        return [], None
+    ts = result.get("timestamp") or []
+    closes_raw = ((result.get("indicators", {}).get("quote") or [{}])[0]
+                  .get("close") or [])
+    closes = [(datetime.fromtimestamp(t, tz=timezone.utc).date(), float(c))
+              for t, c in zip(ts, closes_raw) if c is not None]
+    closes.sort(key=lambda p: p[0])
+    # TTM distributions
+    cutoff = date.today() - timedelta(days=365)
+    ttm = 0.0
+    for k, v in ((result.get("events", {}) or {}).get("dividends", {})
+                 or {}).items():
+        try:
+            d = datetime.fromtimestamp(int(k), tz=timezone.utc).date()
+        except (TypeError, ValueError):
+            continue
+        if d >= cutoff:
+            ttm += _f((v or {}).get("amount")) or 0.0
+    yld = (ttm / closes[-1][1] * 100) if closes and ttm > 0 else None
+    return closes, (round(yld, 2) if yld is not None else None)
+
+
 async def fetch_ishares_etf(store, get_text: GetText) -> str:
     """Pull ETF AUM/NAV/shares. Returns a status string."""
     from collector.store import Store
@@ -229,11 +332,12 @@ async def fetch_ishares_etf(store, get_text: GetText) -> str:
     try:
         by_ticker = parse_ishares(await get_text(ISHARES_URL))
         log.info("ishares_etf: screener returned %d funds", len(by_ticker))
-    except Exception as exc:  # noqa: BLE001 — whole screener failed
+    except Exception as exc:  # noqa: BLE001 -- whole screener failed
         log.warning("ishares_etf: screener failed: %s", exc)
         by_ticker = {}
 
-    missing = [t for t, _ in ETF_UNIVERSE if t not in by_ticker]
+    # (used for logging only; the pending list is built per-ticker below)
+    _missing = [t for t, _ in ETF_UNIVERSE if t not in by_ticker]
 
     # CoinLaw crypto-ETF CSV: fills the non-iShares crypto gap (weekly
     # reported flows) and cross-checks iShares-covered crypto funds.
@@ -300,7 +404,7 @@ async def fetch_ishares_etf(store, get_text: GetText) -> str:
                     params={"symbol": ticker, "apikey": fmp_key}))
                 rec = parse_fmp_info(payload)
                 if rec and rec.get("aum") and not rec.get("nav"):
-                    # etf/info had AUM but no NAV — quote price as proxy
+                    # etf/info had AUM but no NAV -- quote price as proxy
                     await asyncio.sleep(FMP_DELAY)
                     px = await _fmp_quote_price(get_text, fmp_key, ticker)
                     if px:
@@ -328,6 +432,36 @@ async def fetch_ishares_etf(store, get_text: GetText) -> str:
         log.warning("ishares_etf: FMP_API_KEY not set; %d funds pending",
                     len(pending))
 
+    # Price / expense / distribution-yield pass (Harry 2026-10-06: full ETF
+    # data columns). Yahoo chart API is keyless: 1Y closes give immediate
+    # 1M/3M/1Y returns; events=div gives TTM distributions for yield.
+    # Expense: iShares `fees` / FMP `expenseRatio` (stored, rarely changes).
+    # Div yield: iShares `twelveMonTrlYield` preferred, else Yahoo TTM.
+    n_px = 0
+    for ticker, rec in funds.items():
+        if rec.get("expense") is not None:
+            store.upsert_points(f"cycle:etf-{ticker}-expense",
+                                [(today, rec["expense"])])
+        try:
+            closes, y_yield = await _yahoo_price_div(get_text, ticker)
+        except Exception as exc:  # noqa: BLE001
+            log.warning("ishares_etf: yahoo %s failed: %s", ticker, exc)
+            closes, y_yield = [], None
+        if closes:
+            store.upsert_points(f"cycle:etf-{ticker}-price", closes)
+            n_px += 1
+        dy = rec.get("divyield")  # iShares twelveMonTrlYield, %
+        if dy is None:
+            dy = y_yield
+        if dy is not None:
+            store.upsert_points(f"cycle:etf-{ticker}-divyield", [(today, dy)])
+            rec["divyield"] = dy
+        if closes:
+            rec["price"] = closes[-1][1]
+        await asyncio.sleep(YAHOO_DELAY)
+    log.info("ishares_etf: yahoo prices for %d/%d funds",
+             n_px, len(funds))
+
     store.put_doc("etfflows",
                   {"asof": today.isoformat(), "funds": funds,
                    "classes": CLASS_LABELS,
@@ -336,11 +470,14 @@ async def fetch_ishares_etf(store, get_text: GetText) -> str:
                            "non-iShares ETFs; CoinLaw (CC BY 4.0, "
                            "https://coinlaw.io/crypto-etf-holdings-tracker/) "
                            "covers non-iShares crypto ETFs with weekly "
-                           "reported flows. Flows = Δshares × NAV, "
-                           "computed from consecutive snapshots. "
+                           "reported flows. Prices + TTM yields via Yahoo "
+                           "chart API (keyless, 1Y history). Expense: "
+                           "iShares fees / FMP expenseRatio. Flows = "
+                           "Δshares × NAV, computed from consecutive "
+                           "snapshots. Disc/Prem = (price − NAV)/NAV. "
                            "Pending: funds with no free source yet "
                            "(Yahoo v7 quote is entitlement-walled)."},
-                  source="ishares/fmp/coinlaw")
+                  source="ishares/fmp/coinlaw/yahoo")
     return (f"etfflows: {len(funds)}/{len(ETF_UNIVERSE)} funds "
             f"({n_ishares} ishares, {n_fmp} fmp, {n_coinlaw} coinlaw, "
             f"{len(pending)} pending)")

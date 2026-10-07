@@ -19,6 +19,15 @@ hyperscaler watchlist (same names as finra_short.py):
 Snapshot doc "regsho_daily": latest day's aggregates + top-50 tickers by
 short volume.
 
+New detail storage (2026-10-06, "ingest all"):
+  regsho_top table          top-500 tickers by daily short volume per day
+                            (CNMS-consolidated, (d, symbol, market) keyed)
+  regsho_threshold_hist     OTC threshold lists, weekly snapshots back to
+                            2020 (trade_date, symbol keyed)
+Backfill: every trading day from 2020-01-02, resumable via the
+finra_regsho_backfill progress doc (bounded chunk per run, idempotent
+upserts, >=1s CDN gaps).
+
 Dataset 2 — OTC Reg SHO threshold list via FINRA's public Query API
 (keyless; verified 2026-10-04):
   GET  https://api.finra.org/partitions/group/otcMarket/name/vwthresholdList
@@ -26,8 +35,9 @@ Dataset 2 — OTC Reg SHO threshold list via FINRA's public Query API
        {"offset":0,"compareFilters":[{"fieldName":"tradeDate","fieldValue":
        "<YYYY-MM-DD>","compareType":"EQUAL"}],"delimiter":"|","limit":5000,
        "quoteValues":false,"fields":[...]}
-Stored: cycle:regsho-threshold-count (securities on the list per trade date)
-plus snapshot doc "regsho_threshold" holding the list itself.
+Stored: cycle:regsho-threshold-count (securities on the list per trade date;
+weekly back to 2020) plus snapshot doc "regsho_threshold" holding the
+latest list, and per-security history in regsho_threshold_hist.
 
 Threshold failure degrades gracefully (daily volume still lands); a total
 Reg SHO file failure raises so the job surfaces in the health strip.
@@ -66,10 +76,18 @@ TICKERS = ("MSFT", "NVDA", "AAPL", "AMZN", "GOOGL", "META")
 EXPECTED_HEADER = ["Date", "Symbol", "ShortVolume", "ShortExemptVolume",
                    "TotalVolume", "Market"]
 
-# backfill bounds: one year of trading days, bounded request count
-BACKFILL_DAYS = 252
-BACKFILL_ATTEMPTS = 400
-THRESHOLD_BACKFILL = 60
+# backfill bounds: every trading day from 2020-01-02, in bounded chunks
+# per run so one job never blocks the scheduler; progress is resumable via
+# the finra_regsho_backfill doc (idempotent upserts).
+BACKFILL_SINCE = date(2020, 1, 2)
+BACKFILL_CHUNK_DAYS = 120
+BACKFILL_PROGRESS_DOC = "finra_regsho_backfill"
+# top-N tickers per day stored in the dedicated table (bounded cycle-bloat)
+TOP_N = 500
+# threshold history: weekly snapshots back to 2020
+THRESHOLD_SINCE = "2020-01-01"
+THRESHOLD_WEEK_DAYS = 7
+THRESHOLD_MAX_SNAPSHOTS = 400
 
 PARTITIONS_URL = "https://api.finra.org/partitions/group/otcMarket/name/vwthresholdList"
 THRESHOLD_URL = "https://api.finra.org/data/group/otcMarket/name/vwthresholdList"
@@ -156,15 +174,21 @@ async def _fetch_day(get_text: GetText, day: date) -> dict[str, list[dict]] | No
 
 
 def _store_day(store: Store, day: date, per_market: dict[str, list[dict]]) -> dict:
-    """Write aggregate points for one date; return combined ticker rows."""
+    """Write aggregate points for one date; return combined ticker rows.
+
+    All cycle-series writes for the day go through ONE batched upsert
+    (single commit) — 165 separate commits per backfilled day was the
+    bottleneck on slow disks.
+    """
+    batch: list[tuple[str, date, float]] = []
     for _prefix, suffix, _label in MARKETS:
         rows = per_market.get(suffix)
         if rows is None:
             continue
         agg = aggregate(rows)
-        store.upsert_points(f"cycle:regsho-{suffix}-shortvol", [(day, agg["short"])])
-        store.upsert_points(f"cycle:regsho-{suffix}-shortexempt", [(day, agg["exempt"])])
-        store.upsert_points(f"cycle:regsho-{suffix}-shortratio", [(day, agg["ratio"])])
+        batch.append((f"cycle:regsho-{suffix}-shortvol", day, agg["short"]))
+        batch.append((f"cycle:regsho-{suffix}-shortexempt", day, agg["exempt"]))
+        batch.append((f"cycle:regsho-{suffix}-shortratio", day, agg["ratio"]))
     # Combined ticker rows: use the CNMS consolidated file ONLY. CNMS already
     # aggregates every venue; summing CNMS + FNYX + FNSQ would double-count
     # NYSE and TRF volume (audit 2026-10-05). Fall back to summing venues
@@ -181,8 +205,8 @@ def _store_day(store: Store, day: date, per_market: dict[str, list[dict]]) -> di
         c["total"] += r["total"]
     for sym in TICKERS:
         if sym in combined:
-            store.upsert_points(f"cycle:regsho-short-{sym}",
-                                [(day, combined[sym]["short"])])
+            batch.append((f"cycle:regsho-short-{sym}", day,
+                          combined[sym]["short"]))
     # Per-ticker daily history for the day's top-50 shorted names — backs the
     # Top Shorted table's 1D/1W % changes (the snapshot doc alone is one day).
     for sym, v in sorted(combined.items(), key=lambda kv: kv[1]["short"],
@@ -190,12 +214,18 @@ def _store_day(store: Store, day: date, per_market: dict[str, list[dict]]) -> di
         safe = re.sub(r"[^A-Z0-9]", "", sym.upper())
         if not safe:
             continue
-        store.upsert_points(f"cycle:regsho-top-{safe}-shortvol",
-                            [(day, v["short"])])
-        store.upsert_points(f"cycle:regsho-top-{safe}-totalvol",
-                            [(day, v["total"])])
-        store.upsert_points(f"cycle:regsho-top-{safe}-shortexempt",
-                            [(day, v["exempt"])])
+        batch.append((f"cycle:regsho-top-{safe}-shortvol", day, v["short"]))
+        batch.append((f"cycle:regsho-top-{safe}-totalvol", day, v["total"]))
+        batch.append((f"cycle:regsho-top-{safe}-shortexempt", day, v["exempt"]))
+    store.upsert_points_batch(batch)
+    # Top-500 per day into the dedicated table (bounded; no cycle bloat).
+    # Rows are CNMS-consolidated (see above), stored under market="cnms".
+    top_rows = sorted(combined.items(), key=lambda kv: kv[1]["short"],
+                      reverse=True)[:TOP_N]
+    store.upsert_regsho_top([(
+        day.isoformat(), sym, "cnms", v["short"], v["exempt"], v["total"],
+        v["short"] / v["total"] if v["total"] > 0 else 0.0,
+    ) for sym, v in top_rows])
     return combined
 
 
@@ -228,12 +258,28 @@ async def _threshold_count(post_text: PostText, trade_date: str) -> list[dict]:
     return parse_threshold(text)
 
 
+def _weekly_samples(dates: list[str], since: str, max_n: int) -> list[str]:
+    """Newest-first weekly samples (>=7 days apart) from `since`, capped."""
+    out: list[str] = []
+    last: str | None = None
+    for td in sorted(dates, reverse=True):
+        if td < since:
+            break
+        if last is None or (date.fromisoformat(last) - date.fromisoformat(td)).days >= THRESHOLD_WEEK_DAYS:
+            out.append(td)
+            last = td
+        if len(out) >= max_n:
+            break
+    return out
+
+
 async def fetch_finra_regsho(store: Store, get_text: GetText,
                              post_text: PostText,
                              post_json: PostJson | None = None,
                              today: date | None = None) -> str:
-    """Daily: latest Reg SHO short-volume day (+ bounded backfill) and the
-    OTC threshold list. Threshold failures degrade gracefully."""
+    """Daily: latest Reg SHO short-volume day (+ resumable backfill to 2020)
+    and the OTC threshold list (latest + weekly history). Threshold failures
+    degrade gracefully."""
     today = today or date.today()
 
     # 1) latest published short-volume day: probe back up to 10 days
@@ -249,19 +295,32 @@ async def fetch_finra_regsho(store: Store, get_text: GetText,
     day, per_market = latest
     combined = _store_day(store, day, per_market)
 
-    # 2) bounded backfill on an empty-ish store (one year of trading days)
-    if len(store.points("cycle:regsho-cnms-shortvol")) < 30:
-        filled = 0
-        d = day - timedelta(days=1)
-        attempts = 0
-        while filled < BACKFILL_DAYS and attempts < BACKFILL_ATTEMPTS:
-            attempts += 1
+    # 2) backfill to 2020-01-02: resumable, bounded chunk per run.
+    # Progress doc marks the oldest attempted day; upserts make re-runs
+    # idempotent, so an interrupted chunk simply refetches a few days.
+    prog = store.doc(BACKFILL_PROGRESS_DOC)
+    if prog and isinstance(prog.payload, dict) and prog.payload.get("oldest_done"):
+        oldest_done = date.fromisoformat(prog.payload["oldest_done"])
+    else:
+        oldest_done = day  # step 1 just stored the latest day
+    if oldest_done > BACKFILL_SINCE:
+        d = oldest_done - timedelta(days=1)
+        n = 0
+        while d >= BACKFILL_SINCE and n < BACKFILL_CHUNK_DAYS:
             pm = await _fetch_day(get_text, d)
             if pm:
                 _store_day(store, d, pm)
-                filled += 1
+            oldest_done = d  # attempted (stored or not — weekends skip)
+            n += 1
             d -= timedelta(days=1)
-        log.info("finra_regsho backfilled %d days (%d attempts)", filled, attempts)
+            if n % 25 == 0:
+                store.put_doc(BACKFILL_PROGRESS_DOC,
+                              {"oldest_done": oldest_done.isoformat()},
+                              source=SOURCE)
+        store.put_doc(BACKFILL_PROGRESS_DOC,
+                      {"oldest_done": oldest_done.isoformat()}, source=SOURCE)
+        log.info("finra_regsho backfill chunk: %d days, oldest_done=%s",
+                 n, oldest_done)
 
     # 3) latest-day snapshot doc: aggregates + top-50 tickers by short volume
     aggs = {suffix: aggregate(per_market[suffix])
@@ -323,33 +382,44 @@ async def fetch_finra_regsho(store: Store, get_text: GetText,
                     for sym in TICKERS if sym in combined},
     }, source=SOURCE)
 
-    # 4) OTC threshold list — graceful degradation, never blocks the job
+    # 4) OTC threshold list — graceful degradation, never blocks the job.
+    # Latest list always refreshes; weekly snapshots back to 2020 fill the
+    # history table (only dates not already stored are fetched).
     try:
         parts = json.loads(await get_text(PARTITIONS_URL))
-        dates = [p["partitions"][0]
-                 for p in parts.get("availablePartitions", [])][:THRESHOLD_BACKFILL]
-        if not dates:
+        all_dates = sorted(p["partitions"][0]
+                           for p in parts.get("availablePartitions", []))
+        if not all_dates:
             raise ValueError("no threshold partitions")
-        count_pts: list[tuple[date, float]] = []
-        latest_rows: list[dict] = []
-        for i, td in enumerate(dates):
+        newest = all_dates[-1]
+        latest_rows = await _threshold_count(post_text, newest)
+        store.put_doc("regsho_threshold", {
+            "as_of": newest,
+            "count": len(latest_rows),
+            "securities": [{"symbol": r["symbol"], "name": r["name"],
+                            "category": r["category"],
+                            "reg_sho": r["reg_sho"],
+                            "rule4320": r["rule4320"]}
+                           for r in latest_rows],
+        }, source=SOURCE)
+        await asyncio.sleep(API_GAP)
+        count_pts = [(date.fromisoformat(newest), float(len(latest_rows)))]
+        sampled = _weekly_samples(all_dates, THRESHOLD_SINCE,
+                                  THRESHOLD_MAX_SNAPSHOTS)
+        have = {d.isoformat() for d in store.threshold_hist_dates()}
+        todo = [td for td in sampled if td != newest and td not in have]
+        for td in todo:
             rows = await _threshold_count(post_text, td)
+            store.upsert_threshold_hist([(
+                td, r["symbol"], r["name"], r["category"],
+                "Y" if r["reg_sho"] else "N",
+                "Y" if r["rule4320"] else "N",
+            ) for r in rows])
             count_pts.append((date.fromisoformat(td), float(len(rows))))
-            if i == 0:
-                latest_rows = rows
-                store.put_doc("regsho_threshold", {
-                    "as_of": td,
-                    "count": len(rows),
-                    "securities": [{"symbol": r["symbol"], "name": r["name"],
-                                    "category": r["category"],
-                                    "reg_sho": r["reg_sho"],
-                                    "rule4320": r["rule4320"]}
-                                   for r in rows],
-                }, source=SOURCE)
             await asyncio.sleep(API_GAP)
         store.upsert_points("cycle:regsho-threshold-count", count_pts)
-        log.info("finra_regsho threshold: %d securities on %s",
-                 len(latest_rows), dates[0])
+        log.info("finra_regsho threshold: %d securities on %s; %d new "
+                 "weekly snapshots stored", len(latest_rows), newest, len(todo))
     except Exception as exc:  # noqa: BLE001 — degrade, keep the daily data
         log.warning("finra_regsho threshold list skipped: %s", exc)
 

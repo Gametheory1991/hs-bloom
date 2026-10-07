@@ -28,6 +28,7 @@ class FakeStore:
     def __init__(self):
         self.series: dict[str, dict] = {}
         self.docs: dict[str, dict] = {}
+        self.short_interest: dict = {}
 
     def upsert_points(self, key, pts):
         s = self.series.setdefault(key, {})
@@ -43,6 +44,19 @@ class FakeStore:
     def doc(self, key):
         d = self.docs.get(key)
         return None if d is None else type("Doc", (), d)()
+
+    # short-interest full-universe table (in-memory stand-in)
+    def upsert_short_interest(self, rows):
+        for r in rows:
+            self.short_interest[(r[0], r[1])] = r
+
+    def short_interest_settlements(self):
+        counts = {}
+        for (d, _s) in self.short_interest:
+            counts[d] = counts.get(d, 0) + 1
+        from datetime import date as _date
+        return sorted(((_date.fromisoformat(d), n) for d, n in counts.items()),
+                      reverse=True)
 
 
 # ---------- xlsx helper ----------
@@ -264,7 +278,7 @@ def test_finra_short_job_probes_settlements():
     async def fake_text(url, params=None, headers=None):
         if "20260915" not in url:
             raise RuntimeError("404")  # not yet published
-        return text
+        return text * 5  # pad: the job rejects suspiciously small files
 
     store = FakeStore()
     out = asyncio.run(finra_short.fetch_finra_short(

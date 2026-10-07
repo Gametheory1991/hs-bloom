@@ -1,3 +1,83 @@
+## 2026-10-06 — FINRA equity completeness: full short-interest universe + Reg SHO back to 2020 ("ingest all")
+
+**Short interest (`finra_short.py`).** Full per-ticker universe instead of
+aggregate + 6 tickers: every settlement's every row (current/previous
+short, change, change %, ADV, days-to-cover, name, exchange, market class,
+split flag, revision) lands in a dedicated `short_interest` table keyed
+`(settlement_date, symbol)` — ~2.9M rows for 161 settlements
+(2026-10-06: under the 5M full-universe budget, so no top-N truncation).
+Backfill: every settlement from 2020-01-15 to the latest published file,
+idempotent and resumable (progress = stored settlements; weekend 15ths use
+the preceding Friday's file, e.g. `shrt20200814`). Existing
+`cycle:finra-short-total` / `cycle:short:<TICKER>` series and the
+`finra_short` doc are unchanged.
+
+**Reg SHO (`finra_regsho.py`).** Daily short-volume backfill extended from 252 days to 2020-01-02 (all trading days, ~1,700 days × 3 venues,
+resumable via the `finra_regsho_backfill` progress doc, 120-day chunks per
+run, ≥1s CDN gaps). Per-ticker storage expanded from top-50 to top-500 by
+daily short volume in the dedicated `regsho_top` table keyed
+`(d, symbol, market)` (CNMS-consolidated; existing top-50 cycle series
+kept intact for the UI's 1D/1W % changes). Threshold list: weekly
+snapshots back to 2020-01-01 in `regsho_threshold_hist` (trade_date,
+symbol keyed; only missing dates fetched), count series extended to the
+same weekly history, latest-list `regsho_threshold` doc unchanged.
+
+**API.** New endpoints: `GET /api/equity/short-interest` (paginated ticker
+table, search/sort), `/api/equity/short-interest/settlements` (coverage),
+`GET /api/equity/regsho-top` + `/regsho-top/scope`,
+`GET /api/equity/threshold-history` (+ `/dates`). The `shortinterest`
+panel now carries `si_scope` / `regsho_top_scope` / threshold-history
+coverage for honest scope labels.
+
+**UI (EQUITY hub).** Short Interest view: new FULL UNIVERSE table —
+settlement picker, ticker/name search, server-side sort on every column
+(symbol, name, exchange, short, Δ nominal+%, ADV, days-to-cover), paging,
+CSV/XLSX export of the full settlement (~22.6k rows). Short Volume view:
+new TOP-500 SHORTED table (search + paging + export) and a threshold-list snapshot picker with weekly history back to 2020-01-01. Scope lines state
+coverage explicitly ("Full universe — N rows · M settlements
+2026-10-06 → …"). All delta cells nominal+% with heat styling, light
+theme.
+
+**Tests.** New `test_finra_short_full.py` (full-field parse, weekend-15th
+settlements, resumable backfill, idempotency); `test_finra_regsho.py`
+extended (chunked progress doc, top-500 table, weekly sampling,
+threshold-hist table); created the missing `finra_short_sample.csv`
+fixture so the batch-6 short-interest tests pass. No new failures
+(remaining suite failures are pre-existing missing fixtures / the parallel
+ATS workstream's scheduler count assertion).
+
+---
+
+## 2026-10-06 — FINRA ATS Transparency (dark-pool feed)
+
+**Fetcher.** New `collector/src/collector/fetchers/finra_ats.py` + weekly
+`finra_ats` scheduler job (60s stagger after the other FINRA jobs):
+- **Keyless path (LIVE, verified 2026-10-06):** monthly `blocksSummary` —
+  123 partitions, 2016-06-01 .. 2026-08-01, 58 venue MPIDs, per-venue
+  `cycle:ats-m-{mpid}-{shares,trades,sharepct}` + market totals.
+- **Keyed path (built, needs key):** weekly `ATS_W_FIRM` / `ATS_W_SMBL` /
+  `ATS_W_SMBL_FIRM` (+ `HISTORIC` variants) via FINRA OAuth2
+  client-credentials. Without `FINRA_CLIENT_ID`/`FINRA_CLIENT_SECRET` it
+  logs a clear warning and skips cleanly — no crash, keyless data still
+  lands. Free key: gateway.finra.org/app/api-console.
+- Trap fixed during build: the API repeats each venue's monthly totals
+  across 6 `summaryTypeCode` slices — series dedupe to one row per venue
+  (naive sum would 6x-count); per-slice block detail kept in the doc.
+- Secret hygiene: Basic-auth secret transient in the token call only, never
+  logged; bearer token in-memory only (30-min cache cap per FINRA docs).
+
+**UI.** New EQUITY → ATS Transparency sub-tab (`#/equity/ats`): all-ATS
+shares-vs-trades trend chart (1M/3M/1Y/MAX), venue leaderboard (weekly
+shares | trades | share of ATS volume | 1W/1M/1Q/1Y nominal+% deltas with
+heatmap + Bloomberg range sparklines; falls back to 1M/3M/1Y/3Y monthly
+horizons when keyless), security lookup (per-ticker ATS trend + top dark
+pools from the latest keyed week), CSV/XLSX export, honest scope labels
+("weekly, 2–4-week delayed" / "API key required" notice).
+`GET /api/series/ats-*` resolves dynamically (venue/symbol series).
+Detail: `docs/FINRA_ATS_TRANSPARENCY.md`.
+
+---
+
 ## 2026-10-05 — Treasury auctions + econ calendar: real data on the terminal and in the briefing
 
 **Fix (same day): TIPS/FRN auctions get their own buckets.** The Fiscal Data

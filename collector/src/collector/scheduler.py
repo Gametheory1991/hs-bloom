@@ -63,6 +63,7 @@ from collector.fetchers.ticker_stats import fetch_ticker_stats
 from collector.fetchers.finra_ids_star import fetch_finra_ids_star
 from collector.fetchers.nyfed_cmdi import fetch_nyfed_cmdi
 from collector.fetchers.finra_factbook import fetch_finra_factbook, fetch_finra_factbook_annual
+from collector.fetchers.finra_ats import fetch_finra_ats
 from collector.fetchers.ofr_stfm import fetch_ofr_stfm
 from collector.fetchers.frb_ddp import fetch_frb_ddp
 from collector.fetchers.sec_ncen import fetch_sec_ncen
@@ -410,6 +411,13 @@ def register_jobs(
         # dealer concentration, issues outstanding). Yearly refresh.
         "finra_factbook_annual": (cfg.cadences.get("finra_factbook_annual", 365 * 86400), partial(fetch_finra_factbook_annual, store, get_text, get_bytes),
                  start + timedelta(seconds=8550)),
+        # FINRA ATS Transparency — dark-pool volume. Keyless monthly
+        # blocksSummary (2016->) always runs; weekly ATS_W_* detail needs
+        # FINRA_CLIENT_ID/FINRA_CLIENT_SECRET (skips gracefully without).
+        # Weekly cadence (data is weekly, 2-4wk delayed). Starts after the
+        # other FINRA jobs.
+        "finra_ats": (cfg.cadences.get("finra_ats", 604800), partial(fetch_finra_ats, store),
+                 start + timedelta(seconds=8700)),
         # batch 13: OFR Short-Term Funding Monitor (keyless API; SOFR daily,
         # cleared repo daily-prelim, MMF monthly, dealer fails/RP/RRP weekly).
         # Daily job; series stored as-is via upsert.

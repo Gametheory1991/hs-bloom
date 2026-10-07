@@ -3,7 +3,8 @@
 // (rich top-shorted table, margin summary) and POSITIONING → Short Interest.
 // Each sub-tab: nominal+% deltas, Bloomberg sparklines, chart with stat/date
 // selectors, CSV/XLSX export.
-import { getSeries } from "../api.js";
+import { getSeries, getShortInterestTable, getShortInterestSettlements,
+  getRegshoTopTable, getThresholdHistDates, getThresholdHist } from "../api.js";
 import { rangeCells, statsFromValues, RANGE_TH } from "../rangeviz.js";
 import { RANGES, rangeById } from "./trace_grid.js";
 import { matrixToCSV, exportTablesXLSX, todayStamp } from "../export.js";
@@ -228,7 +229,7 @@ async function fillSvMarketDeltas() {
   });
 }
 
-function svRichTopTable(r, ts) {
+function svRichTopTable(r, ts, topScope) {
   const top50 = r.top50 ?? [];
   const tstats = (ts && ts.tickers) || {};
   const statsAsOf = ts && ts.as_of;
@@ -279,13 +280,91 @@ function svRichTopTable(r, ts) {
     `high values mean shorting is concentrated in the name, not spread across the sector. ` +
     `RS 1M = percentile rank of the 21-day return within this table (0-99). ` +
     `Δ52wH = % off the 52-week high. ` +
-    `3Y deltas populate as daily history accumulates (currently ~2Y backfilled).</p>`,
+    (topScope && topScope.days
+      ? `Daily history covers ${topScope.days.toLocaleString("en-US")} trading days ` +
+        `(${esc(topScope.first ?? "")} → ${esc(topScope.last ?? "")}); 3Y deltas ` +
+        `populate for tickers with history that far back.`
+      : `3Y deltas populate as daily history accumulates.`),
     rows: top50.map((t) => {
       const [name, sec] = tickerMeta(t);
       return [t.symbol, name, sec, t.short_volume, t.short_ratio,
         t.short_chg_1d, t.short_chg_1w, t.short_chg_1m, t.short_chg_1q, t.short_chg_1y, t.short_chg_3y,
         t.ratio_chg_1d, t.ratio_chg_1w, t.ratio_chg_1m, t.ratio_chg_1q, t.ratio_chg_1y, t.ratio_chg_3y];
     }) };
+}
+
+// ---- Reg SHO top-500 full table (server-side paged) ----
+const t500State = { day: null, search: "", page: 1, perPage: 50, reqId: 0, _t: null };
+
+async function loadTop500() {
+  const tbody = document.getElementById("sv-top500-tbody");
+  if (!tbody) return;
+  const reqId = ++t500State.reqId;
+  const info = document.getElementById("sv-top500-info");
+  const scopeEl = document.getElementById("sv-top500-scope");
+  tbody.innerHTML = `<tr data-sort-row="off"><td colspan="5" class="muted">Loading…</td></tr>`;
+  try {
+    const q = new URLSearchParams({ search: t500State.search, page: String(t500State.page),
+      per_page: String(t500State.perPage) });
+    if (t500State.day) q.set("day", t500State.day);
+    const r = await getRegshoTopTable(`?${q}`);
+    if (reqId !== t500State.reqId) return;
+    if (r.day) t500State.day = r.day;
+    const rows = r.rows ?? [], total = r.total ?? 0;
+    const pages = Math.max(1, Math.ceil(total / t500State.perPage));
+    tbody.innerHTML = rows.map((x) =>
+      `<tr><td><b>${esc(x.symbol)}</b></td><td class="num">${big(x.short)}</td>` +
+      `<td class="num">${big(x.total)}</td><td class="num">${pct1(x.ratio)}</td>` +
+      `<td class="num">${big(x.exempt)}</td></tr>`).join("") ||
+      `<tr data-sort-row="off"><td colspan="5" class="muted">No rows.</td></tr>`;
+    if (info) info.textContent =
+      `${total.toLocaleString("en-US")} tickers · page ${t500State.page} of ${pages} · ${r.day ?? ""}`;
+    const sc = r.scope ?? {};
+    if (scopeEl) scopeEl.textContent = sc.days
+      ? `Top-500 by daily short volume · ${sc.days.toLocaleString("en-US")} trading days ${sc.first} → ${sc.last} · as of ${r.day ?? "—"}`
+      : "no data yet";
+  } catch (e) {
+    tbody.innerHTML = `<tr data-sort-row="off"><td colspan="5" class="muted">Unavailable — ${esc(e.message)}</td></tr>`;
+  }
+}
+
+// ---- Threshold-list history snapshots ----
+const thrState = { dates: [], reqId: 0 };
+
+async function loadThrHistDates() {
+  const sel = document.getElementById("thr-hist-select");
+  const note = document.getElementById("thr-hist-note");
+  if (!sel) return;
+  try {
+    const r = await getThresholdHistDates();
+    thrState.dates = r.dates ?? [];
+    sel.innerHTML = thrState.dates.map((d, i) =>
+      `<option value="${d}"${i === 0 ? " selected" : ""}>${d}</option>`).join("");
+    if (note && thrState.dates.length)
+      note.textContent = `${thrState.dates.length} weekly snapshots, ` +
+        `${thrState.dates[thrState.dates.length - 1]} → ${thrState.dates[0]}`;
+  } catch { /* keep the latest list */ }
+}
+
+async function loadThrHist() {
+  const sel = document.getElementById("thr-hist-select");
+  const wrap = document.getElementById("thr-hist-wrap");
+  if (!sel || !wrap || !sel.value) return;
+  const reqId = ++thrState.reqId;
+  wrap.innerHTML = `<p class="muted">Loading ${esc(sel.value)}…</p>`;
+  try {
+    const r = await getThresholdHist(`?day=${encodeURIComponent(sel.value)}&per_page=5000`);
+    if (reqId !== thrState.reqId) return;
+    const rows = r.rows ?? [];
+    wrap.innerHTML = `<table data-sortable><tr><th>Symbol</th><th>Name</th><th>Category</th><th>Reg SHO</th><th>Rule 4320</th></tr><tbody>` +
+      rows.map((x) => `<tr><td><b>${esc(x.symbol)}</b></td><td>${esc((x.name ?? "").slice(0, 48))}</td>` +
+        `<td>${esc(x.category ?? "—")}</td><td>${x.reg_sho === "Y" ? "Y" : "—"}</td>` +
+        `<td>${x.rule4320 === "Y" ? "Y" : "—"}</td></tr>`).join("") +
+      `</tbody></table><p class="muted">${rows.length.toLocaleString("en-US")} of ` +
+      `${(r.total ?? rows.length).toLocaleString("en-US")} securities on ${esc(r.day ?? "")}</p>`;
+  } catch (e) {
+    wrap.innerHTML = `<p class="muted">Unavailable — ${esc(e.message)}</p>`;
+  }
 }
 
 export function renderShortVol(si, finraRegsho, tickerStats) {
@@ -304,7 +383,7 @@ export function renderShortVol(si, finraRegsho, tickerStats) {
     `<td>${big(m.total)}</td><td>${pct1(m.ratio)}</td>` +
     `<td class="num" data-d1short>…</td><td class="num" data-d1ratio>…</td></tr>`).join("");
   const mktRows = Object.entries(r.markets ?? {}).map(([k, m]) => [m.label ?? k, m.short, m.total, m.ratio]);
-  const rich = svRichTopTable(r, tickerStats);
+  const rich = svRichTopTable(r, tickerStats, si.regsho_top_scope);
   const t = s.threshold;
   const secs = t?.securities ?? [];
   const thrRows = secs.map((x) => [x.symbol, x.name, x.category, x.reg_sho ? "Y" : "", x.rule4320 ? "Y" : ""]);
@@ -331,10 +410,29 @@ export function renderShortVol(si, finraRegsho, tickerStats) {
     <div id="sv-chart" class="trace-chart"></div>
     <div id="sv-chart-status" class="muted"></div>
     ${rich.html}
+    <h3>TOP-500 SHORTED — FULL TABLE <span class="muted" id="sv-top500-scope">loading…</span></h3>
+    <div class="trace-controls">
+      <label>Search <input type="search" id="sv-top500-search" placeholder="ticker…" aria-label="Search tickers"></label>
+      <span class="seg"><button id="sv-top500-prev">‹ Prev</button><button id="sv-top500-next">Next ›</button></span>
+      <span class="muted" id="sv-top500-info"></span>
+      <button id="sv-top500-dl-csv" class="mini-btn">⤓ CSV (day's top-500)</button>
+      <button id="sv-top500-dl-xlsx" class="mini-btn">⤓ XLSX (day's top-500)</button>
+    </div>
+    <table><tr><th>Ticker</th><th>Short vol (sh)</th><th>Total vol (sh)</th><th>Short ratio</th><th>Exempt vol (sh)</th></tr>
+    <tbody id="sv-top500-tbody"><tr data-sort-row="off"><td colspan="5" class="muted">Loading…</td></tr></tbody></table>
+    <p class="muted">Top-500 tickers by daily short volume, CNMS-consolidated — the full table behind the top-50 above. ` +
+    `Stored per trading day back to 2020-01-02 (see scope line); search filters the day's 500.</p>
     <h3>THRESHOLD LIST — REG SHO <span class="muted">${t ? `${t.count} securities as of ${esc(t.as_of ?? "—")}` : "no data yet"}${thrNote}</span></h3>
-    ${secs.length ? `<table data-sortable><tr><th>Symbol</th><th>Name</th><th>Category</th><th>Reg SHO</th><th>Rule 4320</th></tr>` +
-      secs.map((x) => `<tr><td><b>${esc(x.symbol)}</b></td><td>${esc((x.name ?? "").slice(0, 48))}</td><td>${esc(x.category ?? "—")}</td><td>${x.reg_sho ? "Y" : "—"}</td><td>${x.rule4320 ? "Y" : "—"}</td></tr>`).join("") + `</table>`
-      : `<p class="muted">List is empty.</p>`}`;
+    <div class="trace-controls">
+      <label>Snapshot <select id="thr-hist-select" aria-label="Threshold snapshot date"></select></label>
+      <span class="muted" id="thr-hist-note"></span>
+      <button id="thr-hist-dl-csv" class="mini-btn">⤓ CSV (snapshot)</button>
+    </div>
+    <div id="thr-hist-wrap">
+    ${secs.length ? `<table data-sortable><tr><th>Symbol</th><th>Name</th><th>Category</th><th>Reg SHO</th><th>Rule 4320</th></tr><tbody id="thr-hist-tbody">` +
+      secs.map((x) => `<tr><td><b>${esc(x.symbol)}</b></td><td>${esc((x.name ?? "").slice(0, 48))}</td><td>${esc(x.category ?? "—")}</td><td>${x.reg_sho ? "Y" : "—"}</td><td>${x.rule4320 ? "Y" : "—"}</td></tr>`).join("") + `</tbody></table>`
+      : `<p class="muted">List is empty.</p>`}
+    </div>`;
 
   const topHeaders = ["Symbol", "Name", "Sector", "Short vol (sh)", "Short ratio",
     "Δ vol 1D", "Δ vol 1W", "Δ vol 1M", "Δ vol 1Q", "Δ vol 1Y", "Δ vol 3Y",
@@ -369,6 +467,49 @@ export function renderShortVol(si, finraRegsho, tickerStats) {
   syncSvControls();
   drawSvChart();
   fillSvMarketDeltas();
+
+  // Top-500 full table: search + paging + export.
+  const t500Search = document.getElementById("sv-top500-search");
+  if (t500Search) t500Search.addEventListener("input", (e) => {
+    clearTimeout(t500State._t);
+    t500State._t = setTimeout(() => {
+      t500State.search = e.target.value.trim();
+      t500State.page = 1;
+      loadTop500();
+    }, 300);
+  });
+  document.getElementById("sv-top500-prev").addEventListener("click", () => {
+    if (t500State.page > 1) { t500State.page--; loadTop500(); }
+  });
+  document.getElementById("sv-top500-next").addEventListener("click", () => {
+    t500State.page++; loadTop500();
+  });
+  const t500Export = async (fmt) => {
+    const q = new URLSearchParams({ per_page: "25000", search: t500State.search });
+    if (t500State.day) q.set("day", t500State.day);
+    const r = await getRegshoTopTable(`?${q}`);
+    const headers = ["Symbol", "Short vol (sh)", "Total vol (sh)", "Short ratio", "Exempt vol (sh)"];
+    const rows = (r.rows ?? []).map((x) => [x.symbol, x.short, x.total, x.ratio, x.exempt]);
+    if (fmt === "csv") dlCSV(headers, rows, `regsho-top500-${r.day ?? "latest"}`);
+    else dlXLSX(headers, rows, `regsho-top500-${r.day ?? "latest"}`, `Reg SHO top-500 ${r.day ?? ""}`);
+  };
+  document.getElementById("sv-top500-dl-csv").addEventListener("click", () => t500Export("csv").catch(() => {}));
+  document.getElementById("sv-top500-dl-xlsx").addEventListener("click", () => t500Export("xlsx").catch(() => {}));
+
+  // Threshold history.
+  document.getElementById("thr-hist-select").addEventListener("change", loadThrHist);
+  document.getElementById("thr-hist-dl-csv").addEventListener("click", async () => {
+    const sel = document.getElementById("thr-hist-select");
+    if (!sel || !sel.value) return;
+    try {
+      const r = await getThresholdHist(`?day=${encodeURIComponent(sel.value)}&per_page=5000`);
+      dlCSV(["Symbol", "Name", "Category", "Reg SHO", "Rule 4320"],
+        (r.rows ?? []).map((x) => [x.symbol, x.name, x.category, x.reg_sho, x.rule4320]),
+        `threshold-list-${r.day}`);
+    } catch { /* ignored */ }
+  });
+  loadTop500();
+  loadThrHistDates();
 }
 
 // ============================================================
@@ -589,6 +730,63 @@ function syncSintControls() {
   if (customBox) customBox.style.display = sintState.range === "custom" ? "" : "none";
 }
 
+// ---- Short-interest full universe (server-side paged) ----
+const siuState = { settlement: null, search: "", sort: "short", dir: "desc",
+  page: 1, perPage: 50, reqId: 0, _t: null };
+
+async function loadSiSettlements() {
+  const sel = document.getElementById("siu-settlement");
+  const scopeEl = document.getElementById("siu-scope");
+  if (!sel) return;
+  try {
+    const r = await getShortInterestSettlements();
+    const ss = r.settlements ?? [];
+    sel.innerHTML = ss.map((s, i) =>
+      `<option value="${s.date}"${i === 0 ? " selected" : ""}>${s.date} ` +
+      `(${Number(s.tickers).toLocaleString("en-US")} tickers)</option>`).join("");
+    if (ss.length) siuState.settlement = ss[0].date;
+    if (scopeEl && r.first)
+      scopeEl.textContent =
+        `Full universe — ${Number(r.rows ?? 0).toLocaleString("en-US")} rows · ` +
+        `${ss.length} settlements ${r.first} → ${r.last} · every source cell stored`;
+  } catch { /* the table loader shows the error */ }
+}
+
+async function loadSiUniverse() {
+  const tbody = document.getElementById("siu-tbody");
+  if (!tbody) return;
+  const reqId = ++siuState.reqId;
+  const info = document.getElementById("siu-info");
+  const thead = document.getElementById("siu-thead");
+  tbody.innerHTML = `<tr data-sort-row="off"><td colspan="7" class="muted">Loading…</td></tr>`;
+  try {
+    const q = new URLSearchParams({ search: siuState.search, sort: siuState.sort,
+      direction: siuState.dir, page: String(siuState.page),
+      per_page: String(siuState.perPage) });
+    if (siuState.settlement) q.set("settlement", siuState.settlement);
+    const r = await getShortInterestTable(`?${q}`);
+    if (reqId !== siuState.reqId) return;
+    if (r.settlement) siuState.settlement = r.settlement;
+    const rows = r.rows ?? [], total = r.total ?? 0;
+    const pages = Math.max(1, Math.ceil(total / siuState.perPage));
+    tbody.innerHTML = rows.map((x) => {
+      const d = dCellSh(x.chg_nom, x.chg_pct);
+      return `<tr><td><b>${esc(x.symbol)}</b></td><td>${esc(x.name ?? "—")}</td>` +
+        `<td>${esc(x.exchange ?? "—")}</td><td class="num">${big(x.short)}</td>` +
+        `<td class="num"${heatStyle({ pct: x.chg_pct })}>${d}</td>` +
+        `<td class="num">${big(x.adv)}</td><td class="num">${x.dtc ?? "—"}</td></tr>`;
+    }).join("") || `<tr data-sort-row="off"><td colspan="7" class="muted">No rows.</td></tr>`;
+    if (info) info.textContent =
+      `${total.toLocaleString("en-US")} tickers · page ${siuState.page} of ${pages} · settlement ${r.settlement ?? ""}`;
+    if (thead) thead.querySelectorAll("th[data-siu-sort]").forEach((th) => {
+      const k = th.dataset.siuSort;
+      th.innerHTML = `${th.dataset.label}${k === siuState.sort ? (siuState.dir === "desc" ? " ▼" : " ▲") : ""}`;
+    });
+  } catch (e) {
+    tbody.innerHTML = `<tr data-sort-row="off"><td colspan="7" class="muted">Unavailable — ${esc(e.message)}</td></tr>`;
+  }
+}
+
 export function renderShortInt(si) {
   const body = document.querySelector("#panel-shortint .panel-body");
   if (!body || body.dataset.init) return;
@@ -632,7 +830,24 @@ export function renderShortInt(si) {
     <div id="sint-chart-status" class="muted"></div>
     <h3>WATCHLIST <span class="muted">change vs prior settlement</span></h3>
     <div>${HEAT_LEGEND}</div><table data-sortable><tr><th>Ticker</th><th>Name</th><th>Short (sh)</th><th>Δ vs prior settl.</th><th>Avg daily vol (sh)</th><th>Days to cover</th></tr>` +
-    rows.map((r) => r.html).join("") + `</table>`;
+    rows.map((r) => r.html).join("") + `</table>
+    <h3>FULL UNIVERSE — ALL TICKERS <span class="muted" id="siu-scope">loading…</span></h3>
+    <p class="muted">Every ticker in the FINRA biweekly file — not a watchlist. ` +
+    `Δ vs prior settlement is the source file's own change / change-% columns; click a header to sort.</p>
+    <div class="trace-controls">
+      <label>Settlement <select id="siu-settlement" aria-label="Settlement date"></select></label>
+      <label>Search <input type="search" id="siu-search" placeholder="ticker or name…" aria-label="Search tickers"></label>
+      <span class="seg"><button id="siu-prev">‹ Prev</button><button id="siu-next">Next ›</button></span>
+      <span class="muted" id="siu-info"></span>
+      <button id="siu-dl-csv" class="mini-btn">⤓ CSV (full settlement)</button>
+      <button id="siu-dl-xlsx" class="mini-btn">⤓ XLSX (full settlement)</button>
+    </div>
+    <div class="table-scroll"><table><thead id="siu-thead"><tr>` +
+    [["symbol", "Ticker"], ["name", "Name"], ["exchange", "Exchange"],
+     ["short", "Short (sh)"], ["chg_pct", "Δ vs prior settl."],
+     ["adv", "ADV (sh)"], ["dtc", "Days to cover"]]
+      .map(([k, l]) => `<th data-siu-sort="${k}" data-label="${l}" style="cursor:pointer" title="Sort by ${l}">${l}</th>`).join("") +
+    `</tr></thead><tbody id="siu-tbody"><tr data-sort-row="off"><td colspan="7" class="muted">Loading…</td></tr></tbody></table></div>`;
 
   const wHeaders = ["Ticker", "Name", "Short (sh)", "Δ nominal (sh)", "Δ %", "Avg daily vol (sh)", "Days to cover"];
   const wRows = rows.map((r) => [r.sym, r.name, r.short, r.n, r.p, r.adv, r.dtc]);
@@ -656,4 +871,55 @@ export function renderShortInt(si) {
 
   syncSintControls();
   drawSintChart();
+
+  // Full universe: settlement picker + search + server-side sort + paging + export.
+  const siuSearch = document.getElementById("siu-search");
+  if (siuSearch) siuSearch.addEventListener("input", (e) => {
+    clearTimeout(siuState._t);
+    siuState._t = setTimeout(() => {
+      siuState.search = e.target.value.trim();
+      siuState.page = 1;
+      loadSiUniverse();
+    }, 300);
+  });
+  document.getElementById("siu-settlement").addEventListener("change", (e) => {
+    siuState.settlement = e.target.value;
+    siuState.page = 1;
+    loadSiUniverse();
+  });
+  document.getElementById("siu-prev").addEventListener("click", () => {
+    if (siuState.page > 1) { siuState.page--; loadSiUniverse(); }
+  });
+  document.getElementById("siu-next").addEventListener("click", () => {
+    siuState.page++; loadSiUniverse();
+  });
+  document.querySelectorAll("#siu-thead th[data-siu-sort]").forEach((th) =>
+    th.addEventListener("click", () => {
+      const k = th.dataset.siuSort;
+      if (siuState.sort === k) siuState.dir = siuState.dir === "desc" ? "asc" : "desc";
+      else {
+        siuState.sort = k;
+        siuState.dir = (k === "symbol" || k === "name" || k === "exchange") ? "asc" : "desc";
+      }
+      siuState.page = 1;
+      loadSiUniverse();
+    }));
+  const siuExport = async (fmt) => {
+    const q = new URLSearchParams({ per_page: "25000", search: siuState.search,
+      sort: siuState.sort, direction: siuState.dir });
+    if (siuState.settlement) q.set("settlement", siuState.settlement);
+    const r = await getShortInterestTable(`?${q}`);
+    const headers = ["Ticker", "Name", "Exchange", "Market class", "Short (sh)",
+      "Prev short (sh)", "Δ nominal (sh)", "Δ %", "ADV (sh)", "Days to cover",
+      "Split flag", "Revision"];
+    const rows = (r.rows ?? []).map((x) => [x.symbol, x.name, x.exchange,
+      x.market_class, x.short, x.prev, x.chg_nom, x.chg_pct, x.adv, x.dtc,
+      x.split_flag, x.revision]);
+    if (fmt === "csv") dlCSV(headers, rows, `short-interest-${r.settlement ?? "latest"}`);
+    else dlXLSX(headers, rows, `short-interest-${r.settlement ?? "latest"}`,
+      `FINRA short interest ${r.settlement ?? ""}`);
+  };
+  document.getElementById("siu-dl-csv").addEventListener("click", () => siuExport("csv").catch(() => {}));
+  document.getElementById("siu-dl-xlsx").addEventListener("click", () => siuExport("xlsx").catch(() => {}));
+  loadSiSettlements().then(loadSiUniverse);
 }

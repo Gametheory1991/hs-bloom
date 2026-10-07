@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import re
 from datetime import datetime, timedelta, timezone
 from typing import Literal
 
@@ -115,15 +116,31 @@ def create_app(store: Store, cfg: Config) -> FastAPI:
             name, unit = f"{_om[1]} {_om[2]}".replace("_", " "), _mu
         elif series_id.startswith("etf:"):
             # ETF snapshots: etf:{TICKER}:{metric} — aum ($), nav ($),
-            # shares (sh). Written daily by the ishares_etf job.
+            # shares (sh), price ($), expense (%), divyield (%).
+            # Written daily by the ishares_etf job.
             _em = series_id.split(":", 2)
             key = f"cycle:etf-{_em[1]}-{_em[2]}" if len(_em) == 3 else None
             if not key:
                 raise HTTPException(status_code=404, detail=f"unknown series: {series_id}")
             points = store.points(key)
             _mu = {"aum": "$", "nav": "$", "shares": "sh",
-                   "flow7d": "$"}.get(_em[2], "")
+                   "flow7d": "$", "price": "$", "expense": "%",
+                   "divyield": "%"}.get(_em[2], "")
             name, unit = f"{_em[1]} {_em[2]}", _mu
+        elif series_id.startswith("ats-"):
+            # FINRA ATS Transparency (dynamic venue/symbol series; written by
+            # the finra_ats job). Weekly: ats-total-shares, ats-{mpid}-shares,
+            # ats-sym-{TICKER}-shares; monthly keyless: ats-m-*. Resolved
+            # dynamically like regsho-top — not in cycle_by_id by design.
+            if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9\-]{0,31}", series_id):
+                raise HTTPException(status_code=404,
+                                    detail=f"unknown series: {series_id}")
+            points = store.points(f"cycle:{series_id}")
+            _kind = series_id.rsplit("-", 1)[-1]
+            _mu = {"shares": "sh", "trades": "trades",
+                   "sharepct": "%"}.get(_kind, "")
+            name = series_id[4:].replace("-", " ").upper()
+            unit = _mu
         elif series_id.startswith("regsho-top-") and (
                 series_id.endswith("-shortvol") or series_id.endswith("-totalvol")):
             # Dynamic per-ticker Reg SHO history (backfilled 2Y, 518 days).
@@ -303,6 +320,104 @@ def create_app(store: Store, cfg: Config) -> FastAPI:
             ],
             "updated_at": doc.updated_at,
         }
+
+    @app.get("/api/equity/short-interest/settlements")
+    def si_settlements() -> dict:
+        """FINRA short-interest settlement coverage: every settlement date
+        stored in the full-universe table (2020-01-15 onward)."""
+        scope = store.short_interest_scope()
+        return {
+            "settlements": [{"date": d.isoformat(), "tickers": n}
+                            for d, n in store.short_interest_settlements()],
+            **scope,
+        }
+
+    @app.get("/api/equity/short-interest")
+    def si_table(settlement: str | None = None, search: str = "",
+                 sort: str = "short", direction: str = "desc",
+                 page: int = 1, per_page: int = 50) -> dict:
+        """Paginated full-universe short-interest ticker table for one
+        settlement. per_page caps at 25,000 (explicit full-settlement CSV/XLSX
+        export)."""
+        scope = store.short_interest_scope()
+        if settlement is None:
+            settlements = store.short_interest_settlements()
+            if not settlements:
+                return {"settlement": None, "total": 0, "page": 1,
+                        "per_page": per_page, "rows": [], "scope": scope}
+            settlement = settlements[0][0].isoformat()
+        try:
+            from datetime import date as _d
+            sdate = _d.fromisoformat(settlement)
+        except ValueError:
+            return {"error": "bad settlement date", "settlement": settlement,
+                    "total": 0, "page": 1, "per_page": per_page, "rows": [],
+                    "scope": scope}
+        total, rows = store.short_interest_rows(sdate, search or None, sort,
+                                                direction, page, per_page)
+        return {"settlement": sdate.isoformat(), "total": total,
+                "page": max(1, page), "per_page": min(max(1, per_page), 25000),
+                "rows": rows, "scope": scope}
+
+    @app.get("/api/equity/regsho-top/scope")
+    def regsho_top_scope() -> dict:
+        """Top-500 daily shorted-ticker table coverage (2020-01-02 onward)."""
+        return store.regsho_top_scope()
+
+    @app.get("/api/equity/regsho-top")
+    def regsho_top(day: str | None = None, search: str = "",
+                   page: int = 1, per_page: int = 50) -> dict:
+        """Paginated top-500 tickers by daily short volume for one trading
+        day (CNMS-consolidated). per_page caps at 25,000 for export."""
+        scope = store.regsho_top_scope()
+        if day is None:
+            day = scope.get("last")
+            if not day:
+                return {"day": None, "total": 0, "page": 1,
+                        "per_page": per_page, "rows": [], "scope": scope}
+        try:
+            from datetime import date as _d
+            d = _d.fromisoformat(day)
+        except ValueError:
+            return {"error": "bad day", "day": day, "total": 0, "page": 1,
+                    "per_page": per_page, "rows": [], "scope": scope}
+        total, rows = store.regsho_top_rows(d, search or None, page, per_page)
+        return {"day": d.isoformat(), "total": total, "page": max(1, page),
+                "per_page": min(max(1, per_page), 25000), "rows": rows,
+                "scope": scope}
+
+    @app.get("/api/equity/threshold-history/dates")
+    def threshold_hist_dates() -> dict:
+        """Weekly threshold-list snapshot dates stored (2020-01-01 onward)."""
+        dates = [d.isoformat() for d in store.threshold_hist_dates()]
+        return {"dates": dates, "count": len(dates)}
+
+    @app.get("/api/equity/threshold-history")
+    def threshold_history(day: str | None = None, symbol: str | None = None,
+                          search: str = "", page: int = 1,
+                          per_page: int = 200) -> dict:
+        """Threshold-list securities for one snapshot date, or the full
+        date history for one symbol (symbol lookup)."""
+        if symbol:
+            return {"symbol": symbol.upper(),
+                    "history": store.threshold_hist_symbol(symbol)}
+        dates = store.threshold_hist_dates()
+        if day is None:
+            day = dates[0].isoformat() if dates else None
+            if not day:
+                return {"day": None, "total": 0, "page": 1,
+                        "per_page": per_page, "rows": []}
+        try:
+            from datetime import date as _d
+            d = _d.fromisoformat(day)
+        except ValueError:
+            return {"error": "bad day", "day": day, "total": 0, "page": 1,
+                    "per_page": per_page, "rows": []}
+        total, rows = store.threshold_hist_rows(d, search or None, page,
+                                                per_page)
+        return {"day": d.isoformat(), "total": total, "page": max(1, page),
+                "per_page": min(max(1, per_page), 5000), "rows": rows,
+                "snapshots": len(dates)}
 
     @app.get("/api/figi/lookup")
     def figi_lookup(idtype: str = "TICKER", idvalue: str = "") -> dict:

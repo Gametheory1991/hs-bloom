@@ -122,8 +122,10 @@ def _cboclo_sheet() -> list[list[str]]:
         ["", "AVERAGE PRICE", "98.2", "", "99.9", "100.0"],
         ["", "WEIGHTED AVG. PRICE", "95.9", "", "100.0", "100.0"],
         ["", "VOLUME OF TRADES (000'S)", "2000.0", "", "500.0", "700.0"],
-        ["", "NUMBER OF TRADES", "300", "", "50", "90"],
         ["", "CUSTOMER BUY", "1000.0", "", "250.0", "350.0"],
+        ["", "NUMBER OF TRADES", "300", "", "50", "90"],
+        ["", "DEALER TO DEALER", "17", "", "3", "4"],
+        ["", "<= $1MM", "49", "", "10", "12"],
     ]
 
 
@@ -192,8 +194,83 @@ def test_parse_two_level_headers_cboclo():
     assert clo["aaa-2023-2026-wavgpx"] == pytest.approx(100.0)
     assert clo["cbo-cdo-clo-vol"] == pytest.approx(2000.0 * 1000)
     assert clo["aaa-2023-2026-ntrades"] == pytest.approx(90.0)
-    # breakdown row (CUSTOMER BUY) skipped
-    assert not any("customer" in k for k in clo)
+    # breakdown rows: vol-section (par, $000s x1000) and ntrades-section
+    # (counts) both parsed
+    assert clo["cbo-cdo-clo-vol-custbuy"] == pytest.approx(1000.0 * 1000)
+    assert clo["aaa-2023-2026-vol-custbuy"] == pytest.approx(350.0 * 1000)
+    assert clo["cbo-cdo-clo-ntrades-d2d"] == pytest.approx(17.0)
+    assert clo["aaa-pre2023-ntrades-d2d"] == pytest.approx(3.0)
+    assert clo["cbo-cdo-clo-ntrades-tick-le1mm"] == pytest.approx(49.0)
+    assert clo["aaa-2023-2026-ntrades-tick-le1mm"] == pytest.approx(12.0)
+
+
+def test_parse_breakdown_sections_vol_and_trades():
+    # sheet-4-shaped with full breakdown rows in both the vol section
+    # (par $000s) and the ntrades section (counts)
+    rows = [
+        ["", "PRICING TABLE: NON-AGENCY CMO | ABS"],
+        ["", "Investment Grade / Metric", "NONAGENCY CMO (P&I)", "ABS"],
+        ["", "VOLUME OF TRADES (000'S)", "677.1", "1319.0"],
+        ["", "CUSTOMER BUY", "432.5", "800.0"],
+        ["", "CUSTOMER SELL", "200.7", "400.0"],
+        ["", "DEALER TO DEALER", "43.8", "119.0"],
+        ["", "<= $1MM", "21.5", "100.0"],
+        ["", "<= $10MM", "273.2", "500.0"],
+        ["", "<= $100MM", "382.3", "719.0"],
+        ["", "> $100MM", "0.0", "0.0"],
+        ["", "NUMBER OF TRADES", "160", "200"],
+        ["", "CUSTOMER BUY", "83", "120"],
+        ["", "CUSTOMER SELL", "69", "70"],
+        ["", "DEALER TO DEALER", "8", "10"],
+        ["", "<= $1MM", "79", "90"],
+        ["", "<= $10MM", "61", "80"],
+        ["", "<= $100MM", "20", "30"],
+        ["", "> $100MM", "0", "0"],
+    ]
+    agg = parse_pxtables(_xlsx_multi({4: rows}))
+    nag = agg["nag"]
+    # vol-section: par in $000s stored x1000
+    assert nag["ig-nonagency-cmo-pi-vol-custbuy"] == pytest.approx(432.5 * 1000)
+    assert nag["ig-abs-vol-custsell"] == pytest.approx(400.0 * 1000)
+    assert nag["ig-nonagency-cmo-pi-vol-d2d"] == pytest.approx(43.8 * 1000)
+    assert nag["ig-nonagency-cmo-pi-vol-tick-le1mm"] == pytest.approx(21.5 * 1000)
+    assert nag["ig-nonagency-cmo-pi-vol-tick-le10mm"] == pytest.approx(273.2 * 1000)
+    assert nag["ig-nonagency-cmo-pi-vol-tick-le100mm"] == pytest.approx(382.3 * 1000)
+    # zero ticket-bucket cells skipped
+    assert "ig-nonagency-cmo-pi-vol-tick-gt100mm" not in nag
+    # ntrades-section: counts stored as-is
+    assert nag["ig-nonagency-cmo-pi-ntrades-custbuy"] == pytest.approx(83.0)
+    assert nag["ig-abs-ntrades-custsell"] == pytest.approx(70.0)
+    assert nag["ig-nonagency-cmo-pi-ntrades-d2d"] == pytest.approx(8.0)
+    assert nag["ig-nonagency-cmo-pi-ntrades-tick-le1mm"] == pytest.approx(79.0)
+    assert nag["ig-nonagency-cmo-pi-ntrades-tick-le100mm"] == pytest.approx(20.0)
+
+
+def test_parse_breakdown_stray_rows_ignored():
+    # a breakdown label appearing before any metric row (layout drift)
+    # must not attach to the previous block's metric
+    rows = [
+        ["", "PRICING TABLE: NON-AGENCY CMO | ABS"],
+        ["", "Investment Grade / Metric", "NONAGENCY CMO (P&I)", "ABS"],
+        ["", "CUSTOMER BUY", "432.5", "800.0"],
+        ["", "VOLUME OF TRADES (000'S)", "677.1", "1319.0"],
+        ["", "CUSTOMER BUY", "400.0", "700.0"],
+    ]
+    agg = parse_pxtables(_xlsx_multi({4: rows}))
+    nag = agg["nag"]
+    # stray row (before vol) ignored; the one after vol parsed
+    assert "ig-nonagency-cmo-pi-vol-custbuy" in nag
+    assert nag["ig-nonagency-cmo-pi-vol-custbuy"] == pytest.approx(400.0 * 1000)
+
+
+def test_parse_tba_sheets_have_no_breakdowns():
+    # sheets 1/2 (TBA/specified) carry no breakdown rows — FINRA notes
+    # transaction volume is unavailable there; nothing may be invented
+    agg = parse_pxtables(_xlsx_multi({1: _tba_sheet()}))
+    tba = agg["tba"]
+    assert tba  # the 10 metrics still parse
+    assert not any("-custbuy" in k or "-custsell" in k or "-d2d" in k
+                   or "-tick-" in k for k in tba)
 
 
 def test_parse_grade_blocks_reuse_dims():

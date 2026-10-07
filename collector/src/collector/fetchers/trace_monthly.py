@@ -13,6 +13,14 @@ ABS, ABSX, CMO, MBS, TBA.
 
 Stored as cycle:<id>: par in $M, trades in counts, plus the derived
 customer share of corporate par (dealer-to-customer / total).
+
+Venue splits (2026-10-06): every product row carries ATS / Interdealer /
+Customer splits for both trades and par —
+  cycle:trace-{product}-{par,trades}-{ats,d2d,cust}
+plus the totals cycle:trace-{product}-{par,trades}. Trade counts are
+stored for ALL 10 products (AGCY/ABS/ABSX/CMO/MBS/TBA previously had
+par only). New series are parsed best-effort; the original 15 series
+stay required so a layout drift still fails loudly.
 """
 from __future__ import annotations
 
@@ -35,24 +43,39 @@ SOURCE = "finra-trace-monthly"
 # verified necessary live 2026-10-03. Backfill is ~10 min on first run.
 REQUEST_GAP = 5.0
 
-# store key -> (product label, value column: 4=total trades, 8=total par $M)
-# Covers every product row in the report (incl. the small CONV/CHRC/ELN
-# rows the batch-6 build skipped); trace-corp-cust-share is derived below.
-SERIES = {
-    "trace-corp-par": ("CORP", 8),
-    "trace-corp-trades": ("CORP", 4),
-    "trace-conv-par": ("CONV", 8),
-    "trace-conv-trades": ("CONV", 4),
-    "trace-chrc-par": ("CHRC", 8),
-    "trace-chrc-trades": ("CHRC", 4),
-    "trace-eln-par": ("ELN", 8),
-    "trace-eln-trades": ("ELN", 4),
-    "trace-agcy-par": ("AGCY", 8),
-    "trace-abs-par": ("ABS", 8),
-    "trace-absx-par": ("ABSX", 8),
-    "trace-cmo-par": ("CMO", 8),
-    "trace-mbs-par": ("MBS", 8),
-    "trace-tba-par": ("TBA", 8),
+# store key -> (product label, value column); columns (0-indexed):
+#   1..4 = Trades ATS | Interdealer | Customer | Total
+#   5..8 = Par $M  ATS | Interdealer | Customer | Total
+# Original 15 keys (REQUIRED) keep their exact IDs; the venue-split and
+# newly-added trade-count keys are optional (best-effort parse).
+PRODUCTS = ("CORP", "CONV", "CHRC", "ELN", "AGCY", "ABS", "ABSX", "CMO",
+            "MBS", "TBA")
+
+
+def _build_series() -> dict[str, tuple[str, int]]:
+    out: dict[str, tuple[str, int]] = {}
+    for label in PRODUCTS:
+        slug = label.lower()
+        out[f"trace-{slug}-trades-ats"] = (label, 1)
+        out[f"trace-{slug}-trades-d2d"] = (label, 2)
+        out[f"trace-{slug}-trades-cust"] = (label, 3)
+        out[f"trace-{slug}-trades"] = (label, 4)
+        out[f"trace-{slug}-par-ats"] = (label, 5)
+        out[f"trace-{slug}-par-d2d"] = (label, 6)
+        out[f"trace-{slug}-par-cust"] = (label, 7)
+        out[f"trace-{slug}-par"] = (label, 8)
+    return out
+
+
+SERIES = _build_series()
+# keys that must parse or the whole workbook is rejected (pre-2026-10-06 set)
+REQUIRED_SERIES = {
+    "trace-corp-par", "trace-corp-trades",
+    "trace-conv-par", "trace-conv-trades",
+    "trace-chrc-par", "trace-chrc-trades",
+    "trace-eln-par", "trace-eln-trades",
+    "trace-agcy-par", "trace-abs-par", "trace-absx-par", "trace-cmo-par",
+    "trace-mbs-par", "trace-tba-par",
 }
 DERIVED_SERIES = ("trace-corp-cust-share",)  # customer par / total par (CORP)
 
@@ -66,17 +89,23 @@ def parse_workbook(data: bytes, year: int, month: int) -> dict[str, float]:
     for key, (label, col) in SERIES.items():
         row = find_row(rows, label)
         if row is None or len(row) <= col:
-            raise ValueError(f"product row {label!r} missing")
+            if key in REQUIRED_SERIES:
+                raise ValueError(f"product row {label!r} missing")
+            continue  # new venue/trade keys: best-effort
         val = to_float(row[col])
         if val is None:
-            raise ValueError(f"non-numeric value for {label!r}: {row[col]!r}")
+            if key in REQUIRED_SERIES:
+                raise ValueError(
+                    f"non-numeric value for {label!r}: {row[col]!r}")
+            continue
         out[key] = val
-    # customer share of corporate par: dealer-to-customer vs total (col 7/8)
+    # customer share of corporate par: dealer-to-customer vs total (col 7/8).
+    # Best-effort like the other venue-derived keys: if the customer column
+    # is blank the workbook still parses without it.
     corp = find_row(rows, "CORP")
     cust, total = to_float(corp[7]), to_float(corp[8])
-    if cust is None or not total:
-        raise ValueError("cannot derive trace-corp-cust-share")
-    out["trace-corp-cust-share"] = cust / total
+    if cust is not None and total:
+        out["trace-corp-cust-share"] = cust / total
     # month-end as-of date
     last = calendar.monthrange(year, month)[1]
     out["_asof"] = date(year, month, last)
@@ -156,7 +185,12 @@ async def fetch_trace_monthly(store: Store, get_bytes: GetBytes,
         store.put_doc("trace_monthly", payload, source=SOURCE)
         raise RuntimeError("no TRACE monthly report in last 4 months: "
                            + "; ".join(errors[:2]))
-    if len(store.points("cycle:trace-corp-par")) < 12:
+    # Full history re-parse when thin: (a) never backfilled, or (b) the
+    # 2026-10-06 venue-split / trade-count series are missing. Upserts are
+    # idempotent, so re-parsing every month 2017-01..latest only fills gaps.
+    history_thin = len(store.points("cycle:trace-corp-par")) < 12
+    splits_thin = len(store.points("cycle:trace-corp-par-ats")) < 12
+    if history_thin or splits_thin:
         backfilled = 0
         by, bm = got
         while (by, bm) > (2017, 1):

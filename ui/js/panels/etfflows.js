@@ -1,8 +1,9 @@
-// ETF FLOWS tab: AUM / NAV / shares-outstanding snapshots from the iShares
-// product screener (T+1, keyless) + Yahoo quote fallback for non-iShares
-// funds. Flows are derived: shares = AUM / NAV; net_flow(day) =
-// (shares_t − shares_{t-1}) × nav_t. Data: /api/dashboard "etfflows" panel
-// + /api/series etf:{TICKER}:{aum|nav|shares}.
+// ETF FLOWS tab: AUM / NAV / shares / price / expense / yield from the iShares
+// product screener (T+1, keyless) + FMP fallback (free key) + CoinLaw crypto
+// CSV. Flows are derived: shares = AUM / NAV; net_flow(day) =
+// (shares_t − shares_{t-1}) × nav_t. Prices via Yahoo chart API (keyless, 1Y
+// history → immediate 1M/3M/1Y returns). Disc/Prem = (price − NAV)/NAV.
+// Data: /api/dashboard "etfflows" panel + /api/series etf:{TICKER}:{metric}.
 import { getSeries } from "../api.js";
 import { fmtAge } from "../fmt.js";
 import { heatStyle } from "../heatmap.js";
@@ -39,6 +40,11 @@ function signedMoney(v) {
   return (v >= 0 ? "+" : "−") + money(Math.abs(v)).slice(0);
 }
 
+function pct(v, digits = 1) {
+  if (v == null) return "—";
+  return `${v >= 0 ? "+" : "−"}${Math.abs(v).toFixed(digits)}%`;
+}
+
 /** Net flows from consecutive share snapshots: (shares_t − shares_{t-1}) × nav_t.
  *  Quarterly SEC-XBRL checkpoints (>10d gaps) are skipped — daily flows only. */
 async function fundFlows(t) {
@@ -58,16 +64,37 @@ async function fundFlows(t) {
   return flows;
 }
 
+/** Price return over ~n sessions from the price series. */
+async function priceReturn(t, sessions) {
+  const px = await seriesPts(`etf:${t}:price`);
+  if (px.length < 2) return null;
+  const last = px[px.length - 1][1];
+  const idx = Math.max(0, px.length - 1 - sessions);
+  const base = px[idx][1];
+  if (!base) return null;
+  return (last / base - 1) * 100;
+}
+
 function kpiTile(label, val, sub) {
   return `<div class="kpi"><div class="kpi-label">${label}</div>` +
     `<div class="kpi-value">${val ?? "—"}</div>` +
     `<div class="kpi-sub muted">${sub ?? ""}</div></div>`;
 }
 
+const heatFlow = (v) => v == null || v === 0 ? ""
+  : heatStyle({ z: v > 0 ? 1.5 : -1.5 });
+
 async function leagueRow(t, f) {
-  const aumPts = await seriesPts(`etf:${t}:aum`);
+  const [aumPts, pricePts, navPts] = await Promise.all([
+    seriesPts(`etf:${t}:aum`), seriesPts(`etf:${t}:price`),
+    seriesPts(`etf:${t}:nav`),
+  ]);
   const flows = await fundFlows(t);
   const aum = f.aum;
+  const price = pricePts.length ? pricePts[pricePts.length - 1][1] : null;
+  const nav = navPts.length ? navPts[navPts.length - 1][1]
+    : (f.nav ?? null);
+  const disprem = (price != null && nav) ? (price / nav - 1) * 100 : null;
   const vals = aumPts.map(([, v]) => v);
   const s = vals.length >= 3 ? statsFromValues(vals) : { z: null, pct: null };
   const sumLast = (n) => {
@@ -77,23 +104,32 @@ async function leagueRow(t, f) {
   let f1 = sumLast(1), f5 = sumLast(5), f21 = sumLast(21);
   let wNote = "";
   if (f5 == null && f.source === "coinlaw") {
-    // CoinLaw reports weekly flows directly — no shares derivation needed
     const wpts = await seriesPts(`etf:${t}:flow7d`);
     if (wpts.length) { f5 = wpts[wpts.length - 1][1]; wNote = " (reported wk)"; }
   }
-  const cell = (v, note = "") => v == null ? `<td class="num muted">—</td>`
-    : `<td class="num"${heatStyle({ z: v === 0 ? 0 : (v > 0 ? 1.5 : -1.5) })} title="${esc(note)}"><b>${signedMoney(v)}</b>${note ? `<span class="muted">${esc(note)}</span>` : ""}</td>`;
+  const [r1m, r3m, r1y] = await Promise.all([
+    priceReturn(t, 21), priceReturn(t, 63), priceReturn(t, 252)]);
+  const expense = f.expense;
+  const divy = f.divyield;
+  const flowCell = (v, note = "") => v == null ? `<td class="num muted">—</td>`
+    : `<td class="num"${heatFlow(v)} title="${esc(note)}"><b>${signedMoney(v)}</b>${note ? `<span class="muted">${esc(note)}</span>` : ""}</td>`;
+  const retCell = (v) => v == null ? `<td class="num muted">—</td>`
+    : `<td class="num"${heatStyle({ z: v === 0 ? 0 : (v > 0 ? 1 : -1) })}><b>${pct(v)}</b></td>`;
   return `<tr><td class="sym">${symNameHtml(t)}</td>` +
-    `<td class="muted">${esc(CLASS_LABELS_UI[f.class] ?? f.class ?? "")}</td>` +
+    `<td class="num"><b>${price == null ? "—" : "$" + price.toFixed(2)}</b></td>` +
+    `<td class="num">${nav == null ? "—" : "$" + nav.toFixed(2)}</td>` +
+    (disprem == null ? `<td class="num muted">—</td>`
+      : `<td class="num"${heatStyle({ z: Math.abs(disprem) < 0.05 ? 0 : (disprem > 0 ? 1 : -1) })} title="Premium (+) / discount (−) to NAV"><b>${pct(disprem, 2)}</b></td>`) +
+    `${flowCell(f1)}${flowCell(f5, wNote)}${flowCell(f21)}` +
+    `${retCell(r1m)}${retCell(r3m)}${retCell(r1y)}` +
     `<td class="num"><b>${money(aum)}</b></td>` +
-    `${cell(f1)}${cell(f5, wNote)}${cell(f21)}` +
-    `<td class="num">${f.shares == null ? "—" : (f.shares / 1e6).toFixed(1) + "M"}</td>` +
+    `<td class="num">${expense == null ? "—" : expense.toFixed(2) + "%"}</td>` +
+    `<td class="num">${divy == null ? "—" : divy.toFixed(2) + "%"}</td>` +
     `${rangeCells({ z: s.z, pct: s.pct }, "AUM history")}` +
     `<td class="muted">${esc(f.source ?? "")}</td></tr>`;
 }
 
 function flowsChart(flows, title) {
-  // flows: [[date, $], ...] aggregate daily
   if (!flows || flows.length < 2) return `<div class="muted">Not enough history yet — flows accumulate daily from the first run.</div>`;
   const W = 720, H = 240, padL = 60, padR = 12, padT = 14, padB = 30;
   const mx = Math.max(...flows.map(([, v]) => Math.abs(v)), 1);
@@ -116,10 +152,21 @@ function flowsChart(flows, title) {
 
 let etfClass = "all"; // asset-class filter
 
-const CLASS_ORDER = ["equity", "fixedincome", "privcredit", "commodity", "crypto", "realestate", "other"];
+const CLASS_ORDER = ["equity", "fi-treasury", "fi-ig", "fi-hy", "fi-mbs",
+  "fi-muni", "fi-tips", "fi-loans", "fi-conv", "fi-agg", "fi-intl",
+  "privcredit", "commodity", "crypto", "realestate", "leveraged", "ai", "other"];
 const CLASS_LABELS_UI = {
-  equity: "Equities", fixedincome: "Fixed Income", privcredit: "Private Credit",
-  commodity: "Commodities", crypto: "Crypto", realestate: "Real Estate", other: "Other",
+  equity: "Equities",
+  "fi-treasury": "FI: Treasury", "fi-ig": "FI: IG", "fi-hy": "FI: High Yield",
+  "fi-mbs": "FI: MBS", "fi-muni": "FI: Munis", "fi-tips": "FI: TIPS",
+  "fi-loans": "FI: Loans/CLO", "fi-conv": "FI: Conv/Pfd",
+  "fi-agg": "FI: Aggregate", "fi-intl": "FI: International",
+  privcredit: "Private Credit", commodity: "Commodities", crypto: "Crypto",
+  realestate: "Real Estate", leveraged: "Leveraged/Inverse", ai: "AI",
+  other: "Other",
+};
+const CLASS_DESC = {
+  leveraged: "Specialized ETFs that use financial derivatives to amplify or reverse the daily returns of an underlying index, sector, or single stock.",
 };
 
 export async function renderEtfFlows(doc) {
@@ -140,6 +187,8 @@ export async function renderEtfFlows(doc) {
      ...classes.map((c) =>
        `<button type="button" data-etf-cls="${c}" class="${etfClass === c ? "active" : ""}">${CLASS_LABELS_UI[c] ?? c}</button>`)].join("") +
     `</div>`;
+  const clsDesc = CLASS_DESC[etfClass]
+    ? `<div class="muted" style="margin:4px 0">${esc(CLASS_DESC[etfClass])}</div>` : "";
 
   const pending = d.pending || [];
   const pendingNote = pending.length
@@ -147,15 +196,18 @@ export async function renderEtfFlows(doc) {
     : "";
 
   body.innerHTML =
-    `<div class="panel-subhead"><span>ETF FLOWS — AUM & CREATIONS/REDEMPTIONS <span class="muted">as of ${esc(d.asof ?? "—")} · iShares T+1 · CoinLaw weekly (crypto)</span></span></div>` +
-    filterRow + pendingNote +
+    `<div class="panel-subhead"><span>ETF FLOWS — AUM, PRICE, NAV & CREATIONS/REDEMPTIONS <span class="muted">as of ${esc(d.asof ?? "—")} · iShares T+1 · FMP · CoinLaw weekly (crypto) · Yahoo prices</span></span></div>` +
+    filterRow + clsDesc + pendingNote +
     `<div class="kpirow" id="etf-kpis"><div class="muted">Computing flows…</div></div>` +
     `<div id="etf-chart"><div class="muted">Loading…</div></div>` +
+    `<div class="panel-subhead"><span>CATEGORY SUMMARY <span class="muted">avg expense · avg yield · total AUM · 1W flows</span></span></div>` +
+    `<div style="overflow-x:auto" id="etf-catsummary"></div>` +
     `<div class="panel-subhead"><span>LEAGUE TABLE <span class="muted">${etfClass === "all" ? "all classes" : CLASS_LABELS_UI[etfClass] ?? etfClass} · flows = Δshares × NAV (derived) or reported weekly (CoinLaw) · heat = inflow blue / outflow red</span></span></div>` +
     `<div style="overflow-x:auto"><table class="etftable" data-sortable><thead><tr>` +
-    `<th>ETF</th><th>Class</th><th>AUM</th><th>1D Flow</th><th>1W Flow</th><th>1M Flow</th><th>Shares Out</th>` +
+    `<th>ETF</th><th>Price</th><th>NAV</th><th>Disc/Prem</th><th>1D Flow</th><th>1W Flow</th><th>1M Flow</th>` +
+    `<th>1M Ret</th><th>3M Ret</th><th>1Y Ret</th><th>AUM</th><th>Expense</th><th>Div Yield</th>` +
     `<th data-sort="off">AUM Range<br>${RANGE_LEGEND}</th><th>Src</th></tr></thead>` +
-    `<tbody id="etf-league"><tr><td colspan="9" class="muted">Loading…</td></tr></tbody></table></div>` +
+    `<tbody id="etf-league"><tr><td colspan="15" class="muted">Loading…</td></tr></tbody></table></div>` +
     `<div class="muted">${esc(d.note ?? "")}</div>`;
 
   body.querySelectorAll("[data-etf-cls]").forEach((b) =>
@@ -164,10 +216,8 @@ export async function renderEtfFlows(doc) {
   const shown = etfClass === "all" ? tickers
     : tickers.filter((t) => (funds[t].class || "other") === etfClass);
 
-  // per-fund flows (async, cached series)
   const per = await Promise.all(shown.map(async (t) => ({ t, flows: await fundFlows(t) })));
 
-  // aggregate daily flows
   const byD = {};
   for (const { flows } of per) {
     if (!flows) continue;
@@ -189,10 +239,52 @@ export async function renderEtfFlows(doc) {
   const ch = document.getElementById("etf-chart");
   if (ch) ch.innerHTML = flowsChart(agg, `AGGREGATE DAILY NET FLOWS — ${clsTitle}`);
 
-  // class rollup (always all classes; rows click to filter)
-  const clsAgg = {};
+  // category summary: avg expense, avg div yield, total AUM, 1W flows
   const allPer = etfClass === "all" ? per
     : await Promise.all(tickers.map(async (t) => ({ t, flows: await fundFlows(t) })));
+  const flowsByCls = {};
+  for (const { t, flows } of allPer) {
+    if (!flows) continue;
+    const c = funds[t].class || "other";
+    for (const [dd, v] of flows) {
+      flowsByCls[c] = flowsByCls[c] || {};
+      flowsByCls[c][dd] = (flowsByCls[c][dd] || 0) + v;
+    }
+  }
+  const avg = (xs) => xs.length
+    ? xs.reduce((a, b) => a + b, 0) / xs.length : null;
+  const catRows = classes.map((c) => {
+    const ts = tickers.filter((t) => (funds[t].class || "other") === c);
+    const clsAum = ts.reduce((a, t) => a + (funds[t].aum || 0), 0);
+    const exps = ts.map((t) => funds[t].expense).filter((v) => v != null);
+    const ylds = ts.map((t) => funds[t].divyield).filter((v) => v != null);
+    const dd = flowsByCls[c] || {};
+    const arr = Object.entries(dd).sort(([a], [b]) => (a < b ? -1 : 1));
+    const w = arr.length >= 5 ? arr.slice(-5).reduce((a, [, v]) => a + v, 0) : null;
+    const ae = avg(exps), ay = avg(ylds);
+    const label = CLASS_LABELS_UI[c] ?? c;
+    return `<tr data-cls="${c}" style="cursor:pointer" title="Filter to ${esc(label)}">` +
+      `<td><b>${esc(label)}</b>${etfClass === c ? ' <span class="muted">●</span>' : ""}<br><span class="muted">${ts.length} ETFs</span></td>` +
+      `<td class="num"><b>${money(clsAum)}</b></td>` +
+      `<td class="num"${heatFlow(w)}><b>${w == null ? "—" : signedMoney(w)}</b></td>` +
+      `<td class="num">${ae == null ? "—" : ae.toFixed(2) + "%"}</td>` +
+      `<td class="num">${ay == null ? "—" : ay.toFixed(2) + "%"}</td></tr>`;
+  }).join("");
+  const csEl = document.getElementById("etf-catsummary");
+  if (csEl) {
+    csEl.innerHTML =
+      `<table class="etftable"><thead><tr><th>Category</th><th>AUM</th><th>1W Flow</th><th>Avg Expense</th><th>Avg Div Yield</th></tr></thead>` +
+      `<tbody>${catRows}</tbody></table>` +
+      `<div class="muted">Click a row to filter the league table.</div>`;
+    csEl.querySelectorAll("[data-cls]").forEach((r) =>
+      r.addEventListener("click", () => {
+        etfClass = etfClass === r.dataset.cls ? "all" : r.dataset.cls;
+        renderEtfFlows(doc);
+      }));
+  }
+
+  // class rollup for the chart section (existing behavior)
+  const clsAgg = {};
   for (const { t, flows } of allPer) {
     if (!flows) continue;
     const c = funds[t].class || "other";
@@ -212,7 +304,7 @@ export async function renderEtfFlows(doc) {
       return `<tr data-cls="${c}" style="cursor:pointer" title="Filter to ${esc(label)}">` +
         `<td><b>${esc(label)}</b>${etfClass === c ? ' <span class="muted">●</span>' : ""}</td>` +
         `<td class="num"><b>${money(clsAum)}</b></td>` +
-        `<td class="num"${heatStyle({ z: w == null || w === 0 ? 0 : (w > 0 ? 1.5 : -1.5) })}><b>${w == null ? "—" : signedMoney(w)}</b></td></tr>`;
+        `<td class="num"${heatFlow(w)}><b>${w == null ? "—" : signedMoney(w)}</b></td></tr>`;
     }).join("");
 
   const tb = document.getElementById("etf-league");
@@ -233,5 +325,5 @@ export async function renderEtfFlows(doc) {
   }
 
   const foot = document.querySelector("#panel-etfflows .panel-foot");
-  if (foot) foot.textContent = `DATA: ISHARES T+1 / YAHOO / COINLAW · ${fmtAge(d.updated_at)}`;
+  if (foot) foot.textContent = `DATA: ISHARES T+1 / FMP / COINLAW / YAHOO · ${fmtAge(d.updated_at)}`;
 }

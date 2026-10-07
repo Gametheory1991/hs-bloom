@@ -575,6 +575,93 @@ def _finnhub_panel(store: Store) -> dict:
             "updated_at": doc.updated_at, "source": doc.source}
 
 
+def _ats_panel(store: Store, ats: dict | None, venues: dict,
+               ats_upd, ats_src) -> dict | None:
+    """FINRA ATS Transparency panel payload.
+
+    Venue leaderboard (weekly keyed series when present, keyless monthly
+    blocksSummary otherwise): latest shares/trades, share of ATS volume,
+    and nominal+% deltas across the standard horizons. Trend history for
+    the chart. Degrades to None when the fetcher hasn't run yet.
+    """
+    if ats is None:
+        return None
+    weekly = bool(store.points("cycle:ats-total-shares"))
+    prefix = "" if weekly else "-m"
+    step_days = 7 if weekly else 31  # horizon anchor for monthly fallback
+
+    def _hist(sid: str) -> list:
+        try:
+            pts = store.points(f"cycle:ats{prefix}-{sid}")
+        except Exception:  # noqa: BLE001 — optional section
+            return []
+        return sorted(pts.items())
+
+    def _back(pts: list, days: int):
+        if len(pts) < 2:
+            return None, None
+        cur_d, cur_v = pts[-1]
+        ref = None
+        for d, v in reversed(pts[:-1]):
+            if (cur_d - d).days >= days:
+                ref = (d, v)
+                break
+        if ref is None or not ref[1]:
+            return None, None
+        return cur_v - ref[1], (cur_v - ref[1]) / ref[1]
+
+    total_hist = _hist("total-shares")
+    horizons = (("1w", 7), ("1m", 30), ("1q", 91), ("1y", 365)) if weekly \
+        else (("1m", 31), ("3m", 93), ("1y", 365), ("3y", 1095))
+    leaderboard = []
+    for mpid, meta in venues.items():
+        slug = "".join(c for c in mpid.lower() if c.isalnum())
+        shares = _hist(f"{slug}-shares")
+        trades = _hist(f"{slug}-trades")
+        if not shares:
+            continue
+        cur = shares[-1][1]
+        share_of = (cur / total_hist[-1][1]
+                    if total_hist and total_hist[-1][1] else None)
+        row = {"mpid": mpid, "name": (meta or {}).get("name", mpid),
+               "shares": cur,
+               "trades": trades[-1][1] if trades else None,
+               "share_of_ats": share_of,
+               "spark": [v for _, v in shares[-12:]],
+               "deltas": {}}
+        for tag, days in horizons:
+            nom, pct = _back(shares, days)
+            row["deltas"][tag] = {"nom": nom, "pct": pct}
+        leaderboard.append(row)
+    leaderboard.sort(key=lambda r: r["shares"], reverse=True)
+
+    # Latest weekly snapshot (keyed): top-50 symbols w/ top venues — backs
+    # the security lookup. Keyless-only runs carry latest = None.
+    latest_doc = None
+    latest_week = (ats or {}).get("latest_week")
+    if latest_week:
+        doc = store.doc(f"ats-week-{latest_week}")
+        if doc:
+            latest_doc = doc.payload
+
+    trend = [{"d": d.isoformat(), "v": v} for d, v in total_hist[-260:]]
+    trend_trades = [{"d": d.isoformat(), "v": v}
+                    for d, v in _hist("total-trades")[-260:]]
+    return {
+        "configured": (ats or {}).get("configured", False),
+        "weekly": weekly,
+        "as_of": latest_week or ((ats or {}).get("keyless_range") or [None])[-1],
+        "weeks_stored": (ats or {}).get("weeks_stored", 0),
+        "backfill_pending": (ats or {}).get("backfill_pending", 0),
+        "horizons": [t for t, _ in horizons],
+        "leaderboard": leaderboard,
+        "trend": trend,
+        "trend_trades": trend_trades,
+        "latest_week_detail": latest_doc,
+        "updated_at": ats_upd, "source": ats_src,
+    }
+
+
 def _finra_panel(store: Store) -> dict:
     """Dedicated FINRA tab: every FINRA-sourced dataset in one place.
 
@@ -601,6 +688,8 @@ def _finra_panel(store: Store) -> dict:
     treas, treas_upd, treas_src = _d("trace_treasury")
     monthly, monthly_upd, monthly_src = _d("trace_monthly")
     star, star_upd, star_src = _d("finra_ids_star")
+    ats, ats_upd, ats_src = _d("finra_ats")
+    ats_venues = (_d("ats_venues")[0] or {}).get("mpids", {})
 
     # Margin debit sparkline (last ~2y of monthly points)
     margin_hist = []
@@ -692,6 +781,7 @@ def _finra_panel(store: Store) -> dict:
                   "days": len(store.points("cycle:star-tba-par")),
                   "updated_at": star_upd, "source": star_src}
                  if star else None),
+        "ats": _ats_panel(store, ats, ats_venues, ats_upd, ats_src),
     }
 
 
@@ -720,6 +810,21 @@ def _shortinterest_panel(store: Store) -> dict:
     secs = (thresh.get("securities") or []) if thresh else []
     latest_upd = max([u for u in (regsho_upd, thresh_upd, short_upd) if u],
                      default=None)
+    # Full-universe coverage (2026-10-06 completeness): honest scope labels.
+    # Defensive: some tests use a minimal FakeStore without the new tables.
+    def _scope(fn, default):
+        try:
+            return getattr(store, fn)()
+        except AttributeError:
+            return default
+    si_scope = _scope("short_interest_scope",
+                      {"settlements": 0, "first": None, "last": None, "rows": 0})
+    top_scope = _scope("regsho_top_scope",
+                       {"first": None, "last": None, "days": 0, "rows": 0})
+    try:
+        thr_dates = store.threshold_hist_dates()
+    except AttributeError:
+        thr_dates = []
     return {
         "regsho": ({"as_of": regsho.get("as_of"),
                     "markets": regsho.get("markets", {}),
@@ -727,8 +832,12 @@ def _shortinterest_panel(store: Store) -> dict:
                     "tickers": regsho.get("tickers", {}),
                     "updated_at": regsho_upd, "source": regsho_src}
                    if regsho else None),
+        "regsho_top_scope": top_scope,
         "threshold": ({"as_of": thresh.get("as_of"), "count": thresh.get("count", 0),
                        "securities": secs[:200],
+                       "history_snapshots": len(thr_dates),
+                       "history_first": thr_dates[-1].isoformat() if thr_dates else None,
+                       "history_last": thr_dates[0].isoformat() if thr_dates else None,
                        "updated_at": thresh_upd, "source": thresh_src}
                       if thresh else None),
         "short_interest": ({"as_of": short.get("as_of"),
@@ -736,6 +845,7 @@ def _shortinterest_panel(store: Store) -> dict:
                             "tickers": short.get("tickers", {}),
                             "updated_at": short_upd, "source": short_src}
                            if short else None),
+        "si_scope": si_scope,
         "updated_at": latest_upd,
         "source": "finra",
     }

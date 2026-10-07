@@ -42,9 +42,13 @@ Each block carries the same 10 metric rows (labels in column B):
   AVG. PRICE TOP 5 TRADES -> top5 | STANDARD DEVIATION -> stdev |
   VOLUME OF TRADES (000'S) -> vol ($000s, stored x1000 like STAR) |
   NUMBER OF TRADES -> ntrades
-Breakdown rows interleaved with the metrics (CUSTOMER BUY/SELL,
-DEALER TO DEALER, <= $1MM / $10MM / $100MM ticket buckets and their
-trade-count mirrors) are skipped — only the 10 metrics are stored.
+Breakdown rows (sheets 3-7 only; sheets 1/2 have none per FINRA's note)
+interleaved after each metric row are stored as their own series:
+  CUSTOMER BUY -> custbuy | CUSTOMER SELL -> custsell |
+  DEALER TO DEALER -> d2d | <= $1MM -> tick-le1mm | <= $10MM -> tick-le10mm |
+  <= $100MM -> tick-le100mm | > $10MM -> tick-gt10mm | > $100MM -> tick-gt100mm,
+keyed {suffix}-vol-{bd} (par, $000s, stored x1000) after the vol row and
+{suffix}-ntrades-{bd} (counts) after the ntrades row.
 
 Series naming: cycle:starpx-{sheet}-{sub}-{block}-{dim}-{metric}
 (all lowercase, sanitized; empty parts dropped), e.g.
@@ -55,6 +59,11 @@ Series naming: cycle:starpx-{sheet}-{sub}-{block}-{dim}-{metric}
   cycle:starpx-cmbs-conduit-aaa-lcf-pi-pre2021-avgpx
   cycle:starpx-wcmbs-agcmbs-pi-2021-avgpx
   cycle:starpx-cboclo-aaa-2023-2026-avgpx
+breakdown slices: cycle:starpx-{sheet}-{sub}-{block}-{dim}-{vol|ntrades}-{bd},
+e.g.
+  cycle:starpx-nag-ig-nonagency-cmo-pi-vol-custbuy
+  cycle:starpx-nag-ig-nonagency-cmo-pi-ntrades-tick-le1mm
+  cycle:starpx-cmbs-agcmbs-agency-cmbs-pi-vol-d2d
 
 Zero/empty/suppressed ("*", "-", blank) cells are skipped, never stored:
 a 0.0 price means "no data" in these tables, and TBA/specified volume is
@@ -117,13 +126,27 @@ METRICS = {
     "NUMBER OF TRADES": "ntrades",
 }
 
+# col-B labels that decompose a metric row into counterparty / ticket-size
+# slices. Each becomes its own series keyed
+#   {sub}-{block}-{dim}-{vol|ntrades}-{suffix}
+# (vol-section slices are par in $000s like the vol row — stored x1000;
+# ntrades-section slices are trade counts). Verified live 2026-09-30:
+# sheets 3-7 carry these rows; sheets 1/2 (TBA/specified) have none —
+# FINRA notes transaction volume is unavailable there.
+BREAKDOWN_SUFFIXES = {
+    "CUSTOMER BUY": "custbuy",
+    "CUSTOMER SELL": "custsell",
+    "DEALER TO DEALER": "d2d",
+    "<= $1MM": "tick-le1mm",
+    "<= $10MM": "tick-le10mm",
+    "<= $100MM": "tick-le100mm",
+    "> $10MM": "tick-gt10mm",
+    "> $100MM": "tick-gt100mm",
+}
 # col-B labels that are never blocks or metrics
 _SKIP_PREFIXES = ("PRICING TABLE", "NOTE", "* INDICATES", "AS OF ",
                   "THESE REPORTS", "FOR ADDITIONAL", "FIELD ")
-_BREAKDOWN = {
-    "CUSTOMER BUY", "CUSTOMER SELL", "DEALER TO DEALER",
-    "<= $1MM", "<= $10MM", "<= $100MM", "> $100MM", "> $10MM",
-}
+_BREAKDOWN = set(BREAKDOWN_SUFFIXES)
 _HEADER_LABELS = {
     "ASSET SUB-CLASS / METRIC", "INVESTMENT GRADE / METRIC", "METRIC",
     "DEAL VINTAGE",
@@ -254,6 +277,11 @@ def _parse_sheet(sheet: int, rows: dict[int, list[str]]) -> dict[str, float]:
     sub = ""
     block = ""
     dims: list[tuple[int, str]] = []
+    # most recent metric row ("vol"/"ntrades") — scopes breakdown rows:
+    # CUSTOMER BUY/SELL, DEALER TO DEALER and ticket-size buckets appear
+    # twice per block (once after the vol row in $000s, once after the
+    # ntrades row in counts). Reset whenever the block/dim context changes.
+    last_metric: str | None = None
 
     def col_b(r: list[str]) -> str:
         return r[1].strip() if len(r) > 1 else ""
@@ -268,7 +296,7 @@ def _parse_sheet(sheet: int, rows: dict[int, list[str]]) -> dict[str, float]:
             continue
         if nl.startswith("PRICING TABLE"):
             sub = _sub_key(sheet, b)
-            block, dims = "", []
+            block, dims, last_metric = "", [], None
             continue
         if sheet == 1 and nl.endswith("SETTLEMENT"):
             # TBA sub-tables are per settlement month ("September
@@ -276,28 +304,31 @@ def _parse_sheet(sheet: int, rows: dict[int, list[str]]) -> dict[str, float]:
             abbr = _settlement_abbr(b)
             if abbr:
                 sub = f"{sub}-{abbr}" if sub else abbr
+            last_metric = None
             continue
         if nl.startswith("NON-INVESTMENT GRADE"):
             block = "nonig"
             d = _single_level_dims(row)
             if d:  # grade header may omit dim labels (sheet 4 reuses them)
                 dims = d
+            last_metric = None
             continue
         if nl == "INVESTMENT GRADE / METRIC":
             block = "ig"
             d = _single_level_dims(row)
             if d:
                 dims = d
+            last_metric = None
             continue
         if nl in ("ASSET SUB-CLASS / METRIC",):
-            dims, block = [], ""  # real dims come on the block rows
+            dims, block, last_metric = [], "", None  # real dims come on the block rows
             continue
         if nl == "METRIC":
             # two-level header (sheets 5/6/7): products on this row,
             # vintages on the next
             nxt = rows.get(r + 1, [])
             dims = _two_level_dims(row, nxt)
-            block = ""
+            block, last_metric = "", None
             continue
         metric = METRICS.get(nl)
         if metric is not None and dims:
@@ -312,12 +343,30 @@ def _parse_sheet(sheet: int, rows: dict[int, list[str]]) -> dict[str, float]:
                 suffix = "-".join(p for p in (sub, block, dim_key, metric)
                                   if p)
                 series[suffix] = v
+            last_metric = metric
+            continue
+        bd = BREAKDOWN_SUFFIXES.get(nl)
+        if bd is not None and dims and last_metric in ("vol", "ntrades"):
+            # counterparty / ticket-size slice of the preceding vol or
+            # ntrades row: key {sub}-{block}-{dim}-{vol|ntrades}-{suffix}
+            for i, dim_key in dims:
+                if i >= len(row):
+                    continue
+                v = _num(row[i])
+                if v == 0.0:
+                    continue
+                if last_metric == "vol":
+                    v *= 1000.0  # slices are in $000s like the vol row
+                suffix = "-".join(p for p in (sub, block, dim_key,
+                                              last_metric, bd) if p)
+                series[suffix] = v
             continue
         if _looks_like_block(row, b):
             block = _slug(b)
             dims = _single_level_dims(row)
+            last_metric = None
             continue
-        # breakdown rows, footers, notes: ignored
+        # footers, notes, unknown rows: ignored
     return series
 
 

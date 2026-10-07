@@ -24,7 +24,9 @@ SCREENER = json.dumps({
     "1": {"localExchangeTicker": "TLT", "fundName": "iShares 20+ Year Treasury Bond ETF",
           "navAmount": {"d": "77.08", "r": 77.08},
           "totalNetAssets": {"d": "47,363,247,420", "r": 47363247419.87},
-          "navAmountAsOf": {"d": "Oct 05, 2026", "r": 20261005}},
+          "navAmountAsOf": {"d": "Oct 05, 2026", "r": 20261005},
+          "fees": {"d": "0.15", "r": 0.15},
+          "twelveMonTrlYield": {"d": "5.05", "r": 5.0487}},
     "2": {"localExchangeTicker": "IBIT", "fundName": "iShares Bitcoin Trust ETF",
           "navAmount": {"d": "48.51", "r": 48.509148},
           "totalNetAssets": {"d": "68,987,769,571", "r": 68987769570.79},
@@ -47,7 +49,16 @@ async def fake_get_text(url, **kw):
         return SCREENER
     if "coinlaw.io" in url:
         return COINLAW
+    if "query1.finance.yahoo.com" in url:
+        return YAHOO_CHART
     raise AssertionError(f"unexpected url {url}")
+
+
+YAHOO_CHART = ('{"chart":{"result":[{"meta":{"regularMarketPrice":77.5},'
+               '"timestamp":[1728518400,1728604800],'
+               '"indicators":{"quote":[{"close":[76.9,77.5]}]},'
+               '"events":{"dividends":{"1728518400":{"amount":0.32},'
+               '"1696118400":{"amount":0.30}}}}]}}')
 
 
 COINLAW = ('\ufeffRow ID,Name,Ticker,Issuer,Asset,AUM (USD millions),'
@@ -79,8 +90,11 @@ async def test_fetch_ishares_etf(tmp_path):
     assert doc is not None
     funds = doc.payload["funds"]
     assert funds["TLT"]["source"] == "ishares"
-    assert funds["TLT"]["class"] == "fixedincome"
-    # SPY is non-iShares, non-crypto -> honest pending (Yahoo v7 is walled)
+    assert funds["TLT"]["class"] == "fi-treasury"
+    assert funds["TLT"]["expense"] == 0.15
+    assert funds["TLT"]["divyield"] == 5.0487
+    assert funds["TLT"]["price"] == 77.5  # yahoo latest close
+    # SPY is non-iShares, non-crypto -> honest pending (FMP key unset in test)
     assert "SPY" not in funds
     assert "SPY" in doc.payload["pending"]
     assert "2 ishares" in res and "coinlaw" in res
@@ -88,6 +102,9 @@ async def test_fetch_ishares_etf(tmp_path):
     assert store.points("cycle:etf-TLT-aum")
     assert store.points("cycle:etf-TLT-nav")
     assert store.points("cycle:etf-TLT-shares")
+    assert store.points("cycle:etf-TLT-price")
+    assert store.points("cycle:etf-TLT-expense")
+    assert store.points("cycle:etf-TLT-divyield")
     # CoinLaw fallback: FBTC/BITB are crypto, missing from iShares
     assert funds["FBTC"]["source"] == "coinlaw"
     assert funds["FBTC"]["aum"] == 10810 * 1e6
@@ -97,10 +114,20 @@ async def test_fetch_ishares_etf(tmp_path):
     assert funds["BITB"]["source"] == "coinlaw"
     assert store.points("cycle:etf-BITB-flow7d")  # -51M reported
     assert "coinlaw" in res
-    # new fixed-income / privcredit tickers are in the universe
+    # new fixed-income sub-classes / leveraged / AI tickers are in the universe
     uni = {t for t, _ in ETF_UNIVERSE}
-    for t in ["VCIT", "BKLN", "JAAA", "CLOX", "SGOV", "USFR", "UNG", "EEM"]:
+    for t in ["VCIT", "BKLN", "JAAA", "CLOX", "SGOV", "USFR", "UNG", "EEM",
+              "GOVT", "ANGL", "VMBS", "VTEB", "SCHP", "SRLN", "AAA", "PGX",
+              "SCHZ", "BNDX", "TQQQ", "SQQQ", "TMF", "UVXY", "TSLL",
+              "BOTZ", "AIQ", "WTAI", "THNQ", "ROBT"]:
         assert t in uni
+    clsmap = dict(ETF_UNIVERSE)
+    assert clsmap["TLT"] == "fi-treasury"
+    assert clsmap["LQD"] == "fi-ig"
+    assert clsmap["HYG"] == "fi-hy"
+    assert clsmap["TQQQ"] == "leveraged"
+    assert clsmap["BOTZ"] == "ai"
+    assert "IRBO" not in clsmap  # delisted, verified 2026-10-06
     # unknown tickers absent
     assert "ZZZ" not in funds
 
@@ -172,19 +199,38 @@ async def test_fetch_fmp_no_key(tmp_path):
 
 def test_universe_classes():
     by_t = dict(ETF_UNIVERSE)
-    # Harry's 2026-10-06 expansion: fixed income + private credit
-    for t in ["TLT", "IEF", "SHY", "TIP", "LQD", "HYG", "JNK", "EMB", "MBB",
-              "AGG", "BND", "VCIT", "VCSH", "VGSH", "BKLN", "CWB", "PFF",
-              "MUB", "SHV", "BIL", "SGOV", "USFR"]:
-        assert by_t[t] == "fixedincome", t
-    for t in ["JAAA", "CLOX", "CLOI", "JBBB", "BINC", "BBDC"]:
-        assert by_t[t] == "privcredit", t
+    # Harry's 2026-10-06 expansion: fixed-income sub-classes
+    assert by_t["TLT"] == "fi-treasury"
+    assert by_t["IEF"] == "fi-treasury"
+    assert by_t["SHY"] == "fi-treasury"
+    assert by_t["LQD"] == "fi-ig"
+    assert by_t["VCIT"] == "fi-ig"
+    assert by_t["HYG"] == "fi-hy"
+    assert by_t["JNK"] == "fi-hy"
+    assert by_t["MBB"] == "fi-mbs"
+    assert by_t["MUB"] == "fi-muni"
+    assert by_t["TIP"] == "fi-tips"
+    assert by_t["BKLN"] == "fi-loans"
+    assert by_t["JAAA"] == "fi-loans"
+    assert by_t["CWB"] == "fi-conv"
+    assert by_t["PFF"] == "fi-conv"
+    assert by_t["AGG"] == "fi-agg"
+    assert by_t["BND"] == "fi-agg"
+    assert by_t["EMB"] == "fi-intl"
+    assert by_t["BINC"] == "privcredit"
+    assert by_t["BBDC"] == "privcredit"
     for t in ["GLD", "SLV", "USO", "UNG"]:
         assert by_t[t] == "commodity", t
     for t in ["IBIT", "ETHA", "FBTC", "GBTC"]:
         assert by_t[t] == "crypto", t
-    assert CLASS_LABELS["fixedincome"] == "Fixed Income"
-    assert CLASS_LABELS["privcredit"] == "Private Credit"
+    for t in ["TQQQ", "SQQQ", "TMF", "UVXY", "TSLL"]:
+        assert by_t[t] == "leveraged", t
+    for t in ["BOTZ", "AIQ", "WTAI", "THNQ", "ROBT"]:
+        assert by_t[t] == "ai", t
+    assert "fixedincome" not in CLASS_LABELS  # replaced by sub-classes
+    assert CLASS_LABELS["fi-treasury"] == "FI: Treasury"
+    assert CLASS_LABELS["leveraged"] == "Leveraged/Inverse"
+    assert CLASS_LABELS["ai"] == "AI"
 
 
 @pytest.mark.asyncio

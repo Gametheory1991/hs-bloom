@@ -14,22 +14,43 @@ import { heatStyle, HEAT_LEGEND } from "../heatmap.js";
 
 const PRODUCTS = [
   { id: "total", label: "TOTAL (Treasury + TRACE)", synthetic: true },
-  { id: "ust",  label: "Treasury Total", par: "trace-ust-par",  trades: "trace-ust-trades",  monthly: false },
-  { id: "ust-bills",   label: "Treasury — Bills",      par: "trace-ust-bills-par",   monthly: false },
-  { id: "ust-coupons", label: "Treasury — Nom Coupons", par: "trace-ust-coupons-par", monthly: false },
-  { id: "ust-tips",    label: "Treasury — TIPS",       par: "trace-ust-tips-par",    monthly: false },
-  { id: "ust-frns",    label: "Treasury — FRNs",       par: "trace-ust-frns-par",    monthly: false },
-  { id: "ust-onrun",   label: "Treasury — On-the-run", par: "trace-ust-onrun-par",   monthly: false },
-  { id: "ust-offrun",  label: "Treasury — Off-the-run", par: "trace-ust-offrun-par", monthly: false },
-  { id: "tba",  label: "TBA",            par: "trace-tba-par",  trades: null,                 monthly: true  },
+  { id: "ust",  label: "Treasury Total", par: "trace-ust-par",  trades: "trace-ust-trades",  monthly: false, ust: true },
+  { id: "ust-bills",   label: "Treasury — Bills",      par: "trace-ust-bills-par",   trades: "trace-ust-bills-trades",   monthly: false, ust: true },
+  { id: "ust-coupons", label: "Treasury — Nom Coupons", par: "trace-ust-coupons-par", trades: "trace-ust-coupons-trades", monthly: false, ust: true },
+  { id: "ust-tips",    label: "Treasury — TIPS",       par: "trace-ust-tips-par",    trades: "trace-ust-tips-trades",    monthly: false, ust: true },
+  { id: "ust-frns",    label: "Treasury — FRNs",       par: "trace-ust-frns-par",    trades: "trace-ust-frns-trades",    monthly: false, ust: true },
+  { id: "ust-onrun",   label: "Treasury — On-the-run", par: "trace-ust-onrun-par",   trades: "trace-ust-onrun-trades",   monthly: false },
+  { id: "ust-offrun",  label: "Treasury — Off-the-run", par: "trace-ust-offrun-par", trades: "trace-ust-offrun-trades",  monthly: false },
+  // Treasury coupon maturity buckets (FINRA remaining-years-to-maturity
+  // detail; venue splits via the Treasury venue selector).
+  { id: "ust-c-le2y",   label: "Treasury — Coupons ≤2Y",  par: "trace-ust-coupons-le2y-par",   trades: "trace-ust-coupons-le2y-trades",   monthly: false, ust: true },
+  { id: "ust-c-2y3y",   label: "Treasury — Coupons 2–3Y", par: "trace-ust-coupons-2y3y-par",   trades: "trace-ust-coupons-2y3y-trades",   monthly: false, ust: true },
+  { id: "ust-c-3y5y",   label: "Treasury — Coupons 3–5Y", par: "trace-ust-coupons-3y5y-par",   trades: "trace-ust-coupons-3y5y-trades",   monthly: false, ust: true },
+  { id: "ust-c-5y7y",   label: "Treasury — Coupons 5–7Y", par: "trace-ust-coupons-5y7y-par",   trades: "trace-ust-coupons-5y7y-trades",   monthly: false, ust: true },
+  { id: "ust-c-7y10y",  label: "Treasury — Coupons 7–10Y", par: "trace-ust-coupons-7y10y-par", trades: "trace-ust-coupons-7y10y-trades", monthly: false, ust: true },
+  { id: "ust-c-10y20y", label: "Treasury — Coupons 10–20Y", par: "trace-ust-coupons-10y20y-par", trades: "trace-ust-coupons-10y20y-trades", monthly: false, ust: true },
+  { id: "ust-c-gt20y",  label: "Treasury — Coupons >20Y", par: "trace-ust-coupons-gt20y-par", trades: "trace-ust-coupons-gt20y-trades", monthly: false, ust: true },
+  // TIPS maturity buckets.
+  { id: "ust-t-le5y",   label: "Treasury — TIPS ≤5Y",  par: "trace-ust-tips-le5y-par",   trades: "trace-ust-tips-le5y-trades",   monthly: false, ust: true },
+  { id: "ust-t-5y10y",  label: "Treasury — TIPS 5–10Y", par: "trace-ust-tips-5y10y-par", trades: "trace-ust-tips-5y10y-trades", monthly: false, ust: true },
+  { id: "ust-t-gt10y",  label: "Treasury — TIPS >10Y", par: "trace-ust-tips-gt10y-par",  trades: "trace-ust-tips-gt10y-trades",  monthly: false, ust: true },
+  // On-the-run VWAP by coupon bucket (price per $100 par; daily files only).
+  { id: "ust-v-le2y",   label: "Treasury VWAP — Coupons ≤2Y",   par: "trace-ust-coupons-le2y-vwap",   unit: "px", daily: true, vwap: true },
+  { id: "ust-v-2y3y",   label: "Treasury VWAP — Coupons 2–3Y",  par: "trace-ust-coupons-2y3y-vwap",   unit: "px", daily: true, vwap: true },
+  { id: "ust-v-3y5y",   label: "Treasury VWAP — Coupons 3–5Y",  par: "trace-ust-coupons-3y5y-vwap",   unit: "px", daily: true, vwap: true },
+  { id: "ust-v-5y7y",   label: "Treasury VWAP — Coupons 5–7Y",  par: "trace-ust-coupons-5y7y-vwap",   unit: "px", daily: true, vwap: true },
+  { id: "ust-v-7y10y",  label: "Treasury VWAP — Coupons 7–10Y", par: "trace-ust-coupons-7y10y-vwap",  unit: "px", daily: true, vwap: true },
+  { id: "ust-v-10y20y", label: "Treasury VWAP — Coupons 10–20Y", par: "trace-ust-coupons-10y20y-vwap", unit: "px", daily: true, vwap: true },
+  { id: "ust-v-gt20y",  label: "Treasury VWAP — Coupons >20Y",  par: "trace-ust-coupons-gt20y-vwap",  unit: "px", daily: true, vwap: true },
+  { id: "tba",  label: "TBA",            par: "trace-tba-par",  trades: "trace-tba-trades", monthly: true  },
   { id: "corp", label: "Corporate",      par: "trace-corp-par", trades: "trace-corp-trades", monthly: true  },
   { id: "eln",  label: "ELN",            par: "trace-eln-par",  trades: "trace-eln-trades",   monthly: true  },
   { id: "conv", label: "Convertibles",   par: "trace-conv-par", trades: "trace-conv-trades", monthly: true  },
-  { id: "agcy", label: "Agency",         par: "trace-agcy-par", trades: null,                 monthly: true  },
-  { id: "abs",  label: "ABS",            par: "trace-abs-par",  trades: null,                 monthly: true  },
-  { id: "absx", label: "ABSX",           par: "trace-absx-par", trades: null,                 monthly: true  },
-  { id: "cmo",  label: "CMO",            par: "trace-cmo-par",  trades: null,                 monthly: true  },
-  { id: "mbs",  label: "MBS",            par: "trace-mbs-par",  trades: null,                 monthly: true  },
+  { id: "agcy", label: "Agency",         par: "trace-agcy-par", trades: "trace-agcy-trades", monthly: true  },
+  { id: "abs",  label: "ABS",            par: "trace-abs-par",  trades: "trace-abs-trades",  monthly: true  },
+  { id: "absx", label: "ABSX",           par: "trace-absx-par", trades: "trace-absx-trades", monthly: true  },
+  { id: "cmo",  label: "CMO",            par: "trace-cmo-par",  trades: "trace-cmo-trades",  monthly: true  },
+  { id: "mbs",  label: "MBS",            par: "trace-mbs-par",  trades: "trace-mbs-trades",  monthly: true  },
   { id: "chrc", label: "Church",         par: "trace-chrc-par", trades: "trace-chrc-trades", monthly: true  },
   // STAR: FINRA IDS Structured Trading Activity Reports (daily).
   // Granular breakdown: TBA by issuer, specified pools, agency/non-agency
@@ -291,6 +312,29 @@ export const METRICS = [
 ];
 export const metricById = (id) => METRICS.find((m) => m.id === id) || METRICS[0];
 
+// Venue splits for TRACE monthly rows (ATS / Interdealer / Customer —
+// cycle:trace-{product}-{par,trades}-{ats,d2d,cust}). Applies to the 10
+// monthly TRACE products; the synthetic TOTAL sums the same-venue
+// components. Harry's standing rule requires ATS vs D2C splits.
+export const VENUES = [
+  { id: "total", label: "Total", suffix: "" },
+  { id: "ats", label: "ATS", suffix: "-ats" },
+  { id: "d2d", label: "Interdealer", suffix: "-d2d" },
+  { id: "cust", label: "Customer", suffix: "-cust" },
+];
+export const venueById = (id) => VENUES.find((v) => v.id === id) || VENUES[0];
+
+// Treasury venue splits (ATS&Interdealer vs Dealer-to-Customer —
+// cycle:trace-ust*-{par,trades}-{ats,d2d}). Applies to the 5 UST category
+// rows and the coupon/TIPS maturity-bucket rows; the synthetic TOTAL sums
+// the same-venue Treasury leg. Harry's standing rule requires ATS vs D2C.
+export const UST_VENUES = [
+  { id: "total", label: "Total", suffix: "" },
+  { id: "ats", label: "ATS&ID", suffix: "-ats", title: "ATS & Interdealer" },
+  { id: "d2c", label: "D2C", suffix: "-d2c", title: "Dealer-to-Customer" },
+];
+export const ustVenueById = (id) => UST_VENUES.find((v) => v.id === id) || UST_VENUES[0];
+
 // Range definitions: trailing windows in months, plus custom date range.
 // Stats (percentile/z/avg) are computed over the selected window (min 12
 // points); the window label is shown on the range columns.
@@ -514,7 +558,7 @@ function sparkline(win) {
 }
 
 // ---- grid ----
-const state = { metric: "adv", range: rangeById("3y"), customStart: null, customEnd: null, sortKey: null, sortDir: 1, rows: [], asof: null, reqId: 0 };
+const state = { metric: "adv", venue: "total", ustVenue: "total", range: rangeById("3y"), customStart: null, customEnd: null, sortKey: null, sortDir: 1, rows: [], asof: null, reqId: 0 };
 
 const metricColTitle = () => {
   const m = metricById(state.metric);
@@ -558,12 +602,25 @@ const COLS = [
 ];
 
 async function loadData() {
+  const venue = venueById(state.venue);
+  const uvenue = ustVenueById(state.ustVenue);
   const jobs = PRODUCTS.filter((p) => !p.synthetic).map(async (p) => {
+    // TRACE monthly products honor the venue selector (par/trades series
+    // swap to the -ats/-d2d/-cust splits); UST rows honor the Treasury
+    // venue selector (-ats/-d2c); everything else is venue-less.
+    let parId = p.par, trId = p.trades;
+    if (venue.id !== "total" && p.monthly && !p.capped) {
+      parId = p.par ? p.par + venue.suffix : null;
+      trId = p.trades ? p.trades + venue.suffix : null;
+    } else if (uvenue.id !== "total" && p.ust && !p.vwap) {
+      parId = p.par ? p.par + uvenue.suffix : null;
+      trId = p.trades ? p.trades + uvenue.suffix : null;
+    }
     const [par, tr] = await Promise.all([
-      getSeries(p.par, "max"),
-      p.trades ? getSeries(p.trades, "max").catch(() => null) : Promise.resolve(null),
+      parId ? getSeries(parId, "max") : Promise.resolve(null),
+      trId ? getSeries(trId, "max").catch(() => null) : Promise.resolve(null),
     ]);
-    return { p, par: par.points, tr: tr ? tr.points : null };
+    return { p, par: par ? par.points : [], tr: tr ? tr.points : null };
   });
   const results = await Promise.all(jobs);
   // Most-active CUSIPs: build synthetic products from corp panel bond_hist.
@@ -849,7 +906,7 @@ function renderTable() {
     }));
   wrap.querySelectorAll("table.trace-grid tr[data-pid]").forEach((tr) =>
     tr.addEventListener("click", () => {
-      setTraceChartProduct(tr.dataset.pid);
+      setTraceChartProduct(tr.dataset.pid, state.venue, state.ustVenue);
       document.getElementById("trace-view-chart")?.click();
       document.getElementById("trace-chart-wrap")?.scrollIntoView({ behavior: "smooth", block: "start" });
     }));
@@ -857,8 +914,10 @@ function renderTable() {
   if (asofEl && state.asof) {
     const s0 = state.rows[0]?.stats;
     const winNote = s0 ? (s0.fellBack ? `stats over trailing 3Y (window <12 pts)` : `stats over ${s0.winLabel} window`) : "";
+    const vLbl = venueById(state.venue).label;
+    const uvLbl = ustVenueById(state.ustVenue).title || ustVenueById(state.ustVenue).label;
     asofEl.textContent =
-      `as of ${mlabel(state.asof)} · ${m.label} (${unit}) · ${winNote} (● = now, ◆ = avg/50th pct) · ` +
+      `as of ${mlabel(state.asof)} · ${m.label} (${unit}) · TRACE monthly venue: ${vLbl} · Treasury venue: ${uvLbl} · ${winNote} (● = now, ◆ = avg/50th pct) · ` +
       `Treasury history from Feb 2023 · 1D/1W n/a on monthly rows · ` +
       `On-the-run + Off-the-run = coupons + TIPS only (excl. bills/FRNs) · ` +
       `Capped rows: ADT/TRADES show avg capped trade size ($000s); 144A grades publish total par only · ` +
@@ -875,11 +934,17 @@ export function renderTraceGrid(corpData) {
   const reqId = ++state.reqId;
   const metricBtns = METRICS.map((mt) =>
     `<button data-m="${mt.id}" class="${mt.id === state.metric ? "on" : ""}" title="${mt.title}">${mt.label}</button>`).join("");
+  const venueBtns = VENUES.map((v) =>
+    `<button data-v="${v.id}" class="${v.id === state.venue ? "on" : ""}" title="TRACE monthly venue: ${v.label}">${v.label}</button>`).join("");
+  const ustVenueBtns = UST_VENUES.map((v) =>
+    `<button data-v="${v.id}" class="${v.id === state.ustVenue ? "on" : ""}" title="Treasury venue: ${v.title || v.label}">${v.label}</button>`).join("");
   const rangeBtns = RANGES.map((r) =>
     `<button data-r="${r.id}" class="${r.id === state.range.id ? "on" : ""}">${r.label}</button>`).join("");
   wrap.innerHTML = `
     <div class="trace-controls">
       <span class="seg" id="trace-grid-metric">${metricBtns}</span>
+      <span class="seg" id="trace-grid-venue">${venueBtns}</span>
+      <span class="seg" id="trace-grid-ust-venue">${ustVenueBtns}</span>
       <span class="seg" id="trace-grid-range">${rangeBtns}</span>
       <span id="trace-grid-custom" class="muted" style="display:none">
         <input type="date" id="trace-custom-start" aria-label="Start date"> →
@@ -899,6 +964,20 @@ export function renderTraceGrid(corpData) {
       wrap.querySelectorAll("#trace-grid-metric button").forEach((x) => x.classList.toggle("on", x === b));
       await refresh();
     }));
+  wrap.querySelectorAll("#trace-grid-venue button").forEach((b) =>
+    b.addEventListener("click", async () => {
+      if (state.venue === b.dataset.v) return;
+      state.venue = b.dataset.v;
+      wrap.querySelectorAll("#trace-grid-venue button").forEach((x) => x.classList.toggle("on", x === b));
+      await loadAndRender();
+    }));
+  wrap.querySelectorAll("#trace-grid-ust-venue button").forEach((b) =>
+    b.addEventListener("click", async () => {
+      if (state.ustVenue === b.dataset.v) return;
+      state.ustVenue = b.dataset.v;
+      wrap.querySelectorAll("#trace-grid-ust-venue button").forEach((x) => x.classList.toggle("on", x === b));
+      await loadAndRender();
+    }));
   const customBox = wrap.querySelector("#trace-grid-custom");
   wrap.querySelectorAll("#trace-grid-range button").forEach((b) =>
     b.addEventListener("click", async () => {
@@ -915,19 +994,27 @@ export function renderTraceGrid(corpData) {
     state.range = { id: "custom", label: "Custom", months: null, start: s, end: e };
     await refresh();
   });
-  loadData().then((data) => {
-    if (reqId !== state.reqId) return;
-    wrap.dataset.raw = "1";
-    wrap._rawData = data;
-    const advRows = buildRows(data, "adv", state.range);
-    const mo = advRows.map((r) => r.stats?.asof).filter(Boolean).sort().pop();
-    state.asof = mo || null;
-    refresh();
-  }).catch((err) => {
-    if (reqId !== state.reqId) return;
-    wrap.querySelector("tbody").innerHTML =
-      `<tr><td colspan="20" class="muted">Failed to load grid — ${err.message}</td></tr>`;
-  });
+  // (Re)load series for the current venue/metric and rebuild the grid.
+  // Venue changes need fresh series (different IDs), metric/range changes
+  // only reshape the cached points.
+  async function loadAndRender() {
+    const myId = ++state.reqId;
+    try {
+      const data = await loadData();
+      if (myId !== state.reqId) return;
+      wrap.dataset.raw = "1";
+      wrap._rawData = data;
+      const advRows = buildRows(data, "adv", state.range);
+      const mo = advRows.map((r) => r.stats?.asof).filter(Boolean).sort().pop();
+      state.asof = mo || null;
+      refresh();
+    } catch (err) {
+      if (myId !== state.reqId) return;
+      wrap.querySelector("tbody").innerHTML =
+        `<tr><td colspan="20" class="muted">Failed to load grid — ${err.message}</td></tr>`;
+    }
+  }
+  loadAndRender();
 
   async function refresh() {
     const data = wrap._rawData;

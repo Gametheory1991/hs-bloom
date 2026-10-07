@@ -13,6 +13,11 @@ export const getSeries = (id, range = "10y") => getJson(`/api/series/${encodeURI
 export const getRecessions = () => getJson("/api/recessions");
 export const getHealth = () => getJson("/healthz");
 export const getThirteenF = () => getJson("/api/thirteenf");
+export const getShortInterestTable = (q = "") => getJson(`/api/equity/short-interest${q}`);
+export const getShortInterestSettlements = () => getJson("/api/equity/short-interest/settlements");
+export const getRegshoTopTable = (q = "") => getJson(`/api/equity/regsho-top${q}`);
+export const getThresholdHistDates = () => getJson("/api/equity/threshold-history/dates");
+export const getThresholdHist = (q = "") => getJson(`/api/equity/threshold-history${q}`);
 export const getScorecard = () => getJson("/api/scorecard");
 export const getAuctions = () => getJson("/api/auctions");
 export const getEconCalendar = () => getJson("/api/econ-calendar");

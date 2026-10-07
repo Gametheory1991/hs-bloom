@@ -160,11 +160,24 @@ const PX_METRICS = [
   ["bot5", "Bottom-5 avg"], ["top5", "Top-5 avg"],
   ["q2", "2nd quartile"], ["q3", "3rd quartile"], ["q4", "4th quartile"],
   ["stdev", "Std dev"],
+  ["vol", "Volume ($)"], ["ntrades", "Trade count"],
 ];
-const pxState = { base: "tba|30y-dec-umbs-5", metric: "avgpx", range: "1y", customStart: null, customEnd: null, reqId: 0, plot: null };
+// Counterparty / ticket-size breakdowns (PXTABLES breakdown rows; only
+// published for the volume and trade-count rows, sheets 3-7 — TBA and
+// specified pass-thrus carry no breakdowns per FINRA's note).
+const PX_BREAKDOWNS = [
+  ["all", "All-in (total)"],
+  ["custbuy", "Customer buy"], ["custsell", "Customer sell"], ["d2d", "Dealer-to-dealer"],
+  ["tick-le1mm", "≤ $1MM ticket"], ["tick-le10mm", "≤ $10MM ticket"],
+  ["tick-le100mm", "≤ $100MM ticket"], ["tick-gt10mm", "> $10MM ticket"],
+  ["tick-gt100mm", "> $100MM ticket"],
+];
+const pxState = { base: "tba|30y-dec-umbs-5", metric: "avgpx", breakdown: "all", range: "1y", customStart: null, customEnd: null, reqId: 0, plot: null };
 const pxSeriesId = () => {
   const [sheet, base] = pxState.base.split("|");
-  return `starpx-${sheet}-${base}-${pxState.metric}`;
+  const volish = pxState.metric === "vol" || pxState.metric === "ntrades";
+  const bd = volish && pxState.breakdown !== "all" ? `-${pxState.breakdown}` : "";
+  return `starpx-${sheet}-${base}-${pxState.metric}${bd}`;
 };
 
 function pxFilterRange(points) {
@@ -191,20 +204,34 @@ async function drawPxChart() {
     el.innerHTML = "";
     const mlabel = (PX_METRICS.find((m) => m[0] === pxState.metric) || [])[1] || pxState.metric;
     const blabel = (PX_BASES.find((b) => `${b[0]}|${b[1]}` === pxState.base) || [])[2] || sid;
+    const bdlbl = pxState.metric === "vol" || pxState.metric === "ntrades"
+      ? (PX_BREAKDOWNS.find((b) => b[0] === pxState.breakdown) || [])[1] || ""
+      : "";
+    const fullLabel = `${blabel} — ${mlabel}${bdlbl && pxState.breakdown !== "all" ? ` (${bdlbl})` : ""}`;
     if (typeof uPlot !== "undefined" && pts.length > 1) {
       const axisStyle = { stroke: "#6b7280", grid: { stroke: "#e5e7eb" } };
+      const isVol = pxState.metric === "vol";
+      const isTrades = pxState.metric === "ntrades";
+      const yVals = (u, vs) => vs.map((v) => {
+        if (v == null) return "—";
+        if (isVol) return v >= 1e9 ? `$${(v / 1e9).toFixed(1)}B` : `$${(v / 1e6).toFixed(0)}M`;
+        if (isTrades) return v >= 1e3 ? `${(v / 1e3).toFixed(1)}k` : `${Math.round(v)}`;
+        return v.toFixed(1);
+      });
       pxState.plot = new uPlot({
         width: Math.max(300, el.clientWidth || 900),
         height: 340,
-        series: [{}, { label: `${blabel} — ${mlabel}`, stroke: "#7c3aed", width: 1.5, spanGaps: true }],
-        axes: [axisStyle, { ...axisStyle,
-          values: (u, vs) => vs.map((v) => v == null ? "—" : v.toFixed(1)) }],
+        series: [{}, { label: fullLabel, stroke: "#7c3aed", width: 1.5, spanGaps: true }],
+        axes: [axisStyle, { ...axisStyle, values: yVals }],
       }, [pts.map(([d]) => Date.parse(d) / 1000), pts.map(([, v]) => v)], el);
     }
     const rLbl = pxState.range === "custom" ? `${pxState.customStart}→${pxState.customEnd}` : (rangeById(pxState.range)?.label || pxState.range);
+    const bdNote = (pxState.metric === "vol" || pxState.metric === "ntrades")
+      ? (pxState.breakdown === "all" ? " · breakdowns: buy/sell/d2d/ticket" : "")
+      : "";
     if (statusEl) statusEl.textContent = pts.length
-      ? `${blabel} — ${mlabel}: ${pts.length} daily points (${rLbl}) · FINRA-IDS PXTABLES`
-      : `No data for ${sid} yet — PXTABLES backfill in progress.`;
+      ? `${fullLabel}: ${pts.length} daily points (${rLbl}) · FINRA-IDS PXTABLES${bdNote}`
+      : `No data for ${sid} yet — PXTABLES backfill in progress${(pxState.metric === "vol" || pxState.metric === "ntrades") ? "; TBA/specified carry no breakdown rows (FINRA note)" : ""}.`;
   } catch (e) {
     if (statusEl) statusEl.textContent = `No price data yet — first PXTABLES pull pending (tonight's scheduled run).`;
   }
@@ -215,6 +242,15 @@ function syncPxControls() {
   if (sel) sel.value = pxState.base;
   const msel = document.getElementById("star-px-metric");
   if (msel) msel.value = pxState.metric;
+  const bsel = document.getElementById("star-px-breakdown");
+  const volish = pxState.metric === "vol" || pxState.metric === "ntrades";
+  if (bsel) {
+    bsel.value = pxState.breakdown;
+    bsel.disabled = !volish;
+    bsel.title = volish
+      ? "Counterparty / ticket-size breakdown of volume & trade counts"
+      : "Breakdowns only published for Volume / Trade count rows";
+  }
   document.querySelectorAll("#star-px-range button").forEach((b) =>
     b.classList.toggle("on", b.dataset.range === pxState.range));
   const customBox = document.getElementById("star-px-range-custom");
@@ -531,6 +567,7 @@ export function renderStar(p) {
       <div class="trace-controls">
         <label>Product <select id="star-px-base"></select></label>
         <label>Metric <select id="star-px-metric"></select></label>
+        <label>Counterparty/ticket <select id="star-px-breakdown"></select></label>
         <span class="seg" id="star-px-range"></span>
         <span id="star-px-range-custom" class="muted" style="display:none">
           <input type="date" id="star-px-start" aria-label="Start date"> →
@@ -589,10 +626,21 @@ export function renderStar(p) {
   pxMetric.innerHTML = PX_METRICS.map(([id, label]) =>
     `<option value="${id}">${esc(label)}</option>`).join("");
   pxMetric.value = pxState.metric;
+  const pxBreakdown = document.getElementById("star-px-breakdown");
+  pxBreakdown.innerHTML = PX_BREAKDOWNS.map(([id, label]) =>
+    `<option value="${id}">${esc(label)}</option>`).join("");
+  pxBreakdown.value = pxState.breakdown;
   document.getElementById("star-px-range").innerHTML = RANGES.map((r) =>
     `<button data-range="${r.id}" class="${r.id === pxState.range ? "on" : ""}">${r.label}</button>`).join("");
   pxBase.addEventListener("change", (e) => { pxState.base = e.target.value; drawPxChart(); });
-  pxMetric.addEventListener("change", (e) => { pxState.metric = e.target.value; drawPxChart(); });
+  pxMetric.addEventListener("change", (e) => {
+    pxState.metric = e.target.value;
+    // breakdowns only exist for volume/trade-count rows
+    if (pxState.metric !== "vol" && pxState.metric !== "ntrades") pxState.breakdown = "all";
+    syncPxControls();
+    drawPxChart();
+  });
+  pxBreakdown.addEventListener("change", (e) => { pxState.breakdown = e.target.value; drawPxChart(); });
   body.querySelectorAll("#star-px-range button").forEach((b) =>
     b.addEventListener("click", () => {
       pxState.range = b.dataset.range;

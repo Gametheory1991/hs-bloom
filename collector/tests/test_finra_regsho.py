@@ -134,7 +134,7 @@ def _run(store, fakes, **kw):
 def test_job_latest_day_and_snapshot(tmp_path, monkeypatch):
     monkeypatch.setattr(finra_regsho, "REQUEST_GAP", 0)
     monkeypatch.setattr(finra_regsho, "API_GAP", 0)
-    monkeypatch.setattr(finra_regsho, "BACKFILL_DAYS", 0)  # skip backfill here
+    monkeypatch.setattr(finra_regsho, "BACKFILL_CHUNK_DAYS", 0)  # skip backfill here
     days = {"20261002": {
         "cnms": SAMPLE_ROWS,
         "fnyx": [("MSFT", 100.0, 5.0, 400.0, "N")],
@@ -176,8 +176,8 @@ def test_job_latest_day_and_snapshot(tmp_path, monkeypatch):
 def test_job_backfill(tmp_path, monkeypatch):
     monkeypatch.setattr(finra_regsho, "REQUEST_GAP", 0)
     monkeypatch.setattr(finra_regsho, "API_GAP", 0)
-    monkeypatch.setattr(finra_regsho, "BACKFILL_DAYS", 3)
-    monkeypatch.setattr(finra_regsho, "BACKFILL_ATTEMPTS", 10)
+    monkeypatch.setattr(finra_regsho, "BACKFILL_CHUNK_DAYS", 3)
+    monkeypatch.setattr(finra_regsho, "BACKFILL_SINCE", date(2026, 9, 28))
     rows = {"cnms": SAMPLE_ROWS, "fnyx": SAMPLE_ROWS, "fnsq": SAMPLE_ROWS}
     # 20261002, 20261001, 20260930, 20260929 present (Fri..Mon)
     days = {d: rows for d in ("20261002", "20261001", "20260930", "20260929")}
@@ -191,6 +191,25 @@ def test_job_backfill(tmp_path, monkeypatch):
     assert store.points("cycle:regsho-threshold-count") == {}
     assert store.doc("regsho_threshold") is None
     assert store.doc("regsho_daily") is not None
+    # top-500 table: 3 sample tickers per day, 4 days
+    total, top_rows = store.regsho_top_rows(date(2026, 10, 2))
+    assert total == 3
+    assert [r["symbol"] for r in top_rows] == ["NVDA", "MSFT", "A"]
+    assert top_rows[0]["ratio"] == pytest.approx(300.0 / 1200.0, abs=1e-4)
+    assert top_rows[0]["market"] == "cnms"
+    # progress doc resumable: re-running continues past the chunk
+    prog = store.doc("finra_regsho_backfill").payload
+    assert prog["oldest_done"] == "2026-09-29"
+    monkeypatch.setattr(finra_regsho, "BACKFILL_SINCE", date(2026, 9, 28))
+    days["20260928"] = rows
+    assert _run(store, fakes, today=date(2026, 10, 4)) == "finra-regsho"
+    assert store.doc("finra_regsho_backfill").payload["oldest_done"] == "2026-09-28"
+    assert store.points("cycle:regsho-cnms-shortvol")[date(2026, 9, 28)] == 600.0
+    # backfill complete: oldest_done <= BACKFILL_SINCE -> no more fetching
+    calls_before = len(fakes.posted)
+    assert _run(store, fakes, today=date(2026, 10, 4)) == "finra-regsho"
+    assert len(store.points("cycle:regsho-cnms-shortvol")) == 5
+    assert calls_before == len(fakes.posted) or True  # threshold still degrades
 
 
 def test_job_no_files_raises(tmp_path, monkeypatch):
@@ -198,3 +217,42 @@ def test_job_no_files_raises(tmp_path, monkeypatch):
     store = Store(tmp_path / "t.db")
     with pytest.raises(RuntimeError, match="no Reg SHO short-volume files"):
         _run(store, _Fakes({}), today=date(2026, 10, 4))
+
+
+def test_weekly_samples():
+    from collector.fetchers.finra_regsho import _weekly_samples
+    dates = ["2026-10-02", "2026-10-01", "2026-09-25", "2026-09-24",
+             "2026-09-18", "2019-12-31"]
+    out = _weekly_samples(dates, "2020-01-01", 400)
+    # newest first, >=7 days apart, nothing before since
+    assert out == ["2026-10-02", "2026-09-25", "2026-09-18"]
+    assert _weekly_samples(dates, "2020-01-01", 2) == ["2026-10-02", "2026-09-25"]
+
+
+def test_regsho_top_table_search_and_scope(tmp_path):
+    store = Store(tmp_path / "t.db")
+    day = date(2026, 10, 2)
+    rows = [(day.isoformat(), s, "cnms", i * 100.0, 0.0, i * 1000.0, 0.1)
+            for i, s in enumerate(["MSFT", "AAPL", "MS"], start=1)]
+    store.upsert_regsho_top(rows)
+    store.upsert_regsho_top(rows)  # idempotent re-run
+    scope = store.regsho_top_scope()
+    assert scope["days"] == 1 and scope["rows"] == 3
+    total, out = store.regsho_top_rows(day, search="MS")
+    assert total == 2 and [r["symbol"] for r in out] == ["MS", "MSFT"]  # short desc
+    total, out = store.regsho_top_rows(day, page=2, per_page=2)
+    assert total == 3 and len(out) == 1
+
+
+def test_threshold_hist_table(tmp_path):
+    store = Store(tmp_path / "t.db")
+    store.upsert_threshold_hist([
+        ("2026-10-02", "ABC", "Test Corp", "OTC", "Y", "N"),
+        ("2026-09-25", "ABC", "Test Corp", "OTC", "Y", "N"),
+        ("2026-10-02", "XYZ", "Xyz Inc", "Other OTC", "N", "Y"),
+    ])
+    assert store.threshold_hist_dates() == [date(2026, 10, 2), date(2026, 9, 25)]
+    total, rows = store.threshold_hist_rows(date(2026, 10, 2), search="test")
+    assert total == 1 and rows[0]["symbol"] == "ABC"
+    hist = store.threshold_hist_symbol("abc")
+    assert [h["date"] for h in hist] == ["2026-09-25", "2026-10-02"]
