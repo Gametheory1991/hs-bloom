@@ -1,15 +1,17 @@
 """ETF AUM / NAV / shares-outstanding — iShares product screener primary,
-Yahoo Finance quote API fallback, CoinLaw crypto-ETF CSV fallback.
+FMP (Financial Modeling Prep) fallback, CoinLaw crypto-ETF CSV fallback.
 
 Primary (keyless, daily T+1):
   https://www.ishares.com/us/product-screener/product-screener-v3.1.jsn?...
 526 funds keyed by portfolioId; ticker in `localExchangeTicker`;
 NAV in `navAmount.r`, total net assets in `totalNetAssets.r`.
 
-Fallback chain: iShares screener -> Yahoo Finance (v7 quote) ->
-CoinLaw crypto-ETF tracker CSV (crypto only). etf.com was evaluated
-2026-10-06 and is bot-walled (HTTP 403 via Cloudflare even with full
-browser headers) — not used, do not try to circumvent.
+Fallback chain: iShares screener -> FMP /stable/etf/info (needs the free
+FMP_API_KEY env var; 250 calls/day, ~28/day used) -> CoinLaw crypto-ETF
+tracker CSV (crypto only). etf.com was evaluated 2026-10-06 and is
+bot-walled (HTTP 403 via Cloudflare even with full browser headers) —
+not used, do not try to circumvent. Yahoo v7 quote died 2026-10-06
+(HTTP 401 entitlement wall) and was removed.
 
 CoinLaw (keyless, weekly cadence, CC BY 4.0 — attribution in doc note):
   https://coinlaw.io/crypto-etf-holdings-tracker/?desk_export=csv
@@ -36,15 +38,23 @@ marketCap / sharesOutstanding. Flagged source=yahoo.
 """
 from __future__ import annotations
 
+import asyncio
 import csv
 import io
 import json
 import logging
+import os
 from datetime import date
 
 from collector.http import GetText
 
 log = logging.getLogger(__name__)
+
+# FMP (Financial Modeling Prep) fallback — free key in FMP_API_KEY env var,
+# 250 calls/day. Covers the non-iShares, non-crypto gap (State Street /
+# Vanguard / Invesco / Janus Henderson / PIMCO / WisdomTree / USCF funds).
+FMP_BASE = "https://financialmodelingprep.com/stable"
+FMP_DELAY = 1.1  # polite pacing between FMP calls
 
 ISHARES_URL = ("https://www.ishares.com/us/product-screener/"
                "product-screener-v3.1.jsn"
@@ -175,6 +185,39 @@ def parse_coinlaw(text: str) -> dict[str, dict]:
     return out
 
 
+def parse_fmp_info(payload) -> dict | None:
+    """FMP /stable/etf/info -> {name, aum, nav, shares}. Response is a
+    list with one dict. Field names per FMP docs: `aum` confirmed;
+    NAV tried as navPrice/nav/netAssetValue (defensive — first live
+    production run will confirm which one FMP serves)."""
+    row = payload[0] if isinstance(payload, list) and payload else payload
+    if not isinstance(row, dict):
+        return None
+    aum = _f(row.get("aum"))
+    if not aum:
+        return None
+    nav = (_f(row.get("navPrice")) or _f(row.get("nav"))
+           or _f(row.get("netAssetValue")))
+    return {
+        "name": row.get("name") or row.get("companyName"),
+        "aum": aum, "nav": nav,
+        "shares": aum / nav if nav else None,
+        "asof": row.get("date") or row.get("updated"),
+    }
+
+
+async def _fmp_quote_price(get_text: GetText, key: str,
+                           ticker: str) -> float | None:
+    """Last-resort NAV proxy: FMP /stable/quote price (ETFs trade ~NAV)."""
+    try:
+        q = json.loads(await get_text(
+            f"{FMP_BASE}/quote", params={"symbol": ticker, "apikey": key}))
+        row = q[0] if isinstance(q, list) and q else q
+        return _f((row or {}).get("price")) if isinstance(row, dict) else None
+    except Exception:  # noqa: BLE001
+        return None
+
+
 async def fetch_ishares_etf(store, get_text: GetText) -> str:
     """Pull ETF AUM/NAV/shares. Returns a status string."""
     from collector.store import Store
@@ -202,6 +245,7 @@ async def fetch_ishares_etf(store, get_text: GetText) -> str:
         log.warning("ishares_etf: coinlaw failed: %s", exc)
 
     pending: list[str] = []
+    cls_by_ticker = dict(ETF_UNIVERSE)
     for ticker, cls in ETF_UNIVERSE:
         rec = by_ticker.get(ticker)
         source = "ishares"
@@ -214,8 +258,8 @@ async def fetch_ishares_etf(store, get_text: GetText) -> str:
                        "asset": cl["asset"]}
                 source = "coinlaw"
         if rec is None:
-            # no free source yet (Yahoo v7 quote is entitlement-walled;
-            # issuer-direct APIs pending) — honest pending state
+            # FMP fallback runs after this loop; anything still uncovered
+            # stays honestly pending
             pending.append(ticker)
             continue
         funds[ticker] = {**rec, "ticker": ticker, "class": cls,
@@ -242,18 +286,61 @@ async def fetch_ishares_etf(store, get_text: GetText) -> str:
                             "coinlaw $%.1fB", ticker, rec["aum"] / 1e9,
                             cl_aum / 1e9)
 
+    # FMP fallback (Harry 2026-10-06): free FMP_API_KEY, 250 calls/day.
+    # Covers whatever iShares + CoinLaw missed (non-iShares equity/bond/
+    # commodity ETFs). Skipped entirely when the key is unset.
+    n_fmp = 0
+    fmp_key = os.environ.get("FMP_API_KEY")
+    if fmp_key and pending:
+        for ticker in list(pending):
+            rec = None
+            try:
+                payload = json.loads(await get_text(
+                    f"{FMP_BASE}/etf/info",
+                    params={"symbol": ticker, "apikey": fmp_key}))
+                rec = parse_fmp_info(payload)
+                if rec and rec.get("aum") and not rec.get("nav"):
+                    # etf/info had AUM but no NAV — quote price as proxy
+                    await asyncio.sleep(FMP_DELAY)
+                    px = await _fmp_quote_price(get_text, fmp_key, ticker)
+                    if px:
+                        rec["nav"] = px
+                        rec["shares"] = rec["aum"] / px
+            except Exception as exc:  # noqa: BLE001
+                # error message has the query (key) stripped by http.get_text
+                log.warning("ishares_etf: fmp %s failed: %s", ticker, exc)
+            if rec and rec.get("aum"):
+                pending.remove(ticker)
+                funds[ticker] = {**rec, "ticker": ticker,
+                                 "class": cls_by_ticker.get(ticker, "equity"),
+                                 "source": "fmp"}
+                store.upsert_points(f"cycle:etf-{ticker}-aum",
+                                    [(today, rec["aum"])])
+                if rec.get("nav") is not None:
+                    store.upsert_points(f"cycle:etf-{ticker}-nav",
+                                        [(today, rec["nav"])])
+                if rec.get("shares") is not None:
+                    store.upsert_points(f"cycle:etf-{ticker}-shares",
+                                        [(today, rec["shares"])])
+                n_fmp += 1
+            await asyncio.sleep(FMP_DELAY)
+    elif pending:
+        log.warning("ishares_etf: FMP_API_KEY not set; %d funds pending",
+                    len(pending))
+
     store.put_doc("etfflows",
                   {"asof": today.isoformat(), "funds": funds,
                    "classes": CLASS_LABELS,
                    "pending": pending,
-                   "note": "iShares screener is T+1; CoinLaw (CC BY 4.0, "
+                   "note": "iShares screener is T+1; FMP (free tier) covers "
+                           "non-iShares ETFs; CoinLaw (CC BY 4.0, "
                            "https://coinlaw.io/crypto-etf-holdings-tracker/) "
                            "covers non-iShares crypto ETFs with weekly "
                            "reported flows. Flows = Δshares × NAV, "
                            "computed from consecutive snapshots. "
-                           "Pending: non-iShares funds awaiting issuer-direct "
-                           "APIs (Yahoo v7 quote is entitlement-walled)."},
-                  source="ishares/coinlaw")
+                           "Pending: funds with no free source yet "
+                           "(Yahoo v7 quote is entitlement-walled)."},
+                  source="ishares/fmp/coinlaw")
     return (f"etfflows: {len(funds)}/{len(ETF_UNIVERSE)} funds "
-            f"({n_ishares} ishares, {n_coinlaw} coinlaw, "
+            f"({n_ishares} ishares, {n_fmp} fmp, {n_coinlaw} coinlaw, "
             f"{len(pending)} pending)")

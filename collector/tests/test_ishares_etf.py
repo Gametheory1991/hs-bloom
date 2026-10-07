@@ -1,4 +1,5 @@
-"""iShares ETF fetcher tests: screener parsing, CoinLaw fallback, universe."""
+"""iShares ETF fetcher tests: screener parsing, FMP/CoinLaw fallbacks, universe."""
+import asyncio
 import json
 
 import pytest
@@ -8,9 +9,16 @@ from collector.fetchers.ishares_etf import (
     ETF_UNIVERSE,
     fetch_ishares_etf,
     parse_coinlaw,
+    parse_fmp_info,
     parse_ishares,
 )
 from collector.store import Store
+
+
+@pytest.fixture(autouse=True)
+def _no_fmp_key(monkeypatch):
+    """Existing tests must not touch the network if a key happens to be set."""
+    monkeypatch.delenv("FMP_API_KEY", raising=False)
 
 SCREENER = json.dumps({
     "1": {"localExchangeTicker": "TLT", "fundName": "iShares 20+ Year Treasury Bond ETF",
@@ -95,6 +103,71 @@ async def test_fetch_ishares_etf(tmp_path):
         assert t in uni
     # unknown tickers absent
     assert "ZZZ" not in funds
+
+
+FMP_INFO = json.dumps([{
+    "symbol": "SPY", "name": "SPDR S&P 500 ETF Trust",
+    "expenseRatio": "0.0945%", "aum": 630250000000.0,
+    "navPrice": 661.42}])
+
+
+def test_parse_fmp_info():
+    out = parse_fmp_info(json.loads(FMP_INFO))
+    assert out["aum"] == 630250000000.0
+    assert out["nav"] == 661.42
+    assert out["shares"] == pytest.approx(630250000000.0 / 661.42)
+    assert out["name"] == "SPDR S&P 500 ETF Trust"
+    assert parse_fmp_info([]) is None
+    assert parse_fmp_info([{"symbol": "X"}]) is None  # no aum
+    # alternate NAV field names
+    assert parse_fmp_info([{"aum": 10.0, "nav": 2.0}])["nav"] == 2.0
+    assert parse_fmp_info([{"aum": 10.0, "netAssetValue": 2.5}])["nav"] == 2.5
+
+
+async def _fake_with_fmp(url, **kw):
+    if "financialmodelingprep.com/stable/etf/info" in url:
+        sym = kw.get("params", {}).get("symbol")
+        if sym == "SPY":
+            return FMP_INFO
+        return "[]"
+    return await fake_get_text(url, **kw)
+
+
+@pytest.mark.asyncio
+async def test_fetch_fmp_fallback(monkeypatch, tmp_path):
+    monkeypatch.setenv("FMP_API_KEY", "test-key")
+
+    async def _no_sleep(*a, **k):
+        return None
+
+    monkeypatch.setattr(asyncio, "sleep", _no_sleep)
+    store = Store(str(tmp_path / "t.db"))
+    res = await fetch_ishares_etf(store, _fake_with_fmp)
+    doc = store.doc("etfflows")
+    funds = doc.payload["funds"]
+    assert funds["SPY"]["source"] == "fmp"
+    assert funds["SPY"]["aum"] == 630250000000.0
+    assert funds["SPY"]["class"] == "equity"
+    assert store.points("cycle:etf-SPY-aum")
+    assert store.points("cycle:etf-SPY-nav")
+    assert store.points("cycle:etf-SPY-shares")
+    assert "SPY" not in doc.payload["pending"]
+    assert "1 fmp" in res
+    # FMP returning nothing for other pending funds -> still pending
+    assert "QQQ" in doc.payload["pending"]
+
+
+@pytest.mark.asyncio
+async def test_fetch_fmp_no_key(tmp_path):
+    """No key -> FMP skipped, no network attempt, honest pending."""
+    async def fail_on_fmp(url, **kw):
+        assert "financialmodelingprep" not in url
+        return await fake_get_text(url, **kw)
+
+    store = Store(str(tmp_path / "t.db"))
+    await fetch_ishares_etf(store, fail_on_fmp)
+    doc = store.doc("etfflows")
+    assert "SPY" in doc.payload["pending"]
 
 
 def test_universe_classes():
