@@ -289,7 +289,8 @@ class Store:
         self._execute(
             "INSERT INTO fetcher_status(name, last_success, active_source) VALUES(?,?,?) "
             "ON CONFLICT(name) DO UPDATE SET last_success=excluded.last_success, "
-            "active_source=excluded.active_source",
+            "active_source=excluded.active_source, "
+          "last_error=NULL, last_error_at=NULL",
             (name, _now(), active_source),
         )
 
