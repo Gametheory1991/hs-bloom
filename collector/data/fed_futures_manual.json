@@ -1,0 +1,4 @@
+{
+  "_doc": "Optional manual override for Fed funds futures probabilities per FOMC meeting. Used by the fed_meetings fetcher ONLY when the CME FedWatch third-party archive is stale (>3 days) or missing the meeting. Values are percents 0-100. Never invent values — leave a meeting out rather than guessing.",
+  "meetings": {}
+}
