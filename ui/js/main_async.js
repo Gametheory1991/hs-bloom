@@ -1,0 +1,263 @@
+import { getDashboard, getScorecard } from "./api.js";
+import { fmtAge, fmtClock, isStale } from "./fmt.js";
+import { defiFootData, initDefiViewToggle, renderDefi, renderMidnight } from "./panels/defi.js";
+import { renderBonds, renderEquity } from "./panels/equity.js";
+import { renderMacro } from "./panels/macro.js";
+import { renderAuctions } from "./panels/auctions.js";
+import { renderNews } from "./panels/news.js";
+import { renderCycle } from "./panels/cycle.js";
+import { renderEarningsProfit, renderFiscalEcon } from "./panels/fiscal.js";
+import { renderFigiLookup } from "./panels/figi.js";
+import { renderRiskMap } from "./panels/riskmap.js";
+import { renderRadar } from "./panels/radar.js";
+import { renderPulse } from "./panels/pulse.js";
+import { renderHyper } from "./panels/hyper.js";
+import { renderUniverseSelector } from "./panels/ai_flow.js";
+import { renderTsv } from "./panels/tsv.js";
+import { renderXcorr } from "./panels/xcorr.js";
+import { renderVol } from "./panels/vol.js";
+import { renderOptions } from "./panels/options.js";
+import { renderEtfFlows } from "./panels/etfflows.js";
+import { renderMovers } from "./panels/movers.js";
+import { renderFutures, FUTURES } from "./panels/futures.js";
+import { renderFlows } from "./panels/flows.js";
+import { renderTff } from "./panels/tff.js";
+import { renderScorecard } from "./panels/scorecard.js";
+import { renderCentral } from "./panels/central.js";
+import { renderPredict } from "./panels/predict.js";
+import { renderFinra } from "./panels/finra.js";
+import { renderFactbook } from "./panels/factbook.js";
+import { renderStar } from "./panels/star.js";
+import { renderShortVol, renderMargin, renderShortInt } from "./panels/equityhub.js";
+import { renderTape } from "./panels/tape.js";
+import { renderATS } from "./panels/ats.js";
+import { renderOTC } from "./panels/otc.js";
+import { initSortableObserver } from "./sortable.js";
+import { initExportObserver } from "./export.js";
+import { renderKoi } from "./panels/koi_scorecard.js";
+import { renderAlerts } from "./panels/alerts.js";
+import { renderBriefcheck } from "./panels/briefcheck.js";
+import { renderUsage } from "./panels/usage.js";
+import { initPalette, updateIndex } from "./palette.js";
+import { initHealth } from "./health.js";
+import { renderRefs } from "./panels/refs.js";
+import { renderInsights } from "./panels/insights.js";
+import { initNotifications, notifyInsights } from "./notifications.js";
+import { initChat } from "./chat.js";
+import { initTabs, HUBS } from "./tabs.js";
+import { renderDebtCube } from "./panels/debtcube.js";
+import { renderRegwatchNews, renderRegwatchRules, renderRegwatchTopics } from "./panels/regwatch.js";
+
+const POLL_MS = 60_000;
+const STALE_MINUTES = { equity: 20, bonds: 130, macro: 390, auctions: 2880, news: 40, defi: 35, midnight: 35, refs: 35, insights: 70, riskmap: 2880, xcorr: 2880, gse: 86400, vol: 2880, movers: 10080, radar: 2880, hyper: 10080, tsv: 10080, usaspending: 20160, finnhub: 2880, worldbank: 20160, coingecko: 2880, predict: 120, finra: 2880, star: 2880, shortvol: 2880, margin: 43200, shortint: 2880, tape: 2880, ats: 10080, otc: 2880, tff: 2880, factbook: 43200, regwatch: 120, usage: 60 };  // ~2x cadence
+
+const EMPTY = { rows: [], updated_at: null, source: null };
+
+let lastDash = null; // last successful payload, for the view-toggle re-render (no re-fetch)
+
+// Command-palette index: hubs + panels + series, rebuilt from live payloads
+// (never hardcoded). Series entries deep-link to their hub/sub route.
+const PANEL_ENTRIES = [
+  ["MARKET RADAR", "pulse/snapshot"], ["TOP NEWS", "pulse/snapshot"],
+  ["ALERTS / NEWSLETTER", "pulse/snapshot"], ["ALERT TUNING", "desk/alerts"],
+  ["BRIEFING × TERMINAL CHECK", "desk/briefcheck"],
+  ["MACRO — THIS WEEK", "macro/calendar"], ["CENTRAL — FED WATCH", "macro/central"],
+  ["UST AUCTIONS", "macro/auctions"], ["WORLD BONDS", "macro/bonds"],
+  ["CREDIT — SEGMENTS · UST · STAR · Z-SCORES", "macro/credit"],
+  ["EQTY", "equity/overview"], ["MOVERS — SINGLE-STOCK SIGMA MOVES", "markets/equities"],
+  ["VOL — MACRO VOLATILITY DIGEST", "markets/volcorr"], ["X-CORR — CROSS-ASSET CORRELATION & VOL", "markets/volcorr"],
+  ["FUTURES — FRONT-MONTH", "markets/futures"], ["FLOWS — 13F NET FLOWS", "positioning/flows"],
+  ["TFF — TRADERS IN FINANCIAL FUTURES", "positioning/tff"],
+  ["OPTIONS — GAMMA & FLOW", "markets/options"], ["ETF FLOWS — AUM & CREATIONS", "structure/etfflows"],
+  ["SCORECARD — 1D/1M/3M/1Y + 1Y Z", "pulse/scorecard"],
+  ["CURATED VAULTS — USDC", "markets/digital"],
+  ["PREDICT — MARKETS & EDGE", "positioning/predict"],
+  ["FINRA — BREADTH · CORPORATE · TRACE", "structure/trace"],
+  ["STAR — STRUCTURED PRODUCT ACTIVITY", "structure/star"],
+  ["SHORT VOLUME — REG SHO DAILY", "equity/shortvol"],
+  ["MARGIN DEBT — FINRA", "equity/margin"],
+  ["SHORT INTEREST — FINRA SETTLEMENT", "equity/shortint"],
+  ["TAPE VOLUME — VENUE × TAPE", "equity/tape"],
+  ["ATS TRANSPARENCY — DARK POOLS", "equity/ats"],
+  ["OTC MARKET — FINRA OVER-THE-COUNTER", "equity/otc"],
+  ["TAPE VOLUME — VENUE × TAPE", "equity/tape"],
+  ["KOI — FINRA/TRACE Y/Y SCORECARD", "structure/trace"],
+  ["RISK MAP — WORLD", "structure/maps"], ["COVERAGE MAPS — UNIVERSE & MONEY FLOW", "structure/maps"],
+  ["HYPER — HYPERSCALER DESK", "structure/desks"], ["TSV — TOKENIZED SECURITIES VENUE WATCH", "structure/desks"],
+  ["REG WATCH — NEWS FEED", "regwatch/news"], ["REG WATCH — RULEMAKING TRACKER", "regwatch/rules"],
+  ["REG WATCH — TOPIC WATCH", "regwatch/topics"],
+];
+
+function buildIndex(dash) {
+  const idx = [];
+  for (const h of HUBS) {
+    idx.push({ label: `${h.label} hub`, sub: "hub", hash: `#/${h.id}` });
+    for (const [sid, slabel] of h.subs)
+      idx.push({ label: slabel, sub: `hub · ${h.label}`, hash: `#/${h.id}/${sid}` });
+  }
+  for (const [label, route] of PANEL_ENTRIES)
+    idx.push({ label, sub: "panel", hash: `#/${route}` });
+  // Cycle tab id -> hub/sub route for series deep-links.
+  const CYCLE_ROUTE = {
+    risk: "positioning/positions", econ: "macro/cycle", credit: "macro/cycle",
+    profit: "macro/cycle", pos: "positioning/positions", quant: "positioning/positions",
+    ice: "positioning/positions", struct: "structure/trace", etf: "markets/etfs",
+  };
+  for (const t of dash?.panels?.cycle?.tabs ?? [])
+    for (const p of t.panels ?? [])
+      for (const r of p.rows ?? [])
+        if (r.name) idx.push({ label: r.name, sub: `series · ${t.id}`, hash: `#/${CYCLE_ROUTE[t.id] ?? "macro/cycle"}` });
+  return idx;
+}
+
+async function refreshSearchIndex() {
+  const base = buildIndex(lastDash);
+  try {
+    const sc = await getScorecard();
+    for (const r of sc.rows ?? [])
+      if (r.name) base.push({ label: r.name, sub: "series · scorecard", hash: "#/pulse/scorecard" });
+  } catch { /* scorecard down — tabs/series index still works */ }
+  for (const [, sym, label] of FUTURES)
+    base.push({ label: `${sym} — ${label}`, sub: "futures", hash: "#/markets/futures" });
+  updateIndex(base);
+}
+
+function foot(panelId, name, data) {
+  const el = document.querySelector(`#panel-${panelId} .panel-foot`);
+  const src = (data.source ?? "—").toUpperCase();
+  el.textContent = `DATA: ${src} · ${fmtAge(data.updated_at)}`;
+  el.classList.toggle("stale", isStale(data.updated_at, STALE_MINUTES[name]));
+}
+
+function renderDefiPanel(p) {
+  const defi = p.defi ?? EMPTY;      // ?? EMPTY: tolerate an old collector during rollout
+  const morpho = p.morpho ?? EMPTY;
+  renderDefi(defi, morpho);
+  foot("defi", "defi", defiFootData(defi, morpho));
+}
+
+async function tick() {
+  const banner = document.getElementById("banner");
+  function safeRender(name, fn) {
+    try {
+      const r = fn();
+      if (r && typeof r.catch === "function") {
+        r.catch((err) => console.error(`[tick] ${name} failed:`, err));
+      }
+    } catch (err) { console.error(`[tick] ${name} failed:`, err); }
+  }
+  try {
+    const dash = await getDashboard();
+    lastDash = dash;
+    const p = dash.panels;
+    safeRender("equity", () => renderEquity(p.equity));
+    safeRender("bonds", () => renderBonds(p.bonds));
+    safeRender("macro", () => renderMacro(p.macro));
+    safeRender("auctions", () => renderAuctions(p.auctions ?? EMPTY));
+    safeRender("news", () => renderNews(p.news));
+    safeRender("defipanel", () => renderDefiPanel(p));
+    safeRender("midnight", () => renderMidnight(p.midnight ?? EMPTY));
+    safeRender("refs", () => renderRefs(p.refs ?? EMPTY));
+    safeRender("cycle", () => renderCycle(p.cycle ?? { tabs: [], updated_at: null }));
+    safeRender("fiscalecon", () => renderFiscalEcon(p.usaspending ?? { monthly: [], top_recipients: [], top_agencies: [], updated_at: null }));
+    safeRender("earningsprofit", () => renderEarningsProfit(p.finnhub ?? { earnings: [], insider: [], key_configured: false, updated_at: null }));
+    safeRender("figilookup", () => renderFigiLookup());
+    renderDebtCube(); // QUANT tab debt-cube slicer (own fetch; mounts data-batch11 section)
+    safeRender("riskmap", () => renderRiskMap(p.riskmap ?? { countries: [], asof: null, updated_at: null, source: null }));
+    safeRender("xcorr", () => renderXcorr(p.xcorr ?? { labels: [], matrix_60d: [], pairs: [], rvol: [] },
+                p.gse ?? { series: [] }));
+    safeRender("vol", () => renderVol(p.voldash ?? { rows: [], vix_hist: [], vvix_hist: [], beta: {}, beta_hist: {} }));
+    safeRender("options", () => renderOptions(p.options ?? { symbols: {} }));
+    safeRender("etfflows", () => renderEtfFlows(p.etfflows ?? { funds: {} }));
+    safeRender("movers", () => renderMovers(p.movers ?? { indexes: {}, asof: null, updated_at: null, source: null }));
+    safeRender("radar", () => renderRadar(p.radar ?? { indicators: [], regime: "UNKNOWN", as_of: null, updated_at: null, source: null },
+                p.riskmap ?? { countries: [], asof: null, updated_at: null, source: null }));
+    renderPulse(); // PULSE Phase 2: KPI tiles + range check + talk track (async, self-guarded)
+    safeRender("koi", () => renderKoi());
+    safeRender("hyper", () => renderHyper(p.hyper ?? { issuances: [], equities: [], note: null, updated_at: null, source: null }));
+    safeRender("universeselector", () => renderUniverseSelector(p.ai_flow ?? { universe_id: "ai_buildout", verticals: [], edges: [], rollups: {}, capex_stack: {}, risk_notes: [], updated_at: null, source: null },
+                           p.ms_flow ?? { universe_id: "market_structure", verticals: [], edges: [], rollups: {}, capex_stack: {}, risk_notes: [], updated_at: null, source: null },
+                           p.bank_flow ?? { universe_id: "bank_fixed_income", verticals: [], edges: [], rollups: {}, capex_stack: {}, risk_notes: [], updated_at: null, source: null },
+                           p.tech_flow ?? { universe_id: "technology", verticals: [], edges: [], rollups: {}, capex_stack: {}, risk_notes: [], updated_at: null, source: null },
+                           p.vendor_flow ?? { universe_id: "vendor", verticals: [], edges: [], rollups: {}, capex_stack: {}, risk_notes: [], updated_at: null, source: null },
+                           p.etf_flow ?? { universe_id: "etf", verticals: [], edges: [], rollups: {}, capex_stack: {}, risk_notes: [], updated_at: null, source: null },
+                           p.crypto_flow ?? { universe_id: "crypto", verticals: [], edges: [], rollups: {}, capex_stack: {}, risk_notes: [], updated_at: null, source: null }));
+    safeRender("tsv", () => renderTsv(p.tsv ?? { verticals: [], edges: [], risk_notes: [], order: {}, watch: null, updated_at: null, source: null }));
+    safeRender("insights", () => renderInsights(p.insights ?? { alerts: [], trends: [], newsletter: { headline: "No digest yet", bullets: [] } }));
+    safeRender("predict", () => renderPredict(p.predict ?? { edges: [], movers: [], calibration: [], polymarket: [], kalshi: [], tracked_count: 0, resolved_this_run: 0, skipped: [], disclaimer: null, updated_at: null, source: null }));
+    safeRender("tff", () => renderTff(p.tff ?? {}));
+    safeRender("finra", () => renderFinra(p.finra ?? {}));
+    safeRender("star", () => renderStar(p.finra ?? {}));
+    safeRender("factbook", () => renderFactbook(p.factbook ?? {}));
+    safeRender("shortvol", () => renderShortVol(p.shortinterest ?? {}, p.finra?.regsho, p.finra?.ticker_stats));
+    safeRender("margin", () => renderMargin(p.finra?.margin));
+    safeRender("shortint", () => renderShortInt(p.shortinterest ?? {}));
+    safeRender("tape", () => renderTape(p.tape ?? { dates: [] }));
+    safeRender("ats", () => renderATS(p.finra?.ats ?? null));
+    safeRender("otc", () => renderOTC(p.otc ?? { as_of: null }));
+    safeRender("regwatchnews", () => renderRegwatchNews(p.regwatch ?? {}));
+    safeRender("regwatchrules", () => renderRegwatchRules(p.regwatch ?? {}));
+    safeRender("regwatchtopics", () => renderRegwatchTopics(p.regwatch ?? {}));
+    safeRender("equity-foot", () => foot("equity", "equity", { ...p.equity, source: p.equity.rows[0]?.source }));
+    safeRender("bonds-foot", () => foot("bonds", "bonds", p.bonds));
+    safeRender("macro-foot", () => foot("macro", "macro", p.macro));
+    safeRender("auctions-foot", () => foot("auctions", "auctions", p.auctions ?? EMPTY));
+    safeRender("news-foot", () => foot("news", "news", p.news));
+    safeRender("midnight-foot", () => foot("midnight", "midnight", p.midnight ?? EMPTY));
+    safeRender("refs-foot", () => foot("refs", "refs", p.refs ?? EMPTY));
+    safeRender("insights-foot", () => foot("insights", "insights", p.insights ?? { updated_at: null, source: null }));
+    safeRender("predict-foot", () => foot("predict", "predict", p.predict ?? { updated_at: null, source: null }));
+    safeRender("tff-foot", () => foot("tff", "tff", p.tff ?? { updated_at: null, source: null }));
+    safeRender("finra-foot", () => foot("finra", "finra", { updated_at: p.finra?.regsho?.updated_at ?? null, source: "finra" }));
+    safeRender("factbook-foot", () => foot("factbook", "factbook", p.factbook ?? {}));
+    safeRender("star-foot", () => foot("star", "star", p.finra?.star ?? { updated_at: null, source: null }));
+    safeRender("shortvol-foot", () => foot("shortvol", "shortvol", p.shortinterest ?? {}));
+    safeRender("margin-foot", () => foot("margin", "margin", p.finra?.margin ?? { updated_at: null, source: null }));
+    safeRender("shortint-foot", () => foot("shortint", "shortint", p.shortinterest ?? {}));
+    safeRender("tape-foot", () => foot("tape", "tape", p.tape ?? { updated_at: null, source: null }));
+    safeRender("ats-foot", () => foot("ats", "ats", p.finra?.ats ?? { updated_at: null, source: null }));
+    safeRender("otc-foot", () => foot("otc", "otc", p.otc ?? { updated_at: null, source: null }));
+    safeRender("regwatch-news-foot", () => foot("regwatch-news", "regwatch", p.regwatch ?? {}));
+    safeRender("regwatch-rules-foot", () => foot("regwatch-rules", "regwatch", p.regwatch ?? {}));
+    safeRender("regwatch-topics-foot", () => foot("regwatch-topics", "regwatch", p.regwatch ?? {}));
+    safeRender("usage-foot", () => foot("usage", "usage", { source: "os-bloom", updated_at: new Date().toISOString() }));
+    safeRender("riskmap-foot", () => foot("riskmap", "riskmap", p.riskmap ?? { updated_at: null, source: null }));
+    safeRender("radar-foot", () => foot("radar", "radar", p.radar ?? { updated_at: null, source: null }));
+    safeRender("hyper-foot", () => foot("hyper", "hyper", p.hyper ?? { updated_at: null, source: null }));
+    safeRender("tsv-foot", () => foot("tsv", "tsv", p.tsv ?? { updated_at: null, source: null }));
+    await notifyInsights(p.insights);
+    document.getElementById("clock").textContent = `as of ${fmtClock(dash.as_of)} UTC`;
+    updateIndex(buildIndex(dash));
+    banner.classList.add("hidden");
+  } catch (err) {
+    banner.textContent = `COLLECTOR UNREACHABLE — ${err.message}`;
+    banner.classList.remove("hidden");
+  }
+}
+
+initTabs();
+initNotifications();
+initChat();
+initHealth();
+initPalette();
+initSortableObserver(); // click-to-sort on every table[data-sortable]
+initExportObserver(); // ⤓ CSV/XLSX/PNG/JPG export on every section + panel
+renderFutures();
+renderFlows();
+renderScorecard();
+renderCentral();
+renderAlerts();
+renderBriefcheck();
+renderUsage();
+refreshSearchIndex();
+setInterval(() => { renderFutures(); renderFlows(); renderScorecard(); renderCentral(); renderBriefcheck(); renderKoi(); refreshSearchIndex(); }, 15 * 60_000);
+initDefiViewToggle(() => {
+  if (lastDash) renderDefiPanel(lastDash.panels);
+});
+// A chart drawn while its tab is hidden sees clientWidth 0 and falls back to
+// 300px; redraw on tab switch so it sizes to the now-visible panel.
+window.addEventListener("hashchange", () => {
+  if (lastDash) renderMidnight(lastDash.panels.midnight ?? EMPTY);
+});
+tick();
+setInterval(tick, POLL_MS);
