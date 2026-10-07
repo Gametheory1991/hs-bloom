@@ -81,7 +81,31 @@ async def test_fetch_cycle_isolates_failures(tmp_path):
     async def get_bytes(url, params=None, headers=None):
         raise AssertionError("unused")
 
-    with pytest.raises(RuntimeError, match="1/2 cycle series failed.*bad"):
+    # 1/2 failing is a minority: the job stays healthy (no raise) so
+    # last_success doesn't go stale, but the failure is surfaced.
+    result = await fetch_cycle(series, store, "k", get_text, get_bytes)
+    assert result == "cycle (1 failed)"
+    assert store.points("cycle:vix") != {}  # good series still stored
+    assert store.points("cycle:bad") == {}  # failed series not stored
+
+
+async def test_fetch_cycle_majority_failure_raises(tmp_path):
+    store = Store(tmp_path / "t.db")
+    series = [
+        CycleSeriesCfg(id="bad1", name="Bad1", unit="idx", dbnomics="NOPE/x/y"),
+        CycleSeriesCfg(id="bad2", name="Bad2", unit="idx", dbnomics="NOPE/x/y"),
+        CycleSeriesCfg(id="vix", name="VIX", unit="idx", fred="VIXCLS"),
+    ]
+
+    async def get_text(url, params=None, headers=None):
+        if "db.nomics" in url:
+            raise RuntimeError("HTTP 404")
+        return FRED
+
+    async def get_bytes(url, params=None, headers=None):
+        raise AssertionError("unused")
+
+    with pytest.raises(RuntimeError, match="2/3 cycle series failed"):
         await fetch_cycle(series, store, "k", get_text, get_bytes)
     assert store.points("cycle:vix") != {}  # good series still stored
 
