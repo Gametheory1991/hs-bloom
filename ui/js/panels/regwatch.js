@@ -10,10 +10,13 @@ const safeUrl = (url) => {
 };
 
 const fmtDate = (iso) => {
-  if (!iso) return "—";
+  if (!iso) return "date n/a";  // honest empty state: no fake fetch-time stamp
   const d = new Date(iso);
-  return isNaN(d) ? "—" : d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  return isNaN(d) ? "date n/a" : d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 };
+
+// "Jun 8, 2026 · 4m ago" — or just "date n/a" when the source gave no date.
+const fmtStamp = (iso) => iso ? `${fmtDate(iso)} · ${fmtAge(iso)}` : "date n/a";
 
 const topicChip = (tid, label) =>
   `<a href="#/regwatch/topics" class="badge" data-topic="${esc(tid)}" style="text-decoration:none">${esc(label)}</a>`;
@@ -45,7 +48,7 @@ export function renderRegwatchNews(panel) {
       <div style="margin:3px 0;color:var(--ink);font-size:12px">▸ ${esc(n.summary || "")}</div>
       <div class="news-meta">
         <span class="badge">${esc(n.agency_label || n.agency || "—")}</span>
-        ${fmtDate(n.published_at)} · ${fmtAge(n.published_at)}
+        ${fmtStamp(n.published_at)}
         ${(n.topics ?? []).map((t) => topicChip(t, topicLabel(t))).join(" ")}
       </div>
     </div>`).join("");
@@ -150,9 +153,43 @@ function _rwTopicList(tid, label, hits) {
       <div style="margin:3px 0;color:var(--ink);font-size:12px">▸ ${esc(n.summary || "")}</div>
       <div class="news-meta">
         <span class="badge">${esc(n.agency_label || n.agency || "—")}</span>
-        ${fmtDate(n.published_at)} · ${fmtAge(n.published_at)}
+        ${fmtStamp(n.published_at)}
       </div>
     </div>`).join("");
+}
+
+// Rulemaking items tagged with this topic (Federal Register, last 120 days).
+function _rwTopicRules(tid, label, rules) {
+  const hits = (rules ?? []).filter((r) => (r.topics || []).includes(tid));
+  const head = `<h3 style="margin-top:16px">RULEMAKING — ${esc(label)}</h3>`;
+  if (!hits.length)
+    return head + `<p class="muted">No rulemaking in the last 120 days.</p>`;
+  return head + `
+  <table data-sortable><thead><tr><th>Rule</th><th>Agency</th><th>Published</th><th>Type</th></tr></thead>
+  <tbody>${hits.map((r) => `
+    <tr>
+      <td><a href="${safeUrl(r.link)}" target="_blank" rel="noopener noreferrer">${esc(r.title)}</a></td>
+      <td><span class="badge">${esc(r.agency_label || "")}</span></td>
+      <td style="white-space:nowrap">${fmtDate(r.published_at)}</td>
+      <td>${esc(r.type || "—")}</td>
+    </tr>`).join("")}
+  </tbody></table>`;
+}
+
+// ---- International: non-US agency items (ESMA, FCA) ----
+const _rwIntlNote = `
+  <p class="muted" style="margin:10px 0">Non-US bond-market transparency: ESMA (EU MiFID II/MiFIR post-trade
+  transparency, FITRS, consolidated tape) and the UK FCA (gilt and corporate bond transparency).
+  <strong>Ediphy</strong> (ediphy.io) runs the commercial "tape of tapes" — consolidated post-trade bond data
+  across ESMA, the UK and US TRACE — but publishes no free data feed or RSS, so its tape is tracked here via
+  ESMA/FCA announcements and news mentions, not direct data.</p>`;
+
+function _rwInternational(panel) {
+  const agencies = panel.intl_agencies ?? ["esma", "fca"];
+  const hits = (panel.items ?? []).filter((i) => agencies.includes(i.agency));
+  return _rwIntlNote + (
+    hits.length ? _rwTopicList("international", "International", hits)
+                : `<p class="muted">No international items in the current window — the ESMA/FCA feeds run hourly.</p>`);
 }
 
 export function renderRegwatchTopics(panel) {
@@ -176,13 +213,17 @@ export function renderRegwatchTopics(panel) {
   const strip = `
     <div class="sub-row" style="margin:0 -10px 10px;padding-left:10px" role="tablist" aria-label="Topic Watch tabs">
       ${tabBtn("overall", "Overall")}
+      ${tabBtn("international", "International")}
       ${tids.map((tid) => tabBtn(tid, topics[tid].label)).join("")}
     </div>`;
 
   const content = _rwActiveTopic === "overall"
     ? _rwOverallBoard(panel, tids, itemsByTopic)
+    : _rwActiveTopic === "international"
+    ? _rwInternational(panel)
     : `<h3>${esc(topics[_rwActiveTopic].label)} — ${itemsByTopic[_rwActiveTopic].length} hit${itemsByTopic[_rwActiveTopic].length === 1 ? "" : "s"}</h3>` +
-      _rwTopicList(_rwActiveTopic, topics[_rwActiveTopic].label, itemsByTopic[_rwActiveTopic]);
+      _rwTopicList(_rwActiveTopic, topics[_rwActiveTopic].label, itemsByTopic[_rwActiveTopic]) +
+      _rwTopicRules(_rwActiveTopic, topics[_rwActiveTopic].label, panel.rules);
 
   body.innerHTML = strip + `<div role="tabpanel">${content}</div>`;
 

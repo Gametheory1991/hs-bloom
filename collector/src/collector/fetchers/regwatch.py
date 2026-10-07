@@ -38,12 +38,26 @@ REGWATCH_FEEDS = [
     ("fdic", "FDIC", "https://public.govdelivery.com/topics/USFDIC_26/feed.rss"),
     ("fsb", "FSB", "https://www.fsb.org/feed/"),
     ("ofr", "OFR", "https://www.financialresearch.gov/briefs/feed.rss"),
+    ("esma", "ESMA", "https://www.esma.europa.eu/rss.xml"),
+    ("fca", "FCA", "https://www.fca.org.uk/news/rss.xml"),
 ]
+
+# International bond-market transparency: ESMA publishes MiFID II/MiFIR
+# transparency data and consultations; FCA covers UK bond/gilt transparency.
+# ESMA's RSS carries no date elements at all — those items show "date n/a"
+# by design. FCA uses a non-RFC pubDate ("Tuesday, October 6, 2026 - 10:50")
+# which the title/raw-text date recovery handles.
 
 # Sources checked 2026-10-06 with no usable RSS (kept for the record;
 # re-check periodically): Treasury press releases (RSS discontinued), FHFA,
 # MSRB, BIS, PCAOB (blocked), FSOC, NFA (HTML only), Congress.gov (API key
 # required — add when Harry provides one).
+#
+# Ediphy (ediphy.io, "tape of tapes" consolidating ESMA + UK + TRACE post-trade
+# bond data) checked 2026-10-07: commercial/paywalled product, no RSS, no public
+# API, no machine-readable dates on its news pages. Tracked indirectly — the
+# "ediphy-tape" topic tags any mention across the RSS feeds, and the UI's
+# International tab explains the paywall. Revisit if they publish a free feed.
 
 # topic_id -> (label, [keywords]). Case-insensitive substring match on
 # title + description. Easy for Harry to extend.
@@ -91,10 +105,25 @@ REGWATCH_TOPICS: dict[str, tuple[str, list[str]]] = {
          "generative ai"]),
     "nbfi": ("Nonbank / NBFI",
         ["nonbank", "nbfi", "shadow banking", "non-bank"]),
+    "binary-options": ("Binary Options",
+        ["binary option", "nadex", "binary bet", "all-or-nothing option"]),
+    "mifid-transparency": ("MiFID / EU Bond Transparency",
+        ["mifid", "mifir", "post-trade transparency", "consolidated tape",
+         "fitrs", "transparency calculations", "double volume cap",
+         "bond liquidity data", "systematic internaliser",
+         "systematic internalizer"]),
+    "uk-bond-transparency": ("UK Bond Transparency",
+        ["gilt", "uk bond", "sovereign bond transparency",
+         "fca consults", "fca proposes"]),
+    "ediphy-tape": ("Ediphy / Tape of Tapes",
+        ["ediphy", "fairct", "tape of tapes"]),
 }
 
 MAX_ITEMS = 150
 MAX_SUMMARIZE_PER_RUN = 12
+
+# Non-US agencies — the UI's "International" tab filters on these.
+INTL_AGENCIES = ["esma", "fca"]
 
 # Federal Register API: rulemaking tracker for the three federal agencies
 # (FINRA is an SRO — its rules surface via the FINRA notices feed above).
@@ -111,11 +140,59 @@ def _item_id(link: str) -> str:
     return hashlib.sha256(link.encode()).hexdigest()[:16]
 
 
-def _entry_time(entry) -> str:
+# --- Date recovery -----------------------------------------------------------
+# Several feeds (FINRA notices, ESMA, FCA) publish items with no parseable RSS
+# date. Previously these fell back to "now", which made a June notice display
+# "Oct 7 · 6h ago". Now: try the raw date string, then a date embedded in the
+# title, and otherwise store None so the UI shows "date n/a" — never a fake
+# fetch-time stamp.
+_MONTHS: dict[str, int] = {}
+for _i, _name in enumerate(
+        ["january", "february", "march", "april", "may", "june", "july",
+         "august", "september", "october", "november", "december"]):
+    _MONTHS[_name] = _i + 1
+for _i, _abbr in enumerate(
+        ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug",
+         "sep", "sept", "oct", "nov", "dec"]):
+    _MONTHS.setdefault(_abbr, _i + 1)
+
+_DATE_NUM_RE = re.compile(r"\b(\d{1,2})/(\d{1,2})/(\d{2,4})\b")          # 6/8/2026
+_DATE_TXT_RE = re.compile(                                                # June 8, 2026
+    r"\b([A-Za-z]+)\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{4})\b")
+
+
+def _date_from_text(text: str | None) -> str | None:
+    """Extract an ISO UTC date from free text. None when nothing parses."""
+    if not text:
+        return None
+    m = _DATE_NUM_RE.search(text)
+    if m:
+        mm, dd, yy = int(m.group(1)), int(m.group(2)), int(m.group(3))
+        if yy < 100:  # 2-digit year: 6/8/26 -> 2026
+            yy += 2000 if yy < 50 else 1900
+        if 1 <= mm <= 12 and 1 <= dd <= 31 and 1990 <= yy <= 2100:
+            return f"{yy:04d}-{mm:02d}-{dd:02d}T00:00:00Z"
+    m = _DATE_TXT_RE.search(text)
+    if m:
+        mon = _MONTHS.get(m.group(1).lower())
+        if mon:
+            dd, yy = int(m.group(2)), int(m.group(3))
+            if 1 <= dd <= 31 and 1990 <= yy <= 2100:
+                return f"{yy:04d}-{mon:02d}-{dd:02d}T00:00:00Z"
+    return None
+
+
+def _entry_time(entry, title: str = "") -> str | None:
     parsed = entry.get("published_parsed") or entry.get("updated_parsed")
-    if parsed is None:
-        return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
-    return datetime.fromtimestamp(timegm(parsed), tz=timezone.utc).isoformat().replace("+00:00", "Z")
+    if parsed is not None:
+        return datetime.fromtimestamp(timegm(parsed), tz=timezone.utc).isoformat().replace("+00:00", "Z")
+    # feedparser often chokes on non-RFC dates (e.g. FCA's "Tuesday, October 6,
+    # 2026 - 10:50") — recover from the raw string, then the title.
+    raw = entry.get("published") or entry.get("updated")
+    hit = _date_from_text(raw)
+    if hit:
+        return hit
+    return _date_from_text(title)
 
 
 def _clean(text: str | None, limit: int = 400) -> str:
@@ -152,7 +229,7 @@ async def _fetch_feed(agency: str, label: str, url: str, get_text: GetText) -> t
             "agency_label": label,
             "title": title,
             "link": link,
-            "published_at": _entry_time(entry),
+            "published_at": _entry_time(entry, title),
             "description": desc,
             "topics": tag_topics(title, desc),
         })
@@ -263,10 +340,10 @@ async def fetch_regwatch(store: Store, get_text: GetText) -> str:
     if not items:
         raise RuntimeError("all regwatch feeds failed")
 
-    # dedupe by link id, newest first
+    # dedupe by link id, newest first (undated items sort last, never as "now")
     seen: set[str] = set()
     unique: list[dict] = []
-    for it in sorted(items, key=lambda i: i["published_at"], reverse=True):
+    for it in sorted(items, key=lambda i: i["published_at"] or "", reverse=True):
         if it["id"] in seen:
             continue
         seen.add(it["id"])
@@ -291,6 +368,7 @@ async def fetch_regwatch(store: Store, get_text: GetText) -> str:
         "rules": rules,
         "topics": topics,
         "feed_status": feed_status,
+        "intl_agencies": INTL_AGENCIES,
     }, source="regwatch")
     ok = sum(1 for v in feed_status.values() if v.startswith("ok"))
     return f"regwatch ({ok}/{len(REGWATCH_FEEDS)} feeds, {len(unique)} items, {len(rules)} rules)"

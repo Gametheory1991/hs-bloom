@@ -4,7 +4,12 @@ import os
 import pytest
 
 from collector.fetchers import regwatch
-from collector.fetchers.regwatch import fetch_regwatch, tag_topics
+from collector.fetchers.regwatch import (
+    _date_from_text,
+    _entry_time,
+    fetch_regwatch,
+    tag_topics,
+)
 from collector.store import Store
 
 RSS = """<?xml version="1.0" encoding="UTF-8"?>
@@ -34,6 +39,56 @@ def test_tag_topics_keywords():
 
 def test_tag_topics_case_insensitive():
     assert "slr-leverage" in tag_topics("Agencies Ease Supplementary Leverage Ratio", "")
+
+
+def test_tag_topics_binary_options_and_intl():
+    assert "binary-options" in tag_topics("Nadex lists new binary option contracts", "")
+    assert "binary-options" in tag_topics("ESMA extends binary options ban", "")
+    assert "mifid-transparency" in tag_topics("MiFID II: ESMA makes new bond liquidity data available", "")
+    assert "mifid-transparency" in tag_topics("EU consolidated tape for bonds", "")
+    assert "uk-bond-transparency" in tag_topics("FCA consults on gilt transparency reform", "")
+    assert "ediphy-tape" in tag_topics("Ediphy FairCT selected as EU consolidated tape provider", "")
+    # no false positives on ordinary items
+    assert "mifid-transparency" not in tag_topics("FDIC Issues CRA Examination Schedules", "")
+    assert "binary-options" not in tag_topics("SEC Proposes Treasury Clearing Mandate", "")
+
+
+def test_date_from_text_numeric():
+    assert _date_from_text("Election Notice – 6/8/2026") == "2026-06-08T00:00:00Z"
+    assert _date_from_text("Notice 1/15/26") == "2026-01-15T00:00:00Z"
+    assert _date_from_text("no date here") is None
+    assert _date_from_text(None) is None
+    assert _date_from_text("13/45/2026") is None  # invalid month/day rejected
+
+
+def test_date_from_text_month_name():
+    assert _date_from_text("Tuesday, October 6, 2026 - 10:50") == "2026-10-06T00:00:00Z"
+    assert _date_from_text("Published Jun 17, 2026") == "2026-06-17T00:00:00Z"
+    assert _date_from_text("May 2026 update") is None  # month+year only: no match
+
+
+class _E(dict):
+    """feedparser-like entry stub."""
+
+
+def test_entry_time_prefers_parsed():
+    e = _E(published_parsed=(2026, 10, 5, 12, 0, 0, 0, 0, 0))
+    assert _entry_time(e, "Election Notice – 6/8/2026").startswith("2026-10-05T12:00:00")
+
+
+def test_entry_time_recovers_from_raw_string():
+    e = _E(published="Tuesday, October 6, 2026 - 10:50")
+    assert _entry_time(e, "FCA opens the gateway") == "2026-10-06T00:00:00Z"
+
+
+def test_entry_time_recovers_from_title():
+    e = _E()
+    assert _entry_time(e, "Election Notice – 6/8/2026") == "2026-06-08T00:00:00Z"
+
+
+def test_entry_time_none_when_no_date():
+    # honest null — never a fake fetch-time stamp
+    assert _entry_time(_E(), "ESMA sets 2027 priorities") is None
 
 
 async def fake_get_text(url, params=None, headers=None):
