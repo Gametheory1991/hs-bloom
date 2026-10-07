@@ -1,7 +1,7 @@
 """NY Fed SOMA Treasury holdings by CUSIP (keyless).
 
 Endpoints (verified live 2026-10-05):
-  GET https://markets.newyorkfed.org/api/soma/tsy/get/asofdates/latest.json
+  GET https://markets.newyorkfed.org/api/soma/asofdates/latest.json
       -> latest weekly as-of date (Wednesdays; verified 2026-09-30)
   GET https://markets.newyorkfed.org/api/soma/tsy/get/asof/{yyyy-MM-dd}.csv
       -> 433 CUSIPs, columns: As Of Date, CUSIP, Security Type, Maturity Date,
@@ -124,7 +124,7 @@ async def fetch_soma_cusip(store: Store, get_text: GetText, today=None) -> str:
 
     Writes doc ``soma_cusips`` and the ``cycle:soma-total-par`` series ($bn).
     """
-    latest_json = await get_text(f"{BASE}/tsy/get/asofdates/latest.json")
+    latest_json = await get_text(f"{BASE}/asofdates/latest.json")
     asof = parse_latest_asof(latest_json)
 
     csv_text = await get_text(f"{BASE}/tsy/get/asof/{asof}.csv")
