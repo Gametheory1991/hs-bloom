@@ -68,6 +68,10 @@ def parse_latest_asof(payload: dict | list | str) -> str:
     if isinstance(payload, str):
         payload = json.loads(payload)
 
+    # 2026-10: NY Fed nests the list: {"soma": {"asOfDates": [...]}}
+    if isinstance(payload, dict) and isinstance(payload.get("soma"), dict):
+        payload = payload["soma"]
+
     def _from_item(item) -> str | None:
         if isinstance(item, dict):
             for key in ("asOfDate", "asofdate", "as_of_date", "date"):
