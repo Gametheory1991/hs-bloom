@@ -29,6 +29,51 @@ FR_JSON = """{"count": 1, "results": [{"title": "Test Proposed Rule on Stablecoi
 "comments_close_on": "2026-12-01", "html_url": "https://x.example.gov/r",
 "abstract": "payment stablecoin framework"}]}"""
 
+FR_NOTICE_JSON = """{"count": 1, "results": [{"title": "Joint Industry Plan; Notice of Filing and Immediate Effectiveness of Amendment to the Nasdaq UTP Plan To Extend SIP Operating Hours",
+"type": "Notice", "publication_date": "2026-05-22",
+"comments_close_on": null, "html_url": "https://x.example.gov/n",
+"abstract": "extend the operating hours of the securities information processors"}]}"""
+
+
+def test_tag_topics_munis_regulation():
+    assert "munis-regulation" in tag_topics(
+        "Self-Regulatory Organizations; Municipal Securities Rulemaking Board; "
+        "Order Granting Approval of Proposed Rule Change", "")
+    assert "munis-regulation" in tag_topics(
+        "SEC approves MSRB amendments to muni continuing disclosure", "")
+    assert "munis-regulation" in tag_topics(
+        "Rule 15c2-12 muni disclosure obligations updated", "")
+    assert "munis-regulation" in tag_topics(
+        "EMMA filing requirements for municipal advisors", "")
+    # no false positives on ordinary items
+    assert "munis-regulation" not in tag_topics("FDIC Issues CRA Examination Schedules", "")
+    assert "munis-regulation" not in tag_topics("SEC Proposes Treasury Clearing Mandate", "")
+
+
+def test_tag_topics_extended_hours_and_trf():
+    # Harry's May 2026 TRF hours notice must tag correctly
+    title = "Extension of TRF Operating Hours"
+    desc = ("In alignment with the proposed CTA and UTP Plan amendments to extend "
+            "the operating hours of the Securities Information Processors, FINRA's "
+            "Trade Reporting Facilities (TRFs) will be extending their operating "
+            "hours starting December 6th, 2026.")
+    topics = tag_topics(title, desc)
+    assert "extended-hours" in topics
+    assert "trf" in topics
+    # 24X National Exchange 24/7-trading relief
+    assert "extended-hours" in tag_topics(
+        "Order Granting Temporary Conditional Exemptive Relief to 24X National Exchange", "")
+    # CTA plan amendment
+    assert "trf" in tag_topics(
+        "Consolidated Tape Association; Order Approving the Fortieth Substantive Amendment", "")
+    assert "extended-hours" in tag_topics(
+        "Joint Industry Plan; Notice of Filing of Amendment to Extend SIP Operating Hours", "")
+    # no false positives on ordinary items
+    assert "extended-hours" not in tag_topics("FDIC Issues CRA Examination Schedules", "")
+    assert "extended-hours" not in tag_topics("SEC Proposes Treasury Clearing Mandate", "")
+    # "trf" substring must not fire on unrelated words
+    assert "trf" not in tag_topics("SEC Proposes Treasury Clearing Mandate", "")
+
 
 def test_tag_topics_keywords():
     assert "treasury-clearing" in tag_topics("Treasury Clearing Mandate Finalized", "")
@@ -95,6 +140,9 @@ async def fake_get_text(url, params=None, headers=None):
     if "dead.example" in url:
         raise RuntimeError("connection refused")
     if "federalregister" in url:
+        types = [v for k, v in (params or []) if k == "conditions[type][]"]
+        if "NOTICE" in types:
+            return FR_NOTICE_JSON
         return FR_JSON
     return RSS
 
@@ -114,10 +162,14 @@ async def test_fetch_regwatch_isolates_dead_feeds(tmp_path, monkeypatch):
     assert "treasury-clearing" in doc["items"][0]["topics"]
     assert doc["items"][0]["summary"]  # fallback summary present
     assert doc["feed_status"]["dead"].startswith("error")
-    assert len(doc["rules"]) == 3  # one per FR agency (sec/cftc/fed), same fake payload
+    assert len(doc["rules"]) == 4  # 3 FR RULE/PRORULE (sec/cftc/fed) + 1 SRO notice (deduped across 2 terms)
     assert {r["agency"] for r in doc["rules"]} == {"sec", "cftc", "fed"}
     assert doc["rules"][0]["comments_close_on"] == "2026-12-01"
     assert "genius-tokenization" in doc["rules"][0]["topics"]
+    sro = [r for r in doc["rules"] if r["type"] == "notice"]
+    assert len(sro) == 1
+    assert "extended-hours" in sro[0]["topics"]
+    assert "trf" in sro[0]["topics"]
     assert set(doc["topics"]) == set(regwatch.REGWATCH_TOPICS)
     assert doc["topics"]["treasury-clearing"]["count"] == 1
 

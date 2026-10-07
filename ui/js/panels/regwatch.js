@@ -63,7 +63,8 @@ export function renderRegwatchRules(panel) {
   }
   const proposed = rules.filter((r) => r.type === "proposed")
     .sort((a, b) => (daysUntil(a.comments_close_on) ?? 9999) - (daysUntil(b.comments_close_on) ?? 9999));
-  const finals = rules.filter((r) => r.type !== "proposed");
+  const notices = rules.filter((r) => r.type === "notice");
+  const finals = rules.filter((r) => r.type !== "proposed" && r.type !== "notice");
   const row = (r) => `
     <tr>
       <td><a href="${safeUrl(r.link)}" target="_blank" rel="noopener noreferrer">${esc(r.title)}</a></td>
@@ -78,7 +79,10 @@ export function renderRegwatchRules(panel) {
     <h3 style="margin-top:14px">FINAL RULES (${finals.length})</h3>
     <table data-sortable><thead><tr><th>Rule</th><th>Agency</th><th>Published</th><th></th></tr></thead>
     <tbody>${finals.map(row).join("")}</tbody></table>
-    <p class="muted" style="margin-top:8px">Source: Federal Register API (SEC, CFTC, Federal Reserve). FINRA rules surface via the FINRA notices feed.</p>`;
+    <h3 style="margin-top:14px">SRO / PLAN NOTICES (${notices.length})</h3>
+    <table data-sortable><thead><tr><th>Notice</th><th>Agency</th><th>Published</th><th></th></tr></thead>
+    <tbody>${notices.map(row).join("")}</tbody></table>
+    <p class="muted" style="margin-top:8px">Source: Federal Register API (SEC, CFTC, Federal Reserve). FINRA rules surface via the FINRA notices feed. SRO / plan notices cover CTA/UTP/NMS plan amendments, TRF and SIP operating-hours changes, and 24/7-trading relief.</p>`;
 }
 
 // ---- Topic Watch: Overall board + per-topic second-level tabs ----
