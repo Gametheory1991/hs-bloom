@@ -450,12 +450,12 @@ cycle_series:      # market-cycle series (spec 2026-08-24); exactly one source k
   # ---- batch 4: FRED additions ----
   - { id: ust30y,     name: "US 30Y yield",            unit: "%", fred: DGS30 }
   - { id: us10y,      name: "US 10Y yield",            unit: "%", fred: DGS10 }
-      # ---- Treasury curve maturities (FRED par yields; added 2026-10-07) ----
-      - { id: us2y,       name: "US 2Y yield",             unit: "%", fred: DGS2 }
-        - { id: us3y,       name: "US 3Y yield",             unit: "%", fred: DGS3 }
-          - { id: us5y,       name: "US 5Y yield",             unit: "%", fred: DGS5 }
-            - { id: us7y,       name: "US 7Y yield",             unit: "%", fred: DGS7 }
-              - { id: us20y,      name: "US 20Y yield",            unit: "%", fred: DGS20 }
+  # ---- Treasury curve maturities (FRED par yields; added 2026-10-07) ----
+  - { id: us2y,       name: "US 2Y yield",             unit: "%", fred: DGS2 }
+  - { id: us3y,       name: "US 3Y yield",             unit: "%", fred: DGS3 }
+  - { id: us5y,       name: "US 5Y yield",             unit: "%", fred: DGS5 }
+  - { id: us7y,       name: "US 7Y yield",             unit: "%", fred: DGS7 }
+  - { id: us20y,      name: "US 20Y yield",            unit: "%", fred: DGS20 }
   - { id: cre-delinq, name: "CRE loan delinquency %",  unit: "%", fred: DRCRELEXFACBS }
   # ---- batch 4: CFTC legacy open interest (Treasury futures short-base visual) ----
   - { id: oi-ust-2y,  name: "2Y T-Note futures OI",   unit: contracts, cftc_oi: "042601" }
@@ -1246,7 +1246,7 @@ cycle_tabs:        # layout only; rows reference cycle_series ids
           - { series: real-10y }
           - { series: us-1m-bill }
           - { series: us-6m-bill }
-                              - { series: us-1y-bill }
+          - { series: us-1y-bill }
           - { series: us2y }
           - { series: us3y }
           - { series: us5y }
@@ -1254,7 +1254,7 @@ cycle_tabs:        # layout only; rows reference cycle_series ids
           - { series: us10y }
           - { series: us20y }
           - { series: ust30y }
-                                              - title: "GLOBAL MACRO — WORLD BANK (ANNUAL)"
+      - title: "GLOBAL MACRO — WORLD BANK (ANNUAL)"
         rows:
           - { series: "wb:US:gdp" }
           - { series: "wb:US:cpi" }
