@@ -3,14 +3,18 @@ services:
     name: os-bloom
     runtime: docker
     dockerfilePath: ./Dockerfile
-    plan: free
+    plan: starter
     autoDeploy: true
     healthCheckPath: /healthz
+    disk:
+      name: os-bloom-data
+      mountPath: /var/data
+      sizeGB: 2
     envVars:
       - key: CONFIG_PATH
         value: /app/config.yaml
       - key: DB_PATH
-        value: /tmp/bloom.db
+        value: /var/data/bloom.db
       - key: SERVE_UI
         value: "1"
       - key: UI_PATH
@@ -40,4 +44,4 @@ services:
       - key: GEMINI_API_KEY
         sync: false
       - key: CHAT_MODEL
-        value: gemini-flash-latest
+        value: gemini-flash-lite-latest
