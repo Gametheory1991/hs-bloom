@@ -3,6 +3,9 @@ from __future__ import annotations
 
 from typing import Any, Awaitable, Callable
 
+import asyncio
+import subprocess
+
 import httpx
 
 # Honest, contactable User-Agent. Standard `product/version (comment)` syntax:
@@ -31,6 +34,33 @@ async def get_text(url: str, params: dict | None = None, headers: dict | None = 
                 f"HTTP {resp.status_code} for {resp.url.copy_with(query=None)}"
             ) from None
         return resp.text
+
+
+async def get_text_curl(url: str, params: dict | None = None, headers: dict | None = None) -> str:
+    """GET via the curl binary (subprocess), for WAF-hostile hosts.
+
+    FRED's WAF blackholes Python-TLS clients (httpx/urllib) from the Render
+    host regardless of User-Agent -- requests hang to timeout -- while the
+    curl binary fetches the same public CSVs in ~1s (verified 2026-10-06).
+    Runs the blocking subprocess in a thread so the event loop stays free.
+    """
+    from urllib.parse import urlencode
+
+    full = url + ("?" + urlencode(params) if params else "")
+    ua = (headers or {}).get("User-Agent", USER_AGENT)
+
+    def _run() -> str:
+        r = subprocess.run(
+            ["curl", "-sS", "--max-time", "25", "-A", ua, full],
+            capture_output=True, text=True, timeout=30,
+        )
+        if r.returncode != 0:
+            raise RuntimeError(
+                f"curl exit {r.returncode} for {url}: {r.stderr.strip()[:200]}"
+            )
+        return r.stdout
+
+    return await asyncio.to_thread(_run)
 
 
 async def get_bytes(url: str, params: dict | None = None, headers: dict | None = None) -> bytes:
