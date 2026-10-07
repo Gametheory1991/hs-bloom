@@ -73,6 +73,7 @@ cadences:          # seconds between fetcher runs
   worldbank: 604800    # World Bank macro fundamentals; weekly (annual data)
   usaspending: 604800  # USAspending.gov fiscal pulse; weekly (3 keyless POSTs)
   coingecko: 86400     # CoinGecko top-50 crypto breadth; daily (1 batched call)
+  defillama_rwa: 86400 # Tokenized assets: DefiLlama RWA TVL + CoinGecko token mcaps; daily (~25 calls)
   openfigi: 604800     # OpenFIGI symbology map; weekly (skips w/o OPENFIGI_API_KEY)
   finnhub: 86400       # Finnhub earnings+insider; daily when FINNHUB_API_KEY set
   polymarket: 1800    # Polymarket Gamma top markets by 24h volume; keyless, 1 batched call
@@ -1112,6 +1113,18 @@ cycle_series:      # market-cycle series (spec 2026-08-24); exactly one source k
   - { id: "coingecko:solana:price",    name: "Solana $",   unit: "USD", external: true }
   - { id: "coingecko:xrp:price",      name: "XRP $",      unit: "USD", external: true }
   - { id: "coingecko:dogecoin:price", name: "Dogecoin $", unit: "USD", external: true }
+  - { id: "rwa-mcap-total",            name: "Tokenized assets mcap $",   unit: "$", external: true }
+  - { id: "rwa-tvl-total",             name: "RWA protocol TVL $",         unit: "$", external: true }
+  - { id: "rwa-mcap-class-treasuries", name: "RWA mcap: treasuries $",     unit: "$", external: true }
+  - { id: "rwa-mcap-class-gold",       name: "RWA mcap: gold $",           unit: "$", external: true }
+  - { id: "rwa-mcap-class-stocks",     name: "RWA mcap: stocks $",         unit: "$", external: true }
+  - { id: "rwa-mcap-class-credit",     name: "RWA mcap: private credit $", unit: "$", external: true }
+  - { id: "rwa-mcap-class-realestate", name: "RWA mcap: real estate $",    unit: "$", external: true }
+  - { id: "rwa-tvl-class-treasuries",  name: "RWA TVL: treasuries $",      unit: "$", external: true }
+  - { id: "rwa-tvl-class-credit",      name: "RWA TVL: private credit $", unit: "$", external: true }
+  - { id: "rwa-tvl-class-gold",        name: "RWA TVL: gold $",            unit: "$", external: true }
+  - { id: "rwa-tvl-class-stocks",      name: "RWA TVL: stocks $",          unit: "$", external: true }
+  - { id: "rwa-tvl-class-realestate",  name: "RWA TVL: real estate $",     unit: "$", external: true }
   - { id: "coingecko:cardano:price",  name: "Cardano $",   unit: "USD", external: true }
   - { id: "coingecko:tron:price",     name: "Tron $",     unit: "USD", external: true }
   - { id: "coingecko:usd-coin:price", name: "USDC $",     unit: "USD", external: true }

@@ -463,6 +463,9 @@ def _defi_panel(store: Store) -> dict:
     panel["crypto_as_of"] = cg.payload.get("as_of") if cg else None
     panel["btc_dominance_pct"] = cg.payload.get("btc_dominance_pct") if cg else None
     panel["crypto_updated_at"] = cg.updated_at if cg else None
+    rwa = store.doc("rwa")
+    panel["rwa"] = rwa.payload if rwa else None
+    panel["rwa_updated_at"] = rwa.updated_at if rwa else None
     return panel
 
 

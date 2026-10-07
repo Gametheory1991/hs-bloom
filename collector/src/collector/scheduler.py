@@ -77,6 +77,7 @@ from collector.fetchers.trace_treasury import fetch_trace_treasury
 from collector.fetchers.worldbank import fetch_worldbank
 from collector.fetchers.usaspending import fetch_usaspending
 from collector.fetchers.coingecko import fetch_coingecko
+from collector.fetchers.defillama_rwa import fetch_defillama_rwa
 from collector.fetchers.openfigi import fetch_openfigi
 from collector.fetchers.finnhub import fetch_finnhub
 from collector.fetchers.polymarket import fetch_polymarket
@@ -314,6 +315,10 @@ def register_jobs(
         # keyless, one batched call per day.
         "coingecko": (cfg.cadences.get("coingecko", 86400), partial(fetch_coingecko, store, get_text),
                  start + timedelta(seconds=5100)),
+        # Tokenized assets (RWA): DefiLlama RWA protocol TVL + CoinGecko
+        # tokenized-asset market caps by class. Keyless; ~25 batched calls.
+        "defillama_rwa": (cfg.cadences.get("defillama_rwa", 86400), partial(fetch_defillama_rwa, store, get_text),
+                 start + timedelta(seconds=5250)),
         # batch 11: OpenFIGI symbology enrichment — needs OPENFIGI_API_KEY
         # (free registration); skips cleanly without it, never fails.
         "openfigi": (cfg.cadences.get("openfigi", 604800), partial(fetch_openfigi, store, post_json),
