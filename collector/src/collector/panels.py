@@ -397,6 +397,24 @@ def _etfflows_panel(store: Store) -> dict:
             "updated_at": doc.updated_at, "source": doc.source}
 
 
+def _tff_panel(store: Store) -> dict:
+    """OFR Traders in Financial Futures (doc 'tff').
+
+    Curated groups with rolling weekly history per row — powers the
+    POSITIONING TFF view in one fetch instead of a 150-series fan-out.
+    """
+    doc = store.doc("tff")
+    if doc is None:
+        return {"asof": None, "mnemonic_count": 0, "stored": 0,
+                "groups": [], "note": None,
+                "updated_at": None, "source": None}
+    p = doc.payload or {}
+    return {"asof": p.get("asof"), "mnemonic_count": p.get("mnemonic_count", 0),
+            "stored": p.get("stored", 0), "groups": p.get("groups", []),
+            "note": p.get("note"), "source_url": p.get("source_url"),
+            "updated_at": doc.updated_at, "source": doc.source}
+
+
 def _tape_panel(store: Store) -> dict:
     """NasdaqTrader tape/exchange volume (doc 'tape').
 
@@ -837,6 +855,7 @@ def build_dashboard(
             "options": _options_panel(store),
             "etfflows": _etfflows_panel(store),
             "tape": _tape_panel(store),
+            "tff": _tff_panel(store),
             "radar": _radar_panel(store),
             "hyper": _hyper_panel(store),
             "ai_flow": _universe_panel(store, "ai_buildout"),

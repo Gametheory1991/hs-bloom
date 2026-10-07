@@ -44,6 +44,7 @@ from collector.fetchers.movers import fetch_movers
 from collector.fetchers.news import fetch_news
 from collector.fetchers.regwatch import fetch_regwatch
 from collector.fetchers.ofr import fetch_ofr
+from collector.fetchers.ofr_tff import fetch_ofr_tff
 from collector.fetchers.refs import fetch_refs
 from collector.fetchers.risk import refresh_risk
 from collector.fetchers.thirteenf import fetch_thirteenf
@@ -414,6 +415,11 @@ def register_jobs(
         # Daily job; series stored as-is via upsert.
         "ofr_stfm": (cfg.cadences.get("ofr_stfm", 86400), partial(fetch_ofr_stfm, cfg.ofr_stfm, store, get_text),
                  start + timedelta(seconds=8400)),
+        # OFR Traders in Financial Futures (keyless; weekly). All 153 mnemonics
+        # with full history (2013 ->); stored as cycle:tff-<slug>. Daily-max job
+        # per OFR guidance; the doc 'tff' powers the POSITIONING TFF view.
+        "ofr_tff": (cfg.cadences.get("ofr_tff", 86400), partial(fetch_ofr_tff, store, get_text),
+                 start + timedelta(seconds=8430)),
         # NY Fed Corporate Bond Market Distress Index — weekly xlsx (keyless,
         # browser UA). Stores cycle:cmdi-market/ig/hy; full history on first run.
         "nyfed_cmdi": (cfg.cadences.get("nyfed_cmdi", 604800), partial(fetch_nyfed_cmdi, store, get_bytes),
