@@ -14,7 +14,7 @@ import httpx
 # some upstream WAFs (aaii.com) reject a bare product token, so the comment is
 # load-bearing, not decoration. We never impersonate a browser -- upstreams can
 # identify and contact us, and every source we use serves this UA fine.
-USER_AGENT = "os-bloom/0.1 (+https://github.com/cleyfe/os-bloom)"
+USER_AGENT = "hs-bloom/0.1 (+https://github.com/cleyfe/hs-bloom)"
 
 GetText = Callable[..., Awaitable[str]]
 GetBytes = Callable[..., Awaitable[bytes]]

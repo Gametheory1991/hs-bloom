@@ -359,7 +359,7 @@ def register_jobs(
         # contact UA required by SEC fair-access rules.
         "sec_xbrl_etf": (cfg.cadences.get("sec_xbrl_etf", 604800), partial(fetch_sec_xbrl_etf, store, get_text,
                  (cfg.sec_data.user_agent if cfg.sec_data else
-                  "os-bloom/1.0 contact harrysugamakc@gmail.com")),
+                  "hs-bloom/1.0 contact harrysugamakc@gmail.com")),
                  start + timedelta(seconds=6150)),
         # Inverse 13F: institutional holders per ETF (FMP, free key; 250
         # calls/day). Quarterly snapshots with a 45-day filing lag: the
@@ -376,7 +376,7 @@ def register_jobs(
         "bdc_financials": (cfg.cadences.get("bdc_financials", 604800),
                  partial(fetch_bdc_financials, store, get_text,
                  (cfg.sec_data.user_agent if cfg.sec_data else
-                  "os-bloom/1.0 contact harrysugamakc@gmail.com")),
+                  "hs-bloom/1.0 contact harrysugamakc@gmail.com")),
                  start + timedelta(seconds=6600)),
         # Private Credit universe graph: enriches the vendored BDC/manager/
         # ETF/bond universe with Yahoo prices + XBRL fundamentals daily.

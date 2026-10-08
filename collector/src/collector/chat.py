@@ -16,7 +16,7 @@ from collector.changes import apply_transform
 from collector.config import Config
 from collector.store import Store
 
-SYSTEM_PROMPT = """You are the analyst inside the os-bloom macro terminal — a \
+SYSTEM_PROMPT = """You are the analyst inside the hs-bloom macro terminal — a \
 Bloomberg-ASK-style desk covering equities, fixed income, and economics.
 Rules:
 - Ground EVERY factual claim in the data provided below. Never invent a \

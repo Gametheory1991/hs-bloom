@@ -68,7 +68,7 @@ def _status_payload(cfg: SmtpCfg, **extra) -> dict:
 
 def _render_body(insights: dict, cfg: SmtpCfg) -> str:
     lines = [
-        "os-bloom market digest",
+        "hs-bloom market digest",
         "",
         insights.get("newsletter", {}).get("headline", "Digest updated"),
         "",
@@ -95,7 +95,7 @@ def _render_body(insights: dict, cfg: SmtpCfg) -> str:
 
 def _send(cfg: SmtpCfg, insights: dict) -> None:
     msg = EmailMessage()
-    msg["Subject"] = f"os-bloom digest · {insights.get('newsletter', {}).get('headline', 'update')}"
+    msg["Subject"] = f"hs-bloom digest · {insights.get('newsletter', {}).get('headline', 'update')}"
     msg["From"] = cfg.sender
     msg["To"] = cfg.recipient
     msg.set_content(_render_body(insights, cfg))

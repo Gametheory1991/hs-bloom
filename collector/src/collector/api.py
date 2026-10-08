@@ -150,7 +150,7 @@ def _dashboard_panels(store: Store, cfg: Config) -> tuple[int, dict]:
 
 
 def create_app(store: Store, cfg: Config) -> FastAPI:
-    app = FastAPI(title="os-bloom collector", docs_url=None, redoc_url=None)
+    app = FastAPI(title="hs-bloom collector", docs_url=None, redoc_url=None)
     app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET", "POST", "PUT"])
     series_by_id = {s.id: s for s in cfg.series}
     cycle_by_id = {s.id: s for s in cfg.cycle_series}

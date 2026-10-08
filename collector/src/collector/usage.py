@@ -1,4 +1,4 @@
-"""Built-in usage analytics for os-bloom (no third-party service).
+"""Built-in usage analytics for hs-bloom (no third-party service).
 
 Privacy: raw IPs are never stored — only a SHA256 hash salted with the
 UTC date (so hashes rotate daily and can't be stitched across days).
