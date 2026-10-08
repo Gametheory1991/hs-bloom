@@ -37,6 +37,7 @@ export const getRegshoTopTable = (q = "") => getJson(`/api/equity/regsho-top${q}
 export const getThresholdHistDates = () => getJson("/api/equity/threshold-history/dates");
 export const getThresholdHist = (q = "") => getJson(`/api/equity/threshold-history${q}`);
 export const getScorecard = () => getJson("/api/scorecard");
+export const getStressHeatmaps = () => getJson("/api/stress/heatmaps");
 export const getAuctions = () => getJson("/api/auctions");
 export const getEconCalendar = () => getJson("/api/econ-calendar");
 export const getAlertConfig = () => getJson("/api/alerts/config");

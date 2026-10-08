@@ -733,6 +733,29 @@ def create_app(store: Store, cfg: Config) -> FastAPI:
             "updated_at": doc.updated_at,
         }
 
+    @app.get("/api/stress/heatmaps")
+    def stress_heatmaps_api() -> dict:
+        """Stress Monitor 8 heatmaps: H1/H2 level vs episode peaks (native
+        units), H3/H4 velocity vs episodes (signed), H5/H6 velocity z-scores,
+        H7/H8 level z-scores. Columns: 8 stress episodes + NOW. Returns an
+        empty-matrices payload (never a 500) when the stress_heatmaps
+        scheduler job hasn't run yet — it computes daily."""
+        doc = store.doc("stress_heatmaps")
+        if doc is None or not doc.payload:
+            return {"asof": None, "columns": [], "episodes": [], "rows": [],
+                    "matrices": {}, "texts": {}, "updated_at": None}
+        p = doc.payload
+        return {
+            "asof": p.get("asof"),
+            "columns": p.get("columns", []),
+            "episodes": p.get("episodes", []),
+            "rows": p.get("rows", []),
+            "series_asof": p.get("series_asof", {}),
+            "matrices": p.get("matrices", {}),
+            "texts": p.get("texts", {}),
+            "updated_at": doc.updated_at,
+        }
+
     @app.get("/api/equity/short-interest/settlements")
     def si_settlements() -> dict:
         """FINRA short-interest settlement coverage: every settlement date

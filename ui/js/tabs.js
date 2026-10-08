@@ -6,7 +6,7 @@ import { track } from "./usage.js";
 
 export const HUBS = [
   { id: "pulse", label: "PULSE",
-    subs: [["snapshot", "Snapshot"], ["scorecard", "Scorecard"]] },
+    subs: [["snapshot", "Snapshot"], ["scorecard", "Scorecard"], ["stress", "Stress"]] },
   { id: "macro", label: "MACRO",
     subs: [["calendar", "Calendar"], ["central", "Central Banks"], ["auctions", "UST Auctions"],
            ["bonds", "World Bonds"], ["credit", "Credit"], ["cycle", "Cycle"]] },

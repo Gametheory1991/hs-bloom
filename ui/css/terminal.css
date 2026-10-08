@@ -779,3 +779,17 @@ th .range-legend { margin-top: 2px; }
   /* STRUCTURE hub: card grids collapse to 1-2 columns (auto-fill already does 2-up at 390px) */
   .koi-grid { grid-template-columns: repeat(2, 1fr); }
 }
+
+/* STRESS MONITOR 8 heatmaps (warm dark) */
+.stress-intro { font-size: 11px; margin-bottom: 6px; }
+.stress-legend { font-size: 11px; color: var(--muted); margin-bottom: 14px; }
+.sl-sw { display: inline-block; width: 12px; height: 12px; border-radius: 2px; margin: 0 4px 0 10px; vertical-align: -1px; }
+.stress-hm { margin-bottom: 26px; }
+.stress-hm-title { font-size: 13px; font-weight: 700; color: var(--fg); margin-bottom: 8px; }
+.stress-hm-scroll { overflow-x: auto; }
+.stress-hm-table { min-width: 760px; }
+.stress-hm-table th { font-size: 10px; text-align: center; padding: 6px 8px; white-space: nowrap; }
+.stress-hm-table th.now-col, .stress-hm-table td.now-col { outline: 1px solid var(--amber); outline-offset: -1px; }
+.stress-hm-table th.now-col { color: var(--amber); font-weight: 700; }
+.stress-hm-table td.row-label { text-align: left; font-weight: 600; color: var(--fg); white-space: nowrap; padding-right: 12px; background: none !important; }
+.hm-cell { text-align: center; font-size: 11px; padding: 7px 8px; white-space: nowrap; border-radius: 2px; font-variant-numeric: tabular-nums; }

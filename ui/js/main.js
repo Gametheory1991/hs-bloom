@@ -23,6 +23,7 @@ import { renderFutures, FUTURES } from "./panels/futures.js";
 import { renderFlows } from "./panels/flows.js";
 import { renderTff } from "./panels/tff.js";
 import { renderScorecard } from "./panels/scorecard.js";
+import { renderStressHeatmaps } from "./panels/stress_heatmaps.js";
 import { renderCentral } from "./panels/central.js";
 import { renderPredict } from "./panels/predict.js";
 import { renderFinra } from "./panels/finra.js";
@@ -248,12 +249,13 @@ initExportObserver(); // ⤓ CSV/XLSX/PNG/JPG export on every section + panel
 renderFutures();
 renderFlows();
 renderScorecard();
+renderStressHeatmaps();
 renderCentral();
 renderAlerts();
 renderBriefcheck();
 renderUsage();
 refreshSearchIndex();
-setInterval(() => { renderFutures(); renderFlows(); renderScorecard(); renderCentral(); renderBriefcheck(); renderKoi(); refreshSearchIndex(); }, 15 * 60_000);
+setInterval(() => { renderFutures(); renderFlows(); renderScorecard(); renderStressHeatmaps(); renderCentral(); renderBriefcheck(); renderKoi(); refreshSearchIndex(); }, 15 * 60_000);
 initDefiViewToggle(() => {
   if (lastDash) renderDefiPanel(lastDash.panels);
 });

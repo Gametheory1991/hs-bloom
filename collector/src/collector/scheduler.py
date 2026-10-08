@@ -78,6 +78,7 @@ from collector.fetchers.z1_holdings import fetch_z1_holdings
 from collector.fetchers.mspd import fetch_mspd
 from collector.fetchers.soma_cusip import fetch_soma_cusip
 from collector.debt_cube import refresh_debt_cube
+from collector.stress_heatmaps import refresh_stress_heatmaps
 from collector.fetchers.ice_star import fetch_ice_star
 from collector.fetchers.refs_history import fetch_refs_history
 from collector.fetchers.trace_monthly import fetch_trace_monthly
@@ -526,6 +527,11 @@ def register_jobs(
         # until all source docs exist. Daily.
         "debt_cube": (cfg.cadences.get("debt_cube", 86400), partial(refresh_debt_cube, store),
                  start + timedelta(seconds=10800)),
+        # Stress Monitor 8 heatmaps: compute-only, reads FRED series history
+        # from the store, caches the 8 matrices via put_doc. Daily; starts
+        # after the macro_history job so fresh FRED data is in.
+        "stress_heatmaps": (cfg.cadences.get("stress_heatmaps", 86400), partial(refresh_stress_heatmaps, store),
+                 start + timedelta(seconds=11100)),
         # REG WATCH: regulatory news + surveillance — agency RSS feeds (SEC,
         # CFTC, FINRA, Fed, OCC, FDIC, FSB, OFR), Federal Register rulemaking
         # tracker, Gemini one-line summaries, topic tagging. Hourly; one dead
