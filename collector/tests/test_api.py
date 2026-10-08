@@ -249,3 +249,31 @@ def test_bdc_fundamentals_route(tmp_path):
     assert body["symbol"] == "ARCC"
     assert body["identity_ok"] is True
     assert body["history"]["nii"][-1] == ["2026-06-30", 367000000.0]
+
+
+def test_finra_docs_endpoint_returns_full_payloads_untrimmed(tmp_path):
+    client, store = make_client(tmp_path)
+    store.put_doc("finra_corp", {
+        "bond_hist": {"C1": {"d": ["2024-01-01", "2024-01-02"],
+                              "p": [100.0, 100.5], "y": [4.5, 4.4]}},
+        "cusip_registry": {"C1": {"issuer": "ACME", "coupon": 4.5}},
+    }, source="finra")
+    store.put_doc("trace_treasury", {"rows": [1, 2, 3]}, source="finra-trace")
+    store.put_doc("not_finra", {"x": 1}, source="other")  # not allowlisted
+    body = client.get("/api/finra/docs").json()
+    assert set(body["docs"]) == {"finra_corp", "trace_treasury"}
+    corp = body["docs"]["finra_corp"]
+    # every field present, nothing trimmed
+    assert corp["payload"]["bond_hist"]["C1"]["p"] == [100.0, 100.5]
+    assert corp["payload"]["cusip_registry"]["C1"] == {"issuer": "ACME", "coupon": 4.5}
+    assert corp["source"] == "finra"
+    assert corp["updated_at"]  # per-doc metadata present
+    assert body["docs"]["trace_treasury"]["payload"] == {"rows": [1, 2, 3]}
+    assert body["fetched_at"]
+
+
+def test_finra_docs_endpoint_empty_store(tmp_path):
+    client, _ = make_client(tmp_path)
+    body = client.get("/api/finra/docs").json()
+    assert body["docs"] == {}
+    assert body["fetched_at"]

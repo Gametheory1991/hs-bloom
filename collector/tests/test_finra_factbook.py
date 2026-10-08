@@ -1150,3 +1150,74 @@ def test_annual_job_full_tables_and_history_merge():
     assert "no par" in p["issue_note"]
     kinds = {(f["kind"], f["prod"]) for f in p["annual_files"]}
     assert ("participant", "corp") in kinds
+
+
+MULTI_Q_INDEX = """
+<html><body>
+<a href="/f/Q22026-Corporate-Bond-Tables.xlsx">Corporate Bond Tables</a>
+<a href="/f/Q12026-Corporate-Bond-Tables.xlsx">Corporate Bond Tables</a>
+<a href="/f/Q42025-Corporate-Bond-Tables.xlsx">Corporate Bond Tables</a>
+<a href="/f/Q22026-Agency-Debt-Tables.xlsx">Agency Debt Tables</a>
+</body></html>
+"""
+
+
+def _multi_q_run(store, index_html=MULTI_Q_INDEX, backfill_quarters=None):
+    corp = _corp_workbook()
+    agency = _agency_workbook()
+    fetched = []
+
+    async def fake_get_text(url, headers=None):
+        return index_html
+
+    async def fake_get_bytes(url, headers=None):
+        fetched.append(url)
+        return agency if "Agency" in url else corp
+
+    asyncio.run(fb.fetch_finra_factbook(store, fake_get_text, fake_get_bytes,
+                                        backfill_quarters=backfill_quarters))
+    return fetched
+
+
+def test_fetch_extends_only_missing_quarters():
+    # Q2 2026 already in the canary series: only Q1 2026 + Q4 2025 are fetched
+    # as extensions (the latest-quarter refresh still re-pulls Q2 for the
+    # snapshot doc).
+    store = FakeStore()
+    store.series["cycle:fb-ig-trades"] = {date(2026, 6, 30): 1.0}
+    fetched = _multi_q_run(store)
+    assert len(fetched) == 4  # corp Q2 + agency Q2 refresh, corp Q1 + Q4 2025 new
+    assert sum("Q22026" in u for u in fetched) == 2
+    assert any("Q12026" in u for u in fetched)
+    assert any("Q42025" in u for u in fetched)
+    qf = store.docs["finra_factbook"]["payload"]["quarters_fetched"]
+    assert "corp:2026-Q2" in qf
+    assert "corp:2026-Q1" in qf
+    assert "corp:2025-Q4" in qf
+
+
+def test_fetch_empty_store_pulls_everything_listed():
+    store = FakeStore()
+    fetched = _multi_q_run(store)
+    assert len(fetched) == 4  # all quarters the index lists
+
+
+def test_fetch_resume_skips_logged_quarters():
+    # A quarter in quarters_fetched is never re-downloaded, even when its
+    # quarter-end is absent from the canary series (label/URL mismatch guard).
+    store = FakeStore()
+    store.docs["finra_factbook"] = {
+        "payload": {"quarters_fetched": ["corp:2026-Q1", "corp:2025-Q4"]},
+        "source": "finra-factbook",
+    }
+    fetched = _multi_q_run(store)
+    # Q2 corp + Q2 agency only; logged quarters skipped
+    assert len(fetched) == 2
+    assert all("Q22026" in u for u in fetched)
+
+
+def test_fetch_backfill_quarters_caps_per_run():
+    store = FakeStore()
+    fetched = _multi_q_run(store, backfill_quarters=1)
+    # latest per kind (corp Q2, agency Q2) + 1 older quarter
+    assert len(fetched) == 3

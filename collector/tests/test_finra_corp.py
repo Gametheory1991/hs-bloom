@@ -291,17 +291,13 @@ def test_merge_cusip_registry_accumulates():
     assert set(reg2) == {"C1", "C2", "C3"}
 
 
-def test_merge_cusip_registry_cap():
+def test_merge_cusip_registry_no_eviction():
+    # No cap: every CUSIP ever seen is kept, oldest first.
     lists = {f"2026-09-{d:02d}": [_reg_bond(f"C{d}", 4.0, "2030-01-01", "A2", "A", 4.5)]
              for d in range(1, 10)}
-    old_cap = finra_corp.REGISTRY_CAP
-    finra_corp.REGISTRY_CAP = 5
-    try:
-        reg = finra_corp.merge_cusip_registry(None, lists)
-    finally:
-        finra_corp.REGISTRY_CAP = old_cap
-    assert len(reg) == 5
-    assert "C9" in reg  # newest kept
+    reg = finra_corp.merge_cusip_registry(None, lists)
+    assert len(reg) == 9
+    assert "C1" in reg and "C9" in reg  # oldest AND newest kept
 
 
 def test_build_refi_wall():
@@ -337,3 +333,46 @@ def test_build_refi_wall_empty():
     assert wall["issues"] == 0
     assert wall["buckets"] == {}
     assert wall["yearly"] == []
+
+
+def test_merge_bond_history_keeps_full_history_no_cap():
+    # 500 trading days exceeds the old 400-entry cap: everything must survive.
+    from datetime import timedelta
+    base = date(2023, 2, 15)
+    lists = {}
+    for i in range(500):
+        d = (base + timedelta(days=i)).isoformat()
+        lists[d] = [{"symbol": "ACME123", "last": 100.0 + i * 0.01,
+                     "yield": 4.5}]
+    hist = finra_corp.merge_bond_history({}, lists)
+    h = hist["ACME123"]
+    assert len(h["d"]) == 500
+    assert len(h["p"]) == 500
+    assert len(h["y"]) == 500
+    assert h["d"][0] == "2023-02-15"
+    assert h["d"][-1] == (base + timedelta(days=499)).isoformat()
+
+
+def test_merge_bond_history_prev_long_history_not_retrimmed():
+    # A previously stored long history must not be re-trimmed on merge.
+    prev = {"ACME123": {"d": [f"2020-01-{i:02d}" for i in range(1, 29)] * 16,
+                         "p": [100.0] * 448, "y": [4.5] * 448}}
+    hist = finra_corp.merge_bond_history(
+        prev, {"2026-10-07": [{"symbol": "ACME123", "last": 101.0,
+                               "yield": 4.4}]})
+    assert len(hist["ACME123"]["d"]) == 449
+
+
+def test_merge_cusip_registry_keeps_every_cusip_no_cap():
+    # 5100 CUSIPs exceeds the old 5000 registry cap: all must survive.
+    day = "2026-10-07"
+    reg = finra_corp.merge_cusip_registry(
+        None,
+        {day: [{"symbol": f"CUSIP{i:05d}", "issuer": "ISSUER",
+                "coupon": 4.5, "maturity": "2030-01-15",
+                "moodys": "Baa2", "sp": "BBB", "cat": "inv",
+                "yield": 5.0, "last": 99.0}
+               for i in range(5100)]})
+    assert len(reg) == 5100
+    assert reg["CUSIP00000"]["last_seen"] == day
+    assert reg["CUSIP05099"]["issuer"] == "ISSUER"
