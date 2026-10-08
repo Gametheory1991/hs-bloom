@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: os-bloom
+    name: hs-bloomies
     runtime: docker
     dockerfilePath: ./Dockerfile
     plan: starter
