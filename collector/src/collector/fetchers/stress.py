@@ -265,10 +265,10 @@ HF_CYCLE = [
 # 16.4 ETF momentum set. Price closes live at cycle:etf-<T>-price (Yahoo, 1Y)
 # from fetchers/ishares_etf.py for these 13 (verified in ETF_UNIVERSE).
 ETF_MOM_TICKERS = ["SGOV", "BIL", "VGSH", "VGIT", "GOVT", "EDV", "EMB", "XLK",
-                   "XLF", "XLE", "GLD", "HYG", "LQD"]
+                   "XLF", "XLE", "GLD", "HYG", "LQD", "KRE"]
 # Rest of the 18-ETF set: no cycle:etf-<T>-price series (not in ETF_UNIVERSE,
 # no free verified feed wired) — registered n/a.
-ETF_MOM_MISSING = ["XLI", "XLV", "SMH", "KRE", "LEMB"]
+ETF_MOM_MISSING = ["XLI", "XLV", "SMH", "LEMB"]
 ETF_MOM_LAGS = (1, 5)  # 1d and 5d momentum
 
 # 3.6b flows basket extension (16.4). No etf_flow_<ticker> series exist for

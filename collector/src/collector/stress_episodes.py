@@ -65,7 +65,7 @@ EPISODE_META = [
 # constants
 # ---------------------------------------------------------------------------
 
-MIN_WINDOW_OBS = 30     # "covering": >= 30 observations inside the episode window
+MIN_WINDOW_OBS = 5      # "covering": >= 5 observations inside the episode window (Harry 2026-10-08: relaxed from 30)
 RATIO_CAP_PCT = 150.0    # today's change as % of the episode peak, capped
 FASTER_THRESHOLD = 100.0  # ratio >= 100% counts as "moving faster than the peak"
 LOOKBACK_PAD_DAYS = 35  # pad before a window start so t-n lookbacks resolve
@@ -255,6 +255,9 @@ def _indicator_episodes(entry: dict, dates: list[date], values: list[float],
     """
     kind = _velocity_kind(entry)
     direction = entry.get("direction", "+")
+    if entry.get("abs_velocity"):
+        # §16.4 rate levels: a fast move either way is stress (Harry 2026-10-08)
+        direction = "±"
     freq = entry.get("freq", "D")
     episodes: dict[str, dict] = {}
 

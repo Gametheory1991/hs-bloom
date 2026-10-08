@@ -99,11 +99,11 @@ def test_registry_fidelity():
 
 
 # ---------------------------------------------------------------------------
-# 2. no-history behavior: < 30 obs in the window -> "no history", never zero
+# 2. no-history behavior: < 5 obs in the window -> "no history", never zero
 # ---------------------------------------------------------------------------
 
 def test_no_history():
-    win = [d(2008, 9, 1) + timedelta(days=i) for i in range(10)]  # 10 < 30
+    win = [d(2008, 9, 1) + timedelta(days=i) for i in range(3)]  # 3 < 5
     store = FakeStore({"s:thin": {t: 1.0 + 0.1 * i for i, t in enumerate(win)}})
     reg = [_reg_entry("thin", "+", "D")]
     payload = se.episodes_payload(store, reg, WEIGHTS, as_of=AS_OF)
@@ -111,7 +111,7 @@ def test_no_history():
     assert cell["status"] == "no_history"
     assert cell["episode_max"] is None and cell["ratio_pct"] is None
     assert cell["episode_max"] != 0  # never zero
-    assert "30" in cell["note"]
+    assert "5" in cell["note"]
 
 
 def test_empty_store_is_no_data_not_crash():
