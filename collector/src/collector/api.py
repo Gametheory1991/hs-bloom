@@ -776,8 +776,13 @@ def create_app(store: Store, cfg: Config) -> FastAPI:
 
     @app.get("/api/stress/episodes")
     def stress_episodes_route() -> dict:
-        """Stress Monitor v2 episode registry (WS3's module). Same deferred
-        pattern as /api/stress/alerts."""
+        """Stress Monitor v2 episode registry (WS3's module). Serve-from-cache
+        contract like /api/stress/matrix: the scheduler's refresh_episodes
+        writes the `stress_episodes` doc; until the first run, fall back to a
+        live computation (expensive) and finally the building placeholder."""
+        d = store.doc("stress_episodes")
+        if d is not None and d.payload:
+            return d.payload
         return _deferred_stress_payload(
             ("collector.stress_episodes", "collector.fetchers.stress_episodes"),
             "episodes_payload", "episodes module not present")

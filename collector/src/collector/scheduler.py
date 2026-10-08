@@ -139,6 +139,12 @@ async def _stress_with_views(store, cfg, fred_api_key, get_text, get_bytes):
         evaluate_alerts(store)
     except Exception as e:  # noqa: BLE001 - alerts are best-effort
         log.warning("stress alerts evaluation failed: %s", e)
+    # Phase-2 WS3: episode-relative velocity matrix. Guarded likewise.
+    try:
+        from collector.stress_episodes import refresh_episodes
+        refresh_episodes(store, INDICATORS, STRESS_WEIGHTS)
+    except Exception as e:  # noqa: BLE001 - episodes are best-effort
+        log.warning("stress episodes refresh failed: %s", e)
 
 
 def _catchup_first_runs(
