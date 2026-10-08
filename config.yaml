@@ -28,6 +28,7 @@ cadences:          # seconds between fetcher runs
   stress: 86400     # Stress Monitor v2 Phase-1: missing Tier-1 fetches + scoring refresh; daily
   country_risk: 86400 # world risk map scoring; daily compute job (no external HTTP)
   gse: 2592000      # Fannie/Freddie monthly volume summaries; ~25d release lag, job probes 4 month-ends
+  sifma_issuance: 2592000 # SIFMA US corporate issuance (IG/HY, $B); monthly poll, ~1 month publication lag
   xcorr: 86400      # correlation + realized-vol compute job; daily (no external HTTP)
   movers: 604800    # single-stock sigma movers; ~600 Yahoo requests, weekly Saturday
   voldash: 86400    # vol dashboard compute; daily (no external HTTP)
@@ -232,6 +233,8 @@ cycle_series:      # market-cycle series (spec 2026-08-24); exactly one source k
   - { id: t10y2y,       name: "US 10Y-2Y curve",           unit: "%",   fred: T10Y2Y }
   - { id: ig-oas,       name: "US IG OAS",                 unit: "%",   fred: BAMLC0A0CM }
   - { id: hy-oas,       name: "US HY OAS",                 unit: "%",   fred: BAMLH0A0HYM2 }
+  - { id: hy-issuance-monthly, name: "HY issuance $B (SIFMA)", unit: "$B", external: true }  # sifma_issuance job
+  - { id: ig-issuance-monthly, name: "IG issuance $B (SIFMA)", unit: "$B", external: true }  # sifma_issuance job
   - { id: eu-hy-oas,    name: "Euro HY OAS",               unit: "%",   fred: BAMLHE00EHYIOAS }
   - { id: bbb-oas,      name: "US BBB OAS",                unit: "%",   fred: BAMLC0A4CBBB }
   - { id: ccc-oas,      name: "US CCC OAS",                unit: "%",   fred: BAMLH0A3HYC }

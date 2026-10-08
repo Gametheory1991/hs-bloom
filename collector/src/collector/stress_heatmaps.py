@@ -45,6 +45,7 @@ SERIES = {
     "SOFR": ("sofr", "%", "{:.2f}%", 100, False),
     "IG OAS": ("ig-oas", "bp", "{:.0f}", 100, False),
     "HY OAS": ("hy-oas", "bp", "{:.0f}", 100, False),
+    "HY Issuance": ("hy-issuance-monthly", "$B", "{:.1f}", 1, False),
     "CCC OAS": ("ccc-oas", "bp", "{:.0f}", 100, False),
     "VIX": ("vix", "pts", "{:.1f}", 1, False),
     "NFCI": ("nfci", "idx", "{:.2f}", 1, False),

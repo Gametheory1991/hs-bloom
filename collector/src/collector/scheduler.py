@@ -81,6 +81,7 @@ from collector.fetchers.nport_flows import fetch_nport_flows
 from collector.fetchers.ici_mutual_flows import fetch_ici_mutual_flows
 from collector.fetchers.sec_pfs import fetch_sec_pfs
 from collector.fetchers.sec_ftd import fetch_sec_ftd
+from collector.fetchers.sifma_issuance import fetch_sifma_issuance
 from collector.fetchers.z1_holdings import fetch_z1_holdings
 from collector.fetchers.mspd import fetch_mspd
 from collector.fetchers.soma_cusip import fetch_soma_cusip
@@ -596,6 +597,13 @@ def register_jobs(
         # after the macro_history job so fresh FRED data is in.
         "stress_heatmaps": (cfg.cadences.get("stress_heatmaps", 86400), partial(refresh_stress_heatmaps, store),
                  start + timedelta(seconds=11100)),
+        # SIFMA US corporate bond issuance (IG + HY, $B, Refinitiv via SIFMA).
+        # Monthly poll (~1 month publication lag); first run deep-backfills
+        # Jan 2020 -> present from archived workbook snapshots, later runs
+        # just upsert the live workbook's ~13 months. Primary-market credit
+        # stress signal: HY issuance shutting is real stress.
+        "sifma_issuance": (cfg.cadences.get("sifma_issuance", 2592000), partial(fetch_sifma_issuance, store, get_bytes),
+                 start + timedelta(seconds=11250)),
         # REG WATCH: regulatory news + surveillance — agency RSS feeds (SEC,
         # CFTC, FINRA, Fed, OCC, FDIC, FSB, OFR), Federal Register rulemaking
         # tracker, Gemini one-line summaries, topic tagging. Hourly; one dead

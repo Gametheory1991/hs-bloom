@@ -55,6 +55,8 @@ def test_register_jobs_creates_all_jobs_with_config_cadences(tmp_path):
         "ici_flows", "nport_flows",
         "etf_holders_13f",
         "bdc_financials", "bdc_universe",
+        "sec_ftd", "short_metrics", "stress_heatmaps",
+        "sifma_issuance",
     }
     assert jobs["equity"].trigger.interval.total_seconds() == 300
     assert jobs["news"].trigger.interval.total_seconds() == 600
@@ -101,7 +103,6 @@ def test_main_builds_app(tmp_path, monkeypatch):
     from collector.main import build
 
     app, scheduler = build()
-assert app.title == "hs-bloom collector"
-    assert len(scheduler.get_jobs()) == 92  # +2 bank_financials/finance_dirs (finance batch), +2 bdc_financials/bdc_universe, +1 fed_meetings (pred batch), +1 etf_holders_13f, +2 ici_flows/nport_flows (was 84: +1 finra_otc (was 83: +1 ofr_tff (was 81: +1 sec_xbrl_etf, +1 nasdaq_tape (was 79: +3 cboe_options, ishares_etf, nyfed_cmdi (was 76: +1 defillama_rwa (was 75: +1 regwatch (was 74: +1 finra_breadth, +1 finra_corp, +1 finra_regsho, +1 finra_capped, +1 finra_ids_star, +1 ticker_stats, +2 bank universe, +4 tech/vendor universes, +2 etf universe, +2 crypto universe, +2 factbook, +9 batch13 (ofr_stfm, frb_ddp, sec_ncen, sec_nport, sec_pfs, z1_holdings, mspd, soma_cusip, debt_cube))))
-assert app.title == "os-bloom collector"
-    assert len(scheduler.get_jobs()) == 93  # +1 stress (stress-v2 phase1; was 92: +2 bank_financials/finance_dirs (finance batch), +2 bdc_financials/bdc_universe, +1 fed_meetings (pred batch), +1 etf_holders_13f, +2 ici_flows/nport_flows (was 84: +1 finra_otc (was 83: +1 ofr_tff (was 81: +1 sec_xbrl_etf, +1 nasdaq_tape (was 79: +3 cboe_options, ishares_etf, nyfed_cmdi (was 76: +1 defillama_rwa (was 75: +1 regwatch (was 74: +1 finra_breadth, +1 finra_corp, +1 finra_regsho, +1 finra_capped, +1 finra_ids_star, +1 ticker_stats, +2 bank universe, +4 tech/vendor universes, +2 etf universe, +2 crypto universe, +2 factbook, +9 batch13 (ofr_stfm, frb_ddp, sec_ncen, sec_nport, sec_pfs, z1_holdings, mspd, soma_cusip, debt_cube))))
+
+    assert app.title == "hs-bloom collector"
+    assert len(scheduler.get_jobs()) == 97  # +1 sifma_issuance (was 96: +1 sec_ftd, +1 short_metrics, +1 stress_heatmaps beyond the stale 93 count)
