@@ -1,6 +1,6 @@
 {
-  "name": "os-bloom",
-  "short_name": "os-bloom",
+  "name": "hs-bloom",
+  "short_name": "hs-bloom",
   "start_url": "/#/mkt",
   "display": "standalone",
   "background_color": "#0a0e0a",
