@@ -774,6 +774,19 @@ def create_app(store: Store, cfg: Config) -> FastAPI:
             ("collector.stress_validate", "collector.fetchers.stress_validate"),
             "validation_payload", "validation module not present")
 
+    @app.get("/api/stress/imf")
+    def stress_imf_route() -> dict:
+        """IMF chart panels (WS6's module, §15). Serve-from-cache: the
+        scheduler's refresh_imf writes the `imf_panels` doc; the payload
+        degrades to "source not connected" when the Google credential is
+        absent. Never 500s the panel."""
+        try:
+            from collector.fetchers.imf import imf_payload
+            return imf_payload(store)
+        except Exception:  # noqa: BLE001 — never 500 the panel
+            return {"status": "not_connected",
+                    "note": "IMF panels need a Google service account"}
+
     @app.get("/api/stress/episodes")
     def stress_episodes_route() -> dict:
         """Stress Monitor v2 episode registry (WS3's module). Serve-from-cache

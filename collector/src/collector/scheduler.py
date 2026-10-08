@@ -145,6 +145,13 @@ async def _stress_with_views(store, cfg, fred_api_key, get_text, get_bytes):
         refresh_episodes(store, INDICATORS, STRESS_WEIGHTS)
     except Exception as e:  # noqa: BLE001 - episodes are best-effort
         log.warning("stress episodes refresh failed: %s", e)
+    # Phase-2 WS6: IMF chart panels (§15). Async; guarded likewise. Degrades
+    # to "source not connected" panels when the Google credential is absent.
+    try:
+        from collector.fetchers.imf import refresh_imf
+        await refresh_imf(store, get_text, fred_api_key)
+    except Exception as e:  # noqa: BLE001 - IMF panels are best-effort
+        log.warning("IMF panels refresh failed: %s", e)
 
 
 def _catchup_first_runs(
