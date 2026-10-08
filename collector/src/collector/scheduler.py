@@ -49,7 +49,8 @@ from collector.fetchers.ofr import fetch_ofr
 from collector.fetchers.ofr_tff import fetch_ofr_tff
 from collector.fetchers.refs import fetch_refs
 from collector.fetchers.risk import refresh_risk
-from collector.fetchers.stress import refresh_stress_full
+from collector.fetchers.stress import INDICATORS, STRESS_WEIGHTS, refresh_stress_full
+from collector.fetchers.stress_views import refresh_stress_views
 from collector.fetchers.thirteenf import fetch_thirteenf
 from collector.notify import refresh_digest_and_notify
 from collector.fetchers.tic_flows import fetch_tic_all
@@ -113,6 +114,21 @@ GSE_SECONDS = 30 * 86400  # monthly; the GSE summaries release ~25d after month-
 
 CATCHUP_DELAY = 60   # first catch-up slot: start + 60s
 CATCHUP_GAP = 75     # spacing between catch-up slots (60–90s): no thundering herd
+
+
+async def _stress_with_views(store, cfg, fred_api_key, get_text, get_bytes):
+    """Stress job: Phase-1 fetch + scoring, then Phase-2 view payloads (WS1).
+
+    refresh_stress_full writes the stress_matrix / stress_velocity docs;
+    refresh_stress_views then rebuilds stress_horizon, stress_contagion,
+    stress_divergence, stress_replay and stress_quadrant from the same raw
+    series (recomputed, never read back from the Phase-1 docs). Per-view
+    isolation inside refresh_stress_views means one bad view never blocks
+    the others, and a views failure never breaks the Phase-1 docs.
+    run_fetcher (the job wrapper) records any exception as a job error.
+    """
+    await refresh_stress_full(store, cfg, fred_api_key, get_text, get_bytes)
+    refresh_stress_views(store, INDICATORS, STRESS_WEIGHTS)
 
 
 def _catchup_first_runs(
@@ -201,8 +217,11 @@ def register_jobs(
         # registry) — same signature, registry = the INDICATORS list. The scoring
         # module is not expected to exist yet; the job degrades to data-only and
         # logs it. .get() guard like the risk job.
+        # Phase-2 (WS1): the same job chains refresh_stress_views, which builds
+        # the five Phase-2 view docs (horizon/contagion/divergence/replay/
+        # quadrant) from the raw series the Phase-1 step just wrote.
         "stress": (cfg.cadences.get("stress", 86400),
-                 partial(refresh_stress_full, store, cfg, fred_api_key, get_text, get_bytes),
+                 partial(_stress_with_views, store, cfg, fred_api_key, get_text, get_bytes),
                  start + timedelta(seconds=600)),
         # country risk map: compute-only, reads bond/equity/cycle history.
         # Starts after the risk engine; same graceful-degradation contract and

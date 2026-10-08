@@ -39,6 +39,14 @@ export const getThresholdHist = (q = "") => getJson(`/api/equity/threshold-histo
 export const getScorecard = () => getJson("/api/scorecard");
 export const getStressMatrix = () => getJson("/api/stress/matrix");
 export const getStressVelocity = () => getJson("/api/stress/velocity");
+export const getStressHorizon = () => getJson("/api/stress/horizon");
+export const getStressContagion = () => getJson("/api/stress/contagion");
+export const getStressDivergence = () => getJson("/api/stress/divergence");
+export const getStressReplay = () => getJson("/api/stress/replay");
+export const getStressQuadrant = () => getJson("/api/stress/quadrant");
+export const getStressAlerts = () => getJson("/api/stress/alerts");
+export const getStressValidation = () => getJson("/api/stress/validation");
+export const getStressEpisodes = () => getJson("/api/stress/episodes");
 export const getAuctions = () => getJson("/api/auctions");
 export const getEconCalendar = () => getJson("/api/econ-calendar");
 export const getAlertConfig = () => getJson("/api/alerts/config");

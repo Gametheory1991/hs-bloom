@@ -700,6 +700,84 @@ def create_app(store: Store, cfg: Config) -> FastAPI:
             return {"status": "building"}
         return d.payload
 
+    def _stress_doc(key: str) -> dict:
+        """Serve one cached Phase-2 view doc; {"status": "building"} until the
+        collector's stress job has written it."""
+        d = store.doc(key)
+        if d is None or not d.payload:
+            return {"status": "building"}
+        return d.payload
+
+    @app.get("/api/stress/horizon")
+    def stress_horizon() -> dict:
+        """Stress Monitor v2 (Phase 2, View 2): cached `stress_horizon` doc."""
+        return _stress_doc("stress_horizon")
+
+    @app.get("/api/stress/contagion")
+    def stress_contagion() -> dict:
+        """Stress Monitor v2 (Phase 2, View 3): cached `stress_contagion` doc."""
+        return _stress_doc("stress_contagion")
+
+    @app.get("/api/stress/divergence")
+    def stress_divergence() -> dict:
+        """Stress Monitor v2 (Phase 2, View 4): cached `stress_divergence` doc."""
+        return _stress_doc("stress_divergence")
+
+    @app.get("/api/stress/replay")
+    def stress_replay() -> dict:
+        """Stress Monitor v2 (Phase 2, View 5): cached `stress_replay` doc."""
+        return _stress_doc("stress_replay")
+
+    @app.get("/api/stress/quadrant")
+    def stress_quadrant() -> dict:
+        """Stress Monitor v2 (Phase 2, View 7): cached `stress_quadrant` doc."""
+        return _stress_doc("stress_quadrant")
+
+    def _deferred_stress_payload(mod_paths: tuple[str, ...], func: str,
+                               missing_note: str) -> dict:
+        """Serve a WS2/WS3 module's payload if its module is importable,
+        else the building fallback. Tries both plausible placements
+        (collector.<mod> and collector.fetchers.<mod>) because the owning
+        workers' files are still uncommitted."""
+        for mod_path in mod_paths:
+            try:
+                mod = __import__(mod_path, fromlist=[func])
+            except ImportError:
+                continue
+            fn = getattr(mod, func, None)
+            if fn is None:
+                continue
+            try:
+                return fn(store)
+            except Exception:  # noqa: BLE001 — never 500 the panel
+                return {"status": "building",
+                        "note": missing_note.replace("not present", "error")}
+        return {"status": "building", "note": missing_note}
+
+    @app.get("/api/stress/alerts")
+    def stress_alerts_route() -> dict:
+        """Stress Monitor v2 alerts (WS2's module). Building fallback until
+        the module lands."""
+        return _deferred_stress_payload(
+            ("collector.stress_alerts", "collector.fetchers.stress_alerts"),
+            "alerts_payload", "alerts module not present")
+
+    @app.get("/api/stress/validation")
+    def stress_validation_route() -> dict:
+        """Stress Monitor v2 validation (WS2's module). Same deferred pattern
+        as /api/stress/alerts."""
+        return _deferred_stress_payload(
+            ("collector.stress_validate", "collector.fetchers.stress_validate"),
+            "validation_payload", "validation module not present")
+
+    @app.get("/api/stress/episodes")
+    def stress_episodes_route() -> dict:
+        """Stress Monitor v2 episode registry (WS3's module). Same deferred
+        pattern as /api/stress/alerts."""
+        return _deferred_stress_payload(
+            ("collector.stress_episodes", "collector.fetchers.stress_episodes"),
+            "episodes_payload", "episodes module not present")
+
     @app.get("/api/debt-cube")
     def debt_cube_api(product: str | None = None, maturity: str | None = None,
                       holder: str | None = None) -> dict:
