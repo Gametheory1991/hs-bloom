@@ -154,6 +154,7 @@ series:            # macro click-through charts; transform per changes.apply_tra
   - { id: us-gdp,           name: "US Real GDP QoQ SAAR %",  fred: A191RL1Q225SBEA,    unit: "%",   transform: none }
   - { id: us-retail,        name: "US Retail Sales MoM %",   fred: RSAFS,              unit: "%",   transform: pct_prev }
   - { id: us-fed-rate,      name: "Fed Funds Target Upper %",fred: DFEDTARU,           unit: "%",   transform: none }
+  - { id: us-fed-effective, name: "Fed Funds Effective %",     fred: FEDFUNDS,           unit: "%",   transform: none }
   - { id: ez-hicp-yoy,      name: "EZ HICP YoY %",           fred: CP0000EZ19M086NEST, unit: "%",   transform: yoy }
   - { id: ez-unemployment,  name: "EZ Unemployment %",       fred: LRHUTTTTEZM156S,    unit: "%",   transform: none }
   - { id: ez-gdp,           name: "EZ Real GDP QoQ %",       fred: CLVMEURSCAB1GQEA19, unit: "%",   transform: pct_prev }

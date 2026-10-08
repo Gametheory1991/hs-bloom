@@ -54,6 +54,11 @@ SERIES = {
     "30Y Mortgage": ("us-mortgage-30y", "%", "{:.2f}%", 1, False),
     "Russell 2000": ("iwm", "px", "{:.0f}", 1, False),
     "S&P 500": ("SPX", "px", "{:.0f}", 1, False),
+    "Unemployment": ("us-unemployment", "%", "{:.1f}%", 1, False),
+    "Fed Funds Eff": ("us-fed-effective", "%", "{:.2f}%", 1, False),
+    "CMDI": ("cmdi-market", "idx", "{:.2f}", 1, False),
+    "A/D Spread": ("finra-breadth-corp-all-adspread", "ct", "{:.0f}", 1, False),
+    "52W Lows": ("finra-breadth-corp-all-lo52", "ct", "{:.0f}", 1, False),
 }
 
 MATRICES = ["lvl7", "lvl30", "vel7", "vel30", "velz7", "velz30", "lvlz1y", "lvlzfull"]
