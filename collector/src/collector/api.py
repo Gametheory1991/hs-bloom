@@ -608,6 +608,37 @@ def create_app(store: Store, cfg: Config) -> FastAPI:
             "source": "fiscaldata.treasury.gov",
         }
 
+    # Full FINRA doc payloads for the Drive archive (every field, no trim).
+    FINRA_DOC_KEYS = (
+        "finra_corp", "finra_factbook", "finra_breadth", "regsho_daily",
+        "regsho_threshold", "finra_short", "trace_treasury", "trace_monthly",
+        "finra_ids_star", "finra_ats", "finra_margin", "finra_capped",
+    )
+
+    @app.get("/api/finra/docs")
+    def finra_docs() -> dict:
+        """Full FINRA doc payloads (every field, no trimming) for Drive backup.
+
+        Returns the complete stored payload of each allowlisted FINRA doc
+        plus per-doc ``updated_at``/``source`` metadata. Large archival
+        response by design. All data is public FINRA regulatory data
+        already shown on this public terminal.
+        """
+        docs: dict[str, dict] = {}
+        for key in FINRA_DOC_KEYS:
+            d = store.doc(key)
+            if d is None:
+                continue
+            docs[key] = {
+                "payload": d.payload,
+                "updated_at": d.updated_at,
+                "source": d.source,
+            }
+        return {
+            "docs": docs,
+            "fetched_at": datetime.now(timezone.utc).isoformat(),
+        }
+
     @app.get("/api/econ-calendar")
     def econ_calendar() -> dict:
         """Econ calendar: upcoming releases + past 7 days with actuals.
