@@ -49,6 +49,11 @@ SERIES = {
     "VIX": ("vix", "pts", "{:.1f}", 1, False),
     "NFCI": ("nfci", "idx", "{:.2f}", 1, False),
     "Claims": ("claims", "k", "{:.0f}k", 1 / 1000, True),  # excluded from H3/H4 (scale)
+    "Sahm": ("us-sahm", "pp", "{:.2f}", 1, False),
+    "CPI YoY": ("us-cpi-yoy", "%", "{:.1f}%", 1, False),
+    "30Y Mortgage": ("us-mortgage-30y", "%", "{:.2f}%", 1, False),
+    "Russell 2000": ("iwm", "px", "{:.0f}", 1, False),
+    "S&P 500": ("SPX", "px", "{:.0f}", 1, False),
 }
 
 MATRICES = ["lvl7", "lvl30", "vel7", "vel30", "velz7", "velz30", "lvlz1y", "lvlzfull"]
@@ -141,7 +146,12 @@ def _load_series(store: Store) -> dict[str, dict[str, float]]:
     for name, (sid, *_rest) in SERIES.items():
         if sid == "__real10y__":
             continue
-        pts = store.points(sid)
+        # Store keys are prefixed (macro:/cycle:/idx:/ref:); try each.
+        pts: dict = {}
+        for cand in (sid, f"macro:{sid}", f"cycle:{sid}", f"idx:{sid}", f"ref:{sid}"):
+            pts = store.points(cand)
+            if pts:
+                break
         raw[name] = {_iso(k) if isinstance(k, date) else str(k): v for k, v in pts.items()}
     data.update(raw)
     d10 = raw.get("US 10Y", {})

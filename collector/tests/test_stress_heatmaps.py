@@ -118,7 +118,7 @@ def test_columns_and_episodes_shape(store):
     assert len(p["episodes"]) == 8
     for key in sh.MATRICES:
         m = p["matrices"][key]
-        assert len(m) == 12 and all(len(r) == 9 for r in m), key
+        assert len(m) == len(sh.SERIES) and all(len(r) == 9 for r in m), key
 
 
 def test_refresh_job_caches_doc(store):
