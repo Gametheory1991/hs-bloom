@@ -4,7 +4,7 @@ import { fmtAge } from "../fmt.js";
 const esc = (s) => String(s).replace(/[&<>\"']/g, (c) =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
-const BASE = window.OSBLOOM_API ?? "";
+const BASE = window.HSBLOOM_API ?? "";
 const ID_TYPES = ["TICKER", "CUSIP", "ISIN", "SEDOL", "FIGI"];
 
 // Interactive FIGI lookup (batch 11): appended to the STRUCT tab next to the
