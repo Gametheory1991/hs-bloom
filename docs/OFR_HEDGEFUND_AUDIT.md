@@ -1,4 +1,4 @@
-# OFR Hedge Fund Coverage Audit — os-bloom
+# OFR Hedge Fund Coverage Audit — hs-bloom
 
 **As of 2026-10-06.** Question: do we have the FULL set of OFR data to track hedge funds?
 

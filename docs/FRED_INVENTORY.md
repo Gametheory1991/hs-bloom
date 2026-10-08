@@ -1,4 +1,4 @@
-# FRED Inventory — os-bloom
+# FRED Inventory — hs-bloom
 
 **As of 2026-10-06.** 119 unique FRED mnemonics across `config.yaml` (`series:`, `cycle_series:`, `bonds:`, `cb_rates:`).
 All are pulled via the FRED observations API (`collector/src/collector/fetchers/fred.py`) with **no date bounds — full history on first run, incremental upserts after** (`store.upsert_points`).

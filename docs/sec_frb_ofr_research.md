@@ -1,10 +1,10 @@
-# SEC / FRB / OFR Data Research — os-bloom risk completeness
+# SEC / FRB / OFR Data Research — hs-bloom risk completeness
 Research date: 2026-10-05. All URLs below were verified live with curl in this session
 (HTTP status + actual response shape checked). No collector code was written.
 
 Conventions: SEC.gov aggressively rate-limits scripts (403 "Request Rate Threshold
 Exceeded" on generic UAs). All SEC fetches in this report succeeded with a declared
-contact UA: `os-bloom-research/1.0 (contact: harrysugamakc@gmail.com)` — SEC requires
+contact UA: `hs-bloom-research/1.0 (contact: harrysugamakc@gmail.com)` — SEC requires
 this. Keep request cadence low (≤1 req/2s).
 
 ---
@@ -104,7 +104,7 @@ already tracked, so they drop straight into the existing `ofr.py` fetcher.
   `/v1/series/timeseries?mnemonic=`, `/v1/calc/spread/`, `/v1/series/dataset/`.
   Datasets (prefix / count / cadence):
   - `FNYR-*` (30, **daily**): SOFR/EFFR/BGCR/TGCR/OBFR + percentiles. `FNYR-SOFR-A` verified
-    live — **3.88 on 2026-10-02** (matches os-bloom's current SOFR). Clean JSON alternative to
+    live — **3.88 on 2026-10-02** (matches hs-bloom's current SOFR). Clean JSON alternative to
     scraping NY Fed.
   - `REPO-*` (164, **daily**): FICC DVP cleared-repo average rates. Suffix `-P` = preliminary
     (**current: 3.86 on 2026-10-02**), `-F` = final (lags to 2026-06-30). Use `-P` for dashboard.
@@ -124,9 +124,9 @@ already tracked, so they drop straight into the existing `ofr.py` fetcher.
   documented public OFR APIs. There is no OFR API for money-market-fund *holdings*
   (that's SEC N-MFP, §4b) or cleared bilateral repo beyond the DVP series above.
 
-## 4. Risk data-completeness audit — SEC + FRB sources NOT in os-bloom
+## 4. Risk data-completeness audit — SEC + FRB sources NOT in hs-bloom
 
-(Already in os-bloom and therefore excluded: FRED macro/rates series, NY Fed primary-dealer
+(Already in hs-bloom and therefore excluded: FRED macro/rates series, NY Fed primary-dealer
 stats via `dealer.py`, CFTC positioning via `cftc_pos.py`, FINRA TRACE, 13F, the 3 OFR HF series.)
 
 ### SEC
