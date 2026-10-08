@@ -59,6 +59,9 @@ SERIES = {
     "CMDI": ("cmdi-market", "idx", "{:.2f}", 1, False),
     "A/D Spread": ("finra-breadth-corp-all-adspread", "ct", "{:.0f}", 1, False),
     "52W Lows": ("finra-breadth-corp-all-lo52", "ct", "{:.0f}", 1, False),
+    "Margin Debt": ("finra-margin-debit", "$M", "{:,.0f}", 1, False),
+    "Free Credit Cash": ("finra-margin-credit-cash", "$M", "{:,.0f}", 1, False),
+    "Free Credit Margin": ("finra-margin-credit-margin", "$M", "{:,.0f}", 1, False),
 }
 
 MATRICES = ["lvl7", "lvl30", "vel7", "vel30", "velz7", "velz30", "lvlz1y", "lvlzfull"]
