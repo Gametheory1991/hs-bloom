@@ -786,13 +786,14 @@ th .range-legend { margin-top: 2px; }
 .sl-sw { display: inline-block; width: 12px; height: 12px; border-radius: 2px; margin: 0 4px 0 10px; vertical-align: -1px; }
 .stress-hm { margin-bottom: 26px; }
 .stress-hm-title { font-size: 13px; font-weight: 700; color: var(--fg); margin-bottom: 8px; }
-.stress-hm-scroll { overflow-x: auto; }
-.stress-hm-table { min-width: 760px; }
-.stress-hm-table th { font-size: 10px; text-align: center; padding: 6px 8px; white-space: nowrap; }
-.stress-hm-table th.now-col, .stress-hm-table td.now-col { outline: 1px solid var(--amber); outline-offset: -1px; }
-.stress-hm-table th.now-col { color: var(--amber); font-weight: 700; }
-.stress-hm-table td.row-label { text-align: left; font-weight: 600; color: var(--fg); white-space: nowrap; padding-right: 12px; background: none !important; }
-.hm-cell { text-align: center; font-size: 11px; padding: 7px 8px; white-space: nowrap; border-radius: 2px; font-variant-numeric: tabular-nums; }
+.stress-hm-scroll { overflow-x: auto; overflow-y: auto; max-height: 70vh; border: 1px solid var(--border); border-radius: 8px; }
+.stress-hm-table { min-width: 900px; border-collapse: separate; border-spacing: 0; }
+.stress-hm-table th { font-size: 13px; text-align: center; padding: 10px 12px; white-space: nowrap; position: sticky; top: 0; background: var(--bg); z-index: 2; }
+.stress-hm-table th.now-col, .stress-hm-table td.now-col { outline: 2px solid var(--amber); outline-offset: -2px; }
+.stress-hm-table th.now-col { color: var(--amber); font-weight: 800; font-size: 14px; }
+.stress-hm-table td.row-label { text-align: left; font-weight: 700; font-size: 14px; color: var(--fg); white-space: nowrap; padding: 12px 16px 12px 8px; background: var(--bg) !important; position: sticky; left: 0; z-index: 1; }
+.hm-cell { text-align: center; font-size: 15px; font-weight: 700; padding: 12px 14px; white-space: nowrap; border-radius: 3px; font-variant-numeric: tabular-nums; }
+.hm-cell.now-col { font-size: 16px; }
 /* ===== STRESS — MATRIX · VELOCITY (Phase 1) ===== */
 .stress-head { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
 .stress-gauge { text-align: center; min-width: 110px; }
