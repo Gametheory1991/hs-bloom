@@ -28,13 +28,22 @@ filter are excluded from all three metrics.
 """
 from __future__ import annotations
 
+import json
 import logging
 from datetime import date, timedelta
+from pathlib import Path
 
 from collector.fetchers.finra_dynarep import DynarepSession
 from collector.store import Store
 
 log = logging.getLogger(__name__)
+
+# Static registry seed: CUSIPs evicted by the old REGISTRY_CAP=5000 policy.
+# Restores their static attributes (issuer/coupon/maturity/ratings) so the
+# registry is whole again; live fields (yield/price/spread_bps) repopulate
+# when a bond reappears in the daily most-active lists.
+SEED_REGISTRY_PATH = Path(__file__).resolve().parent.parent / "data" / "seed_cusip_registry.json"
+_SEED_REGISTRY_CACHE: dict | None = None
 
 SOURCE = "finra-corp-most-active"
 HISTORY_START = date(2023, 2, 15)  # earliest date with data (verified live)
@@ -278,6 +287,46 @@ def merge_cusip_registry(prev: dict | None,
     return reg
 
 
+def _load_seed_registry() -> dict:
+    """Seed registry (static attributes for previously-evicted CUSIPs)."""
+    global _SEED_REGISTRY_CACHE
+    if _SEED_REGISTRY_CACHE is None:
+        try:
+            _SEED_REGISTRY_CACHE = json.loads(SEED_REGISTRY_PATH.read_text())
+        except OSError as exc:
+            log.warning("seed registry unavailable (%s): %s",
+                        SEED_REGISTRY_PATH, exc)
+            _SEED_REGISTRY_CACHE = {}
+    return _SEED_REGISTRY_CACHE
+
+
+def restore_seed_registry(registry: dict) -> int:
+    """Add seed CUSIPs missing from the registry (never overwrite).
+
+    Restores the static attributes (issuer, coupon, maturity, moodys, sp,
+    cat, last_seen) of bonds evicted by the old REGISTRY_CAP policy.
+    Existing entries are left untouched — production holds fresher
+    yield/price/spread_bps/last_seen for bonds still in the daily lists.
+    Idempotent: after the first merge it is a no-op. Returns the number
+    of entries added.
+    """
+    seed = _load_seed_registry()
+    if not seed:
+        return 0
+    added = 0
+    for cusip, s in seed.items():
+        if cusip in registry or not isinstance(s, dict):
+            continue
+        registry[cusip] = {
+            k: s[k] for k in ("issuer", "coupon", "maturity", "moodys",
+                              "sp", "cat", "last_seen")
+            if s.get(k) is not None and s.get(k) != ""
+        }
+        registry[cusip]["seed_restored"] = True
+        added += 1
+    return added
+
+
 def build_refi_wall(registry: dict, asof: date) -> dict:
     """Aggregate the CUSIP registry into the refinancing-wall view.
 
@@ -478,6 +527,11 @@ async def fetch_finra_corp(store: Store,
                                    all_lists)
     cusip_registry = merge_cusip_registry(prev_payload.get("cusip_registry"),
                                           all_lists)
+    # Restore bonds evicted by the old REGISTRY_CAP policy (idempotent;
+    # adds only CUSIPs missing from the registry).
+    restored = restore_seed_registry(cusip_registry)
+    if restored:
+        log.info("finra_corp: restored %d seed registry entries", restored)
     asof_d = date.fromisoformat(as_of)
     for dslug, info in latest_lists.items():
         for i, b in enumerate(info["bonds"]):
