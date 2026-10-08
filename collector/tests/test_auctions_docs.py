@@ -160,10 +160,54 @@ def test_pull_cutoff_no_data_returns_none():
 def test_pull_cutoff_history_complete_returns_recent_window():
     store = FakeStore()
     store.put_doc("auction_results",
-                  {"results": [], "history_complete": True},
+                  {"results": [], "history_complete": True,
+                   "history_version": 2},
                   source="fiscaldata.treasury.gov")
     expected = (date.today() - timedelta(days=540)).isoformat()
     assert _pull_cutoff(store, 540) == expected
+
+
+def test_pull_cutoff_v1_complete_triggers_full_repull():
+    # History completed under the old `completed` definition (bid_to_cover
+    # required) skipped pre-2000 auctions: must re-pull everything once.
+    store = FakeStore()
+    store.put_doc("auction_results",
+                  {"results": [], "history_complete": True},
+                  source="fiscaldata.treasury.gov")
+    assert _pull_cutoff(store, 540) is None
+
+
+def test_parse_detail_pre2000_completed_via_yield():
+    # Treasury didn't publish bid_to_cover before ~2000; a record with a
+    # high yield but no bid-to-cover is still a completed auction.
+    det = parse_detail({
+        "auction_date": "1995-06-15",
+        "security_type": "Note", "security_term": "10-Year",
+        "total_accepted": "12000", "high_yield": "6.540",
+        "bid_to_cover_ratio": None,
+    })
+    assert det is not None
+    assert det["completed"] is True
+    assert det["high_yield"] == 6.54
+    assert det["bid_to_cover"] is None
+
+
+def test_parse_detail_announced_not_completed():
+    # No yield and no bid-to-cover: results haven't posted.
+    det = parse_detail({
+        "auction_date": "2026-10-20",
+        "security_type": "Note", "security_term": "10-Year",
+        "total_accepted": None, "high_yield": None,
+        "bid_to_cover_ratio": None,
+    })
+    assert det is not None
+    assert det["completed"] is False
+
+
+def test_store_auction_docs_sets_history_version():
+    store = FakeStore()
+    _store_auction_docs(store, [], [], history_complete=True)
+    assert store._docs["auction_results"]["history_version"] == 2
 
 
 def test_pull_cutoff_shallow_history_returns_none_for_deep_backfill():
