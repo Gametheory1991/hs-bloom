@@ -277,3 +277,25 @@ def test_finra_docs_endpoint_empty_store(tmp_path):
     body = client.get("/api/finra/docs").json()
     assert body["docs"] == {}
     assert body["fetched_at"]
+
+
+def test_finra_docs_endpoint_includes_tape_and_otc_prefix(tmp_path):
+    client, store = make_client(tmp_path)
+    store.put_doc("tape", {"venues": {"FINRA": [1, 2]}}, source="nasdaq")
+    store.put_doc("otc-top100-2026-10", {"rows": ["A"]}, source="finra-otc")
+    store.put_doc("otc-dailylist-2026-10-07", {"rows": ["B"]}, source="finra-otc")
+    store.put_doc("other-doc", {"x": 1}, source="other")  # not matched
+    body = client.get("/api/finra/docs").json()
+    assert set(body["docs"]) == {"tape", "otc-top100-2026-10",
+                                 "otc-dailylist-2026-10-07"}
+    assert body["docs"]["tape"]["payload"] == {"venues": {"FINRA": [1, 2]}}
+    assert body["docs"]["otc-top100-2026-10"]["payload"] == {"rows": ["A"]}
+
+
+def test_store_doc_keys_prefix(tmp_path):
+    store = Store(tmp_path / "t.db")
+    store.put_doc("otc-a", {"x": 1}, source="s")
+    store.put_doc("otc-b", {"x": 2}, source="s")
+    store.put_doc("other", {"x": 3}, source="s")
+    assert store.doc_keys("otc-") == ["otc-a", "otc-b"]
+    assert store.doc_keys("zzz-") == []
