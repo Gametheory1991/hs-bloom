@@ -14,7 +14,7 @@ import xlrd
 from collector.http import USER_AGENT, GetBytes
 
 URL = "https://www.aaii.com/files/surveys/sentiment.xls"
-# aaii.com's WAF 403s a bare product token (e.g. "os-bloom/0.1") but serves the
+# aaii.com's WAF 403s a bare product token (e.g. "hs-bloom/0.1") but serves the
 # file to the standard `product/version (comment)` form. Honest, not disguised.
 HEADERS = {"User-Agent": USER_AGENT}
 

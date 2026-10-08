@@ -110,7 +110,7 @@ log = logging.getLogger(__name__)
 
 INDEX_URL = "https://www.finra.org/filing-reporting/trace/trace-fact-book"
 SOURCE = "finra-factbook"
-CONTACT_UA = "os-bloom/1.0 contact harrysugamakc@gmail.com"
+CONTACT_UA = "hs-bloom/1.0 contact harrysugamakc@gmail.com"
 REQUEST_GAP = 2.0  # polite: <=1 req/2s, same posture as the SEC fetchers
 # Backfill budget per run; None = every quarter the index lists. The FINRA
 # index carries quarterly workbooks back to Q2 2014, and the fetcher pulls

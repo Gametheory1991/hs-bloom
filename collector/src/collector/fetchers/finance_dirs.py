@@ -23,7 +23,7 @@ from collector.store import Store
 log = logging.getLogger(__name__)
 
 SOURCE = "finance-dirs-monthly"
-UA = {"User-Agent": "os-bloom/1.0 (finance directory refresh; contact)"}
+UA = {"User-Agent": "hs-bloom/1.0 (finance directory refresh; contact)"}
 
 # ---------------------------------------------------------------- primary
 # dealers: NY Fed primary dealer list, verified 2026-10-07 via web search
