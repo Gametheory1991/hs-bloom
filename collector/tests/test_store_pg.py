@@ -36,10 +36,15 @@ class FakeConn:
 
     def execute(self, sql, args=()):
         self.seen_sql.append(sql)
+        sql = re.sub(r"--.*?$", "", sql, flags=re.MULTILINE)
         s = " ".join(sql.split())
+        if not s:
+            return FakeCursor([])
         if s.startswith("CREATE TABLE"):
             return FakeCursor([])
         if s.startswith("CREATE INDEX"):
+            return FakeCursor([])
+        if s.startswith("INSERT INTO meta"):
             return FakeCursor([])
         if s.startswith("INSERT INTO series_points"):
             sid, d, v = args

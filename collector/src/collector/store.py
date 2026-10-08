@@ -68,7 +68,7 @@ CREATE TABLE IF NOT EXISTS meta(
   value INTEGER NOT NULL
 );
 -- FINRA equity completeness (2026-10-06): full-universe detail tables.
--- One row per (settlement, ticker); ~22.6k tickers x ~160 settlements.
+-- One row per (settlement, ticker), ~22.6k tickers x ~160 settlements.
 CREATE TABLE IF NOT EXISTS short_interest(
   settlement_date TEXT NOT NULL,
   symbol          TEXT NOT NULL,

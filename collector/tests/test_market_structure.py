@@ -50,6 +50,9 @@ class FakeStore:
     def points(self, key, since=None):
         return self.series.get(key, {})
 
+    def points_many(self, series_ids):
+        return {series_id: self.series.get(series_id, {}) for series_id in series_ids}
+
     def put_doc(self, key, payload, source=None):
         self.docs[key] = payload
 
