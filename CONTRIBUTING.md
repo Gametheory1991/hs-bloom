@@ -1,4 +1,4 @@
-# Contributing to os-bloom
+# Contributing to hs-bloom
 
 Thanks for taking a look. This is a small, focused project: a self-hosted
 markets terminal that runs on free data. The bar for a change is that it keeps

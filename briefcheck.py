@@ -10,7 +10,7 @@ Standalone: stdlib only. Runs on an operator machine, OFF Render.
 
 Usage:
     python briefcheck.py --briefing-html PATH \
-        --base-url https://os-bloom.onrender.com [--tolerance-pct N]
+        --base-url https://hs-bloomies.onrender.com [--tolerance-pct N]
 
 Exit code 0 when every mapped metric agrees within tolerance, 1 otherwise.
 Stdout carries the JSON report:
@@ -234,7 +234,7 @@ def to_canonical(value: float, kind: str | None, expect: str) -> float | None:
 # Terminal fetching
 # --------------------------------------------------------------------------
 def fetch_json(url: str) -> dict:
-    req = urllib.request.Request(url, headers={"User-Agent": "os-bloom-briefcheck/1.0"})
+    req = urllib.request.Request(url, headers={"User-Agent": "hs-bloom-briefcheck/1.0"})
     with urllib.request.urlopen(req, timeout=30) as resp:
         return json.load(resp)
 
@@ -314,9 +314,9 @@ def check_table(table: dict, tvals: dict, rel_override: float | None) -> tuple[i
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(description="Cross-check the daily briefing email against the os-bloom terminal.")
+    ap = argparse.ArgumentParser(description="Cross-check the daily briefing email against the hs-bloom terminal.")
     ap.add_argument("--briefing-html", required=True, help="path to the briefing email HTML file")
-    ap.add_argument("--base-url", required=True, help="terminal base URL, e.g. https://os-bloom.onrender.com")
+    ap.add_argument("--base-url", required=True, help="terminal base URL, e.g. https://hs-bloomies.onrender.com")
     ap.add_argument("--tolerance-pct", type=float, default=None,
                     help="override relative tolerance (percent) for rel-mode checks")
     args = ap.parse_args(argv)

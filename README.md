@@ -1,4 +1,4 @@
-# os-bloom
+# hs-bloom
 
 Customized fork of the upstream self-hosted macro and markets terminal, with
 mobile/PWA support and automated anomaly/trend digesting.
@@ -12,7 +12,7 @@ No Bloomberg seat, no paid vendors, no brokerage account —
 one free FRED API key is the only credential you need.
 
 Written largely by AI agents, directed and reviewed by a human. That is the
-point rather than a disclaimer: os-bloom is both a working terminal and an
+point rather than a disclaimer: hs-bloom is both a working terminal and an
 experiment in how far AI-assisted development carries a real system — one with
 live upstreams, awkward data, and decisions that have to be defended.
 
@@ -22,7 +22,7 @@ live upstreams, awkward data, and decisions that have to be defended.
 ![Paid data sources](https://img.shields.io/badge/paid%20data%20sources-0-f5a623?style=flat-square)
 ![Built AI-first](https://img.shields.io/badge/built-AI--first-8a63d2?style=flat-square)
 
-<img src="docs/screenshot-mkt.png" alt="os-bloom MKT tab: equity indexes, world bonds, macro calendar and headlines" width="900">
+<img src="docs/screenshot-mkt.png" alt="hs-bloom MKT tab: equity indexes, world bonds, macro calendar and headlines" width="900">
 
 </div>
 
@@ -72,7 +72,7 @@ You need Docker and a free [FRED API key](https://fred.stlouisfed.org/docs/api/a
 (instant, email only). Gmail delivery is optional and uses an app password.
 
 ```bash
-git clone https://github.com/Gametheory1991/os-bloom.git && cd os-bloom
+git clone https://github.com/Gametheory1991/hs-bloom.git && cd hs-bloom
 cp .env.example .env        # then set FRED_API_KEY
 docker compose up --build
 ```
@@ -107,7 +107,7 @@ newsletter delivery state.
 
 ### Gmail newsletter delivery
 
-Set these in `/home/runner/work/os-bloom/os-bloom/.env` to enable real email
+Set these in `/home/runner/work/hs-bloom/hs-bloom/.env` to enable real email
 delivery of the digest:
 
 ```bash

@@ -1677,7 +1677,7 @@ tic:                 # TIC Table 5 (slt_table5.txt), monthly, values in $bn; Gra
   countries: [Japan, United Kingdom, "China, Mainland", Belgium, "Cayman Islands", Bahamas, Luxembourg, Canada, Ireland, France, Taiwan]
 
 thirteenf:           # SEC EDGAR 13F-HR; quarterly filings (<=45d lag); UA is mandatory — set a real contact before deploy
-  user_agent: "os-bloom/1.0 contact harrysugamakc@gmail.com"
+  user_agent: "hs-bloom/1.0 contact harrysugamakc@gmail.com"
   watchlist:
     - { name: "Berkshire Hathaway",      cik: "0001067983" }
     - { name: "Bridgewater Associates",  cik: "0001350694" }
@@ -1724,7 +1724,7 @@ frb_ddp:             # Federal Reserve Board releases via FRED (the Board's DDP 
   - { id: cp-other,          name: "CP outstanding: other $bn",                   fred: OTHCOMP, unit: "$bn" }
 
 sec_data:            # shared declared-contact UA for all SEC batch fetchers (SEC 403s generic UAs)
-  user_agent: "os-bloom/1.0 contact harrysugamakc@gmail.com"
+  user_agent: "hs-bloom/1.0 contact harrysugamakc@gmail.com"
 
 feeds:             # RSS bundle; a dead feed is skipped silently
   - { name: FT,          url: "https://www.ft.com/rss/home" }

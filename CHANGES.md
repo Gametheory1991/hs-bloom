@@ -216,7 +216,7 @@ tests incl. end-to-end threshold scaling and muted-send suppression.
 **4. briefcheck.py (NEW, repo root) — briefing-vs-terminal cross-check.**
 Standalone stdlib-only script for an operator machine (OFF Render):
 `python briefcheck.py --briefing-html PATH --base-url
-https://os-bloom.onrender.com [--tolerance-pct N]`. Parses the briefing's
+https://hs-bloomies.onrender.com [--tolerance-pct N]`. Parses the briefing's
 tables generically by header row, maps ~45 metrics (rates/curve, plumbing,
 vol, conditions, ETFs) to `/api/scorecard` + `/api/series`, compares with
 per-unit tolerances (10bp yields/spreads, 5bp OAS, 1% levels, 5% dollar
@@ -829,7 +829,7 @@ Harry asked for a terminal tab with a full world map: green = good/indicators
 positive, yellow = improving, orange = deteriorating, red = risk zone. Also
 asked that the map data land in his Google Drive — covered by wiring the
 `country_risk` payload into the `/api/insights` digest, which the daily
-`daily-osbloom-drive-snapshot` cron pulls.
+`daily-hsbloom-drive-snapshot` cron pulls.
 
 **Backend** — `collector/src/collector/fetchers/country_risk.py` (NEW): daily
 compute job, zero HTTP. Scores each of the 13 bond-matrix countries 0–100 from
@@ -874,13 +874,13 @@ no-lookahead, doc+history writes). Frontend render verified headless in node:
 - NEW: `ui/js/panels/riskmap.js`, `ui/js/world110m.js`
 - Tests: `collector/tests/test_country_risk.py`
 - Config: merge `risk-map-config-snippet.yaml` (`country_risk: 86400` cadence)
-  into `~/workspace/your_files/os-bloom/config.yaml` — do NOT replace that file.
+  into `~/workspace/your_files/hs-bloom/config.yaml` — do NOT replace that file.
 
 ## 2026-10-03 — Auction surveillance, TFF Treasury positioning, primary-dealer stats (subagent batch 2)
 
-Staged under `~/workspace/os-bloom-data/`, mirroring repo paths. Config additions are
+Staged under `~/workspace/hs-bloom-data/`, mirroring repo paths. Config additions are
 in `config-snippet-auctions-tff-dealer.yaml` (additive snippet — merge into the
-parent-owned `~/workspace/your_files/os-bloom/config.yaml`, do not wholesale-replace it).
+parent-owned `~/workspace/your_files/hs-bloom/config.yaml`, do not wholesale-replace it).
 
 ### 1. Treasury auction surveillance — `fetchers/auctions.py` (NEW)
 
@@ -949,7 +949,7 @@ plus the new sections.
 1. Copy staged code files over the repo tree (new: `fetchers/auctions.py`,
    `fetchers/dealer.py`; modified: `config.py`, `scheduler.py`; tests + fixtures optional).
 2. Merge `config-snippet-auctions-tff-dealer.yaml` into
-   `~/workspace/your_files/os-bloom/config.yaml` (cadences + `auctions`/`dealer`
+   `~/workspace/your_files/hs-bloom/config.yaml` (cadences + `auctions`/`dealer`
    sections + 4 `cftc_pos` entries).
 3. Commit via GitHub web UI (App connection is read-only); Render auto-deploys.
 4. Optional follow-up (not built): an `auction:` source key on `CycleSeriesCfg`
@@ -1000,7 +1000,7 @@ yield feed). Cross-task note: dealer-fails probing prefers the sibling's exact
 ids (`dealer:ust-fail-deliver` / `dealer:ust-fail-receive`, summed); auction
 buckets follow the sibling's `auction:<Type>-<Tenor>` scheme.
 
-## 0. Parent-agent additions on top (2026-10-03, merged into `~/workspace/your_files/os-bloom/config.yaml`)
+## 0. Parent-agent additions on top (2026-10-03, merged into `~/workspace/your_files/hs-bloom/config.yaml`)
 
 - **`ofr:` cycle_series source key**: any OFR Hedge Fund Monitor mnemonic can now be a
   first-class cycle series (new `ofr` field on `CycleSeriesCfg`, dispatch branch in
@@ -1020,11 +1020,11 @@ buckets follow the sibling's `auction:<Type>-<Tenor>` scheme.
 
 # CHANGES.md — four new data fetchers (staged 2026-10-03)
 
-Staged under `~/workspace/os-bloom-data/`, mirroring repo paths. Read-only GitHub
+Staged under `~/workspace/hs-bloom-data/`, mirroring repo paths. Read-only GitHub
 App connection: **nothing was pushed**. Apply by copying these files over the repo
 tree, then commit via the GitHub web UI (Render auto-deploys on push).
 
-**Do not touch** `~/workspace/your_files/os-bloom/config.yaml` — that is a separate
+**Do not touch** `~/workspace/your_files/hs-bloom/config.yaml` — that is a separate
 staged change owned by the parent agent; the config.yaml changes below are based on
 the **live repo config.yaml fetched fresh 2026-10-03** (~14:45 UTC, pristine version
 without the 22 pending FRED series — the merge is additive and conflict-free).
@@ -1144,10 +1144,10 @@ Same anonymous Socrata pattern as `fetchers/cftc.py` (keyless, `$limit=5000`).
 - **SEC fair-access (mandatory):** descriptive User-Agent is **configurable**
   (`thirteenf.user_agent`) — SEC 403s the `product/version (+url)` style
   (verified twice 2026-10-03), and the repo's own default
-  `os-bloom/0.1 (+https://github.com/cleyfe/os-bloom)` is exactly that style,
+  `hs-bloom/0.1 (+https://github.com/cleyfe/hs-bloom)` is exactly that style,
   so the fetcher passes its own UA. ≤10 req/sec honored via 0.5s pauses.
   **Set `user_agent` to a real contact before first run**
-  (default is a placeholder `os-bloom/1.0 contact admin@example.com`).
+  (default is a placeholder `hs-bloom/1.0 contact admin@example.com`).
 - **Watchlist** (config `thirteenf.watchlist`, all verified to have 13F-HR
   filings): Berkshire Hathaway `0001067983`, Bridgewater Associates
   `0001350694`, Renaissance Technologies `0001037389`, Pershing Square
@@ -1199,10 +1199,10 @@ before staging.
 
 ## Apply steps
 
-1. **config.yaml**: use `~/workspace/your_files/os-bloom/config.yaml` (the parent's merged
+1. **config.yaml**: use `~/workspace/your_files/hs-bloom/config.yaml` (the parent's merged
    copy — it contains everything: the 22 pending FRED series, 13-country bond matrix,
    QUANT tab, AND the four new sections below). Do **not** use the staged
-   `~/workspace/os-bloom-data/config.yaml` — it was built from the pristine live config
+   `~/workspace/hs-bloom-data/config.yaml` — it was built from the pristine live config
    and lacks the parent's changes.
 2. Copy staged code files over the repo tree (paths mirror the repo):
    new: `fetchers/ofr.py`, `fetchers/cftc_pos.py`, `fetchers/tic.py`,
