@@ -49,6 +49,7 @@ from collector.fetchers.ofr import fetch_ofr
 from collector.fetchers.ofr_tff import fetch_ofr_tff
 from collector.fetchers.refs import fetch_refs
 from collector.fetchers.risk import refresh_risk
+from collector.fetchers.stress import refresh_stress_full
 from collector.fetchers.thirteenf import fetch_thirteenf
 from collector.notify import refresh_digest_and_notify
 from collector.fetchers.tic_flows import fetch_tic_all
@@ -195,6 +196,15 @@ def register_jobs(
         # the risk cadence) from breaking scheduler registration entirely.
         "risk": (cfg.cadences.get("risk", 86400), partial(refresh_risk, store),
                  start + timedelta(seconds=300)),
+        # Stress Monitor v2 Phase-1: fetch genuinely missing Tier-1 sources,
+        # then run the scoring refresh. refresh_stress_full (fetchers/stress.py)
+        # coordinates with Worker A's collector.stress_score.refresh_stress(store,
+        # registry) — same signature, registry = the INDICATORS list. The scoring
+        # module is not expected to exist yet; the job degrades to data-only and
+        # logs it. .get() guard like the risk job.
+        "stress": (cfg.cadences.get("stress", 86400),
+                 partial(refresh_stress_full, store, cfg, fred_api_key, get_text, get_bytes),
+                 start + timedelta(seconds=600)),
         # country risk map: compute-only, reads bond/equity/cycle history.
         # Starts after the risk engine; same graceful-degradation contract and
         # .get() guard so an old config.yaml can't break registration.

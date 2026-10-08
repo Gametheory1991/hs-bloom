@@ -49,7 +49,7 @@ def test_catchup_empty_store_gives_early_slots_in_order(tmp_path):
     # data jobs still fire at boot
     assert _first_run_delta_seconds(jobs["equity"]) < CATCHUP_DELAY
     # staggered compute jobs catch up early, in dependency order, spaced out
-    ordered = ["risk", "country_risk", "xcorr", "voldash", "movers", "home_radar"]
+    ordered = ["risk", "stress", "country_risk", "xcorr", "voldash", "movers", "home_radar"]
     deltas = [_first_run_delta_seconds(jobs[n]) for n in ordered]
     assert all(d < 600 for d in deltas), deltas  # far sooner than the old +300s…+1800s offsets
     assert deltas == sorted(deltas), deltas  # dependency order preserved
@@ -64,7 +64,7 @@ def test_catchup_recent_run_keeps_large_offset(tmp_path):
     stale = (now - timedelta(days=2)).isoformat().replace("+00:00", "Z")
     # every staggered job ran recently except home_radar (stale)
     recent = {
-        "risk": now_s, "country_risk": now_s, "xcorr": now_s, "voldash": now_s,
+        "risk": now_s, "stress": now_s, "country_risk": now_s, "xcorr": now_s, "voldash": now_s,
         "movers": now_s, "home_radar": stale, "hyperscaler": now_s,
         "ai_capex": now_s, "ai_graph": now_s, "ms_capex": now_s,
         "ms_graph": now_s, "trace_treasury": now_s, "trace_monthly": now_s,

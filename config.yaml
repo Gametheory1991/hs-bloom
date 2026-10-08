@@ -25,6 +25,7 @@ cadences:          # seconds between fetcher runs
   dealer: 604800    # NY Fed primary dealer stats; weekly (released Wednesdays)
   nyfed_cmdi: 604800 # NY Fed Corporate Bond Market Distress Index; weekly (Friday EOW rows)
   risk: 86400       # risk/prediction engine; daily compute job (no external HTTP)
+  stress: 86400     # Stress Monitor v2 Phase-1: missing Tier-1 fetches + scoring refresh; daily
   country_risk: 86400 # world risk map scoring; daily compute job (no external HTTP)
   gse: 2592000      # Fannie/Freddie monthly volume summaries; ~25d release lag, job probes 4 month-ends
   xcorr: 86400      # correlation + realized-vol compute job; daily (no external HTTP)

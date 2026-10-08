@@ -38,7 +38,8 @@ export const getThresholdHistDates = () => getJson("/api/equity/threshold-histor
 export const getThresholdHist = (q = "") => getJson(`/api/equity/threshold-history${q}`);
 export const getScorecard = () => getJson("/api/scorecard");
 export const getStressHeatmaps = () => getJson("/api/stress/heatmaps");
-export const getAuctions = () => getJson("/api/auctions");
+export const getStressMatrix = () => getJson("/api/stress/matrix");
+export const getStressVelocity = () => getJson("/api/stress/velocity");export const getAuctions = () => getJson("/api/auctions");
 export const getEconCalendar = () => getJson("/api/econ-calendar");
 export const getAlertConfig = () => getJson("/api/alerts/config");
 export const getUsage = (days = 30) => getJson(`/api/usage?days=${days}`);

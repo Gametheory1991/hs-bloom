@@ -698,6 +698,31 @@ def create_app(store: Store, cfg: Config) -> FastAPI:
             rows.append(row)
         return {"rows": rows}
 
+    @app.get("/api/stress/matrix")
+    def stress_matrix() -> dict:
+        """Stress Monitor v2 (Phase 1): cached `stress_matrix` doc.
+
+        Served straight from the store — never recomputed inline. The
+        collector's stress job writes this doc (indicators, composites,
+        overall gauge, gaps); until the first run, returns
+        {"status": "building"} so the UI renders a clean placeholder.
+        """
+        d = store.doc("stress_matrix")
+        if d is None or not d.payload:
+            return {"status": "building"}
+        return d.payload
+
+    @app.get("/api/stress/velocity")
+    def stress_velocity() -> dict:
+        """Stress Monitor v2 (Phase 1): cached `stress_velocity` doc.
+
+        Same serve-from-cache contract as /api/stress/matrix.
+        """
+        d = store.doc("stress_velocity")
+        if d is None or not d.payload:
+            return {"status": "building"}
+        return d.payload
+
     @app.get("/api/debt-cube")
     def debt_cube_api(product: str | None = None, maturity: str | None = None,
                       holder: str | None = None) -> dict:
