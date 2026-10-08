@@ -64,6 +64,7 @@ from collector.fetchers.finra_breadth import fetch_finra_breadth
 from collector.fetchers.finra_corp import fetch_finra_corp
 from collector.fetchers.finra_capped import fetch_finra_capped
 from collector.fetchers.finra_margin import fetch_finra_margin
+from collector.short_metrics import refresh_short_metrics
 from collector.fetchers.finra_short import fetch_finra_short
 from collector.fetchers.finra_regsho import fetch_finra_regsho
 from collector.fetchers.ticker_stats import fetch_ticker_stats
@@ -314,6 +315,9 @@ def register_jobs(
         # batch 6: FINRA margin statistics, monthly.
         "finra_margin": (cfg.cadences.get("finra_margin", 30 * 86400), partial(fetch_finra_margin, store, get_bytes),
                  start + timedelta(seconds=3300)),
+        # computed short metrics (days-to-cover, SI velocity) — runs after finra_short.
+        "short_metrics": (cfg.cadences.get("short_metrics", 86400), partial(refresh_short_metrics, store),
+                 start + timedelta(seconds=3600)),
         # batch 9: tokenized-securities universe — same generic universe
         # fetchers, new universe_id. XBRL fundamentals for the 6 public
         # names (COIN/HOOD/BLSH/BTCS/NDAQ/ICE), then the money-flow graph.

@@ -434,6 +434,7 @@ cycle_series:      # market-cycle series (spec 2026-08-24); exactly one source k
   - { id: pc-etp,   name: "Put/Call ETP",                   unit: ratio, cboe: "EXCHANGE TRADED PRODUCTS PUT/CALL RATIO" }
   - { id: pc-spx,   name: "Put/Call SPX+SPXW (0DTE incl.)",  unit: ratio, cboe: "SPX + SPXW PUT/CALL RATIO" }
   - { id: pc-vix,   name: "Put/Call VIX options",           unit: ratio, cboe: "CBOE VOLATILITY INDEX (VIX) PUT/CALL RATIO" }
+  - { id: opt-TLT-atm-iv, name: "MOVE proxy — TLT ATM implied vol (NOT official MOVE)", unit: "%", external: true }
   # ---- CFTC legacy COT breadth (codes verified live 2026-10-03; weekly Tuesdays) ----
   - { id: cot-sofr, name: "SOFR 3M futures net non-commercial",  unit: contracts, cftc: "134741" }
   - { id: cot-vixf, name: "VIX futures net non-commercial",      unit: contracts, cftc: "1170E1" }
@@ -679,6 +680,9 @@ cycle_series:      # market-cycle series (spec 2026-08-24); exactly one source k
   - { id: star-clo-trades,         name: "STAR CLO trades",          unit: "k",  external: true }
   # ---- batch 6: FINRA short interest (2x/month; external) ----
   - { id: finra-short-total, name: "Total short interest (shares)", unit: "sh", external: true }
+  - { id: short-days-to-cover, name: "Short days-to-cover (mkt-wide, computed)", unit: "days", external: true }
+  - { id: short-interest-vel7, name: "Short interest 7d % chg (computed)", unit: "%", external: true }
+  - { id: short-interest-vel30, name: "Short interest 30d % chg (computed)", unit: "%", external: true }
   - { id: short-MSFT,  name: "MSFT short interest",  unit: "sh", external: true }
   - { id: short-NVDA,  name: "NVDA short interest",  unit: "sh", external: true }
   - { id: short-AAPL,  name: "AAPL short interest",  unit: "sh", external: true }
