@@ -44,7 +44,7 @@ def test_fetcher_status(tmp_path):
     by_name = {st["name"]: st for st in s.statuses()}
     assert by_name["equity"]["active_source"] == "yahoo"
     assert by_name["equity"]["last_success"] is not None
-    assert by_name["equity"]["last_error"] == "boom"  # error history kept
+    assert by_name["equity"]["last_error"] is None  # cleared after recovery
     assert by_name["news"]["last_success"] is None
 
 

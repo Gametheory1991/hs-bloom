@@ -7,12 +7,12 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 def test_load_real_config():
     cfg = load_config(REPO_ROOT / "config.yaml")
-    assert len(cfg.indexes) == 10
+    assert len(cfg.indexes) == 19
     spx = cfg.indexes[0]
     assert (spx.symbol, spx.yahoo) == ("SPX", "^GSPC")
     assert spx.yahoo == "^GSPC"
     assert {b.country for b in cfg.bonds} == {
-        "US", "DE", "FR", "IT", "ES", "NL", "BE", "UK", "JP", "CA", "AU", "CH", "SE"
+        "US", "DE", "FR", "IT", "ES", "NL", "BE", "UK", "JP", "CA", "AU", "CH", "SE", "MX", "KR"
     }
     us = next(b for b in cfg.bonds if b.country == "US")
     assert us.fred == "DGS10"

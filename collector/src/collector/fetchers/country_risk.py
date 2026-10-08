@@ -1,6 +1,6 @@
 """Per-country market risk scoring for the RISK MAP tab.
 
-Daily compute job (no HTTP). Scores each of the 13 bond-matrix countries 0-100
+Daily compute job (no HTTP). Scores each of the 15 bond-matrix countries 0-100
 from up to three inputs, each expressed as a percentile vs its own history:
 
   a. 10Y sovereign yield percentile vs trailing 5Y   (store: yield:<CC>10Y)
