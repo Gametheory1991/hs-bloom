@@ -22,6 +22,10 @@ class FakeStore:
     def upsert_points(self, series_id, points):
         self.points[series_id] = list(points)
 
+    def upsert_points_batch(self, items):
+        for series_id, d, v in items:
+            self.points.setdefault(series_id, []).append((d, v))
+
     def put_doc(self, key, payload, source):
         self._docs[key] = payload
 

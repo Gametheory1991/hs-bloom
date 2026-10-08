@@ -2,8 +2,15 @@
 import json
 from datetime import date, timedelta
 
+import pytest
+
 from collector.config import AuctionsCfg
-from collector.fetchers.auctions import fetch_auctions, parse_detail
+from collector.fetchers.auctions import (
+    _pull_cutoff,
+    _store_auction_docs,
+    fetch_auctions,
+    parse_detail,
+)
 
 
 class FakeStore:
@@ -13,6 +20,10 @@ class FakeStore:
 
     def upsert_points(self, series_id, points):
         self.points[series_id] = list(points)
+
+    def upsert_points_batch(self, items):
+        for series_id, d, v in items:
+            self.points.setdefault(series_id, []).append((d, v))
 
     def put_doc(self, key, payload, source):
         self._docs[key] = payload
@@ -130,3 +141,103 @@ async def test_fetch_auctions_doc_upsert_overwrites_announced():
     res = store._docs["auction_results"]["results"]
     assert len(res) == 1  # upserted, not duplicated
     assert res[0]["completed"] is True and res[0]["bid_to_cover"] == 2.53
+
+
+# --- history policy: no prune, no cap, incremental-from-earliest ---------
+
+def _seed_results(store, dates_cusips):
+    store.put_doc("auction_results", {"results": [
+        {"auction_date": d, "cusip": c, "bucket": "Note-10Y",
+         "completed": True, "bid_to_cover": 2.5}
+        for d, c in dates_cusips
+    ]}, source="fiscaldata.treasury.gov")
+
+
+def test_pull_cutoff_no_data_returns_none():
+    assert _pull_cutoff(FakeStore(), 540) is None
+
+
+def test_pull_cutoff_history_complete_returns_recent_window():
+    store = FakeStore()
+    store.put_doc("auction_results",
+                  {"results": [], "history_complete": True},
+                  source="fiscaldata.treasury.gov")
+    expected = (date.today() - timedelta(days=540)).isoformat()
+    assert _pull_cutoff(store, 540) == expected
+
+
+def test_pull_cutoff_shallow_history_returns_none_for_deep_backfill():
+    # Stored history shallower than one revision window: no deep pull has
+    # completed yet, so the next run must pull everything.
+    store = FakeStore()
+    recent = (date.today() - timedelta(days=10)).isoformat()
+    _seed_results(store, [(recent, "A1")])
+    assert _pull_cutoff(store, 540) is None
+
+
+def test_pull_cutoff_partial_deep_history_extends_backward():
+    store = FakeStore()
+    old = (date.today() - timedelta(days=900)).isoformat()
+    _seed_results(store, [(old, "A1")])
+    expected = (date.fromisoformat(old) - timedelta(days=540)).isoformat()
+    assert _pull_cutoff(store, 540) == expected
+
+
+def test_store_auction_docs_keeps_full_history_no_prune():
+    # Records far older than the old 180-day prune window must survive.
+    store = FakeStore()
+    ancient = (date.today() - timedelta(days=400)).isoformat()
+    _seed_results(store, [(ancient, "OLD1")])
+    _store_auction_docs(store, [], [], history_complete=False)
+    res = store._docs["auction_results"]["results"]
+    assert any(r["cusip"] == "OLD1" for r in res)
+
+
+def test_store_auction_docs_no_record_cap():
+    # The old 1000-record cap is gone: everything is kept.
+    store = FakeStore()
+    base = date.today() - timedelta(days=1100)
+    recs = [((base + timedelta(days=i)).isoformat(), f"C{i}")
+            for i in range(1200)]
+    _seed_results(store, recs)
+    _store_auction_docs(store, [], [], history_complete=False)
+    assert len(store._docs["auction_results"]["results"]) == 1200
+
+
+async def test_fetch_auctions_full_pull_sets_history_complete():
+    # Empty store -> no date filter -> clean full pull marks history done.
+    seen_params = []
+
+    async def fake_get(url, params=None, headers=None):
+        seen_params.append(params or {})
+        if (params or {}).get("page[number]") not in (None, "1"):
+            return json.dumps({"data": []})
+        past = (date.today() - timedelta(days=5)).isoformat()
+        return json.dumps({"data": [_raw(past, "Note", "10-Year", "2.53",
+                                         hy="4.213", cusip="A1")]})
+
+    store = FakeStore()
+    cfg = AuctionsCfg(buckets=["Note-10Y"], lookback_days=30)
+    assert await fetch_auctions(cfg, store, fake_get) == "auctions"
+    assert all("filter" not in p for p in seen_params)
+    assert store._docs["auction_results"]["history_complete"] is True
+
+
+async def test_fetch_auctions_interrupted_pull_leaves_marker_unset():
+    # A pull that errors before paging to completion must not claim history
+    # is complete; the idempotent upsert lets the next run resume.
+    async def fake_get(url, params=None, headers=None):
+        if (params or {}).get("page[number]") == "2":
+            raise RuntimeError("boom")
+        past = (date.today() - timedelta(days=5)).isoformat()
+        return json.dumps({"data": [
+            _raw(past, "Note", "10-Year", "2.53", hy="4.213", cusip=f"A{i}")
+            for i in range(100)]})
+
+    store = FakeStore()
+    cfg = AuctionsCfg(buckets=["Note-10Y"], lookback_days=30)
+    with pytest.raises(RuntimeError, match="boom"):
+        await fetch_auctions(cfg, store, fake_get)
+    # partial data kept for resume, but history not marked complete
+    assert len(store._docs["auction_results"]["results"]) == 100
+    assert store._docs["auction_results"].get("history_complete") is not True
