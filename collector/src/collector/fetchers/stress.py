@@ -19,6 +19,17 @@ zero out the gauge). refresh_stress_full() fetches the missing sources and
 materializes DERIVED/PROXY rows as stress:<id> series first, then calls the
 scoring refresh when the module exists; it degrades cleanly when it does not
 (no crash, gap logged).
+
+Phase 2 (spec 16.4/16.5, WS4): auction detail per bucket (bid-to-cover,
+indirect/direct/dealer takedown; tail is n/a — no free when-issued feed),
+put/call total/equity/index, ETF 1d/5d momentum as DERIVED rows, the full OFR
+HF Monitor fpf set that is actually configured (mnemonics verified against the
+hf/v1 metadata endpoint), and Market-activity rows re-registered as DERIVED
+log-volume series (|z| of log volume per 16.4 — the stress job log-transforms,
+the engine scores; stress_score.py untouched). Licensing (16.9): every row
+carries `redistributable` (yes/no/unknown). Rates levels carry
+`abs_velocity=True` (16.4 flight-to-quality rule; the engine's velocity layer
+already ranks |raw| percentiles, so the flag is a registry declaration).
 """
 from __future__ import annotations
 
@@ -77,9 +88,38 @@ LAG_Q = {"expected_lag_days": 120, "max_age_days": 240}  # quarterly (OFR, Form 
 LAG_E = {"expected_lag_days": 10, "max_age_days": 45}    # event series (auctions)
 
 
+# ---------------------------------------------------------------------------
+# Licensing (spec 16.9): every indicator carries `redistributable` —
+# yes / no / unknown — auto-derived from its source unless explicitly
+# overridden. Honest mapping: FRED / OFR (financialresearch.gov) / Treasury
+# FiscalData / CFTC / NY Fed research data and os-bloom's own engine outputs
+# are public and redistributable; AAII's survey is not (16.9 names it); the
+# daybook CDX capture is not (passed explicitly per row); TRACE, STAR, Cboe,
+# Yahoo and ICE terms were not checked, so they stay "unknown".
+# ---------------------------------------------------------------------------
+def _redist_from_source(source: str) -> str:
+    s = (source or "").lower()
+    if "aaii" in s:
+        return "no"
+    if "fred" in s:
+        return "yes"
+    if "financialresearch.gov" in s or "ofr" in s:
+        return "yes"
+    if "fiscaldata" in s:
+        return "yes"
+    if "cftc" in s:
+        return "yes"
+    if "ny fed" in s or "new york fed" in s:
+        return "yes"
+    if "os-bloom" in s:
+        return "yes"
+    return "unknown"
+
+
 def _ind(id, category, name, unit, direction, freq, tier, series_id, source, tag,
          inputs=None, formula=None, reason=None, rung=None, note=None,
-         composite_excluded=False, **lag):
+         composite_excluded=False, redistributable=None, abs_velocity=False,
+         **lag):
     d = {
         "id": id, "category": category, "name": name, "unit": unit,
         "direction": direction, "freq": freq, "tier": tier,
@@ -88,14 +128,19 @@ def _ind(id, category, name, unit, direction, freq, tier, series_id, source, tag
         "reason": reason or "", "rung": rung or "",
         "ladder_rung": rung or "",  # alias: collector.stress_score reads this key
         "note": note or "", "composite_excluded": composite_excluded,
+        # 16.9 licensing; 16.4: rates levels flag abs_velocity=True
+        "redistributable": redistributable or _redist_from_source(source),
+        "abs_velocity": bool(abs_velocity),
     }
     d.update(lag or LAG_D)
     return d
 
 
-def _na(id, category, name, unit, direction, freq, reason, rung="rung 6: n/a — no free or reachable source"):
+def _na(id, category, name, unit, direction, freq, reason,
+        rung="rung 6: n/a — no free or reachable source", redistributable=None):
     return _ind(id, category, name, unit, direction, freq, "extended", None,
-                "n/a", "n/a", reason=reason, rung=rung)
+                "n/a", "n/a", reason=reason, rung=rung,
+                redistributable=redistributable)
 
 
 # Auction buckets straight from config.yaml `auctions.buckets` (13 configured;
@@ -107,7 +152,8 @@ AUCTION_BUCKETS = [
 ]
 
 # OFR Hedge Fund Monitor rows (config.yaml `ofr_series`; stored as
-# ofr:<mnemonic> by fetchers/ofr.py — verified 2026-10-08).
+# ofr:<mnemonic> by fetchers/ofr.py — every mnemonic verified against the
+# hf/v1 metadata endpoint 2026-10-08).
 OFR_HF = [
     ("hf-gav", "HF gross assets", "$", "FPF-ALLQHF_GAV_SUM", "+"),
     ("hf-count", "Qualifying hedge funds", "count", "FPF-ALLQHF_COUNT", "±"),
@@ -164,6 +210,85 @@ STAR_SECTIONS = [
 ]
 LAG_STAR = {"expected_lag_days": 7, "max_age_days": 21}
 
+# Additional OFR Hedge Fund Monitor rows from config.yaml `cycle_series`
+# (batch 13; stored as cycle:<id> by the cycle job — same fpf dataset).
+# Mnemonics verified against the hf/v1 metadata endpoint 2026-10-08.
+# (registry id, name, unit, mnemonic, direction)
+HF_CYCLE = [
+    ("hf-treasury-long", "HF long Treasury cash holdings", "$",
+     "FPF-ASSETCLASS_LTREASURY_SUM", "+"),
+    ("hf-ust-short", "HF short Treasury exposure", "$",
+     "FPF-ASSETCLASS_STREASURY_SUM", "+"),
+    ("hf-nav", "Qualifying HF net assets", "$", "FPF-ALLQHF_NAV_SUM", "+"),
+    ("hf-ird-gne", "HF rates-derivatives gross notional", "$",
+     "FPF-ASSETCLASS_IRD_GNE_SUM", "+"),
+    ("hf-rv-lev", "Relative-value HF leverage ratio", "x",
+     "FPF-STRATEGY_RV_LEVERAGERATIO_NAVWMEAN", "+"),
+    ("hf-multi-lev", "Multi-strategy HF leverage ratio", "x",
+     "FPF-STRATEGY_MULTI_LEVERAGERATIO_NAVWMEAN", "+"),
+    ("hf-macro-lev", "Macro HF leverage ratio", "x",
+     "FPF-STRATEGY_MACRO_LEVERAGERATIO_NAVWMEAN", "+"),
+    ("hf-credit-gne", "HF credit gross notional", "$",
+     "FPF-ASSETCLASS_CREDIT_GNE_SUM", "+"),
+    ("hf-credit-long", "HF credit long notional", "$",
+     "FPF-ASSETCLASS_CREDIT_LGNE_SUM", "+"),
+    ("hf-credit-short", "HF credit short notional", "$",
+     "FPF-ASSETCLASS_CREDIT_SGNE_SUM", "+"),
+    ("hf-eq-gne", "HF equity gross notional", "$",
+     "FPF-ASSETCLASS_EQUITIES_GNE_SUM", "+"),
+    ("hf-eq-long", "HF equity long notional", "$",
+     "FPF-ASSETCLASS_EQUITIES_LGNE_SUM", "+"),
+    ("hf-eq-short", "HF equity short notional", "$",
+     "FPF-ASSETCLASS_EQUITIES_SGNE_SUM", "+"),
+    ("hf-fx-gne", "HF FX gross notional", "$",
+     "FPF-ASSETCLASS_FX_GNE_SUM", "+"),
+    ("hf-pb-borrow", "HF prime-brokerage borrowing", "$",
+     "FPF-BORROW_PRIMEBROKER_SUM", "+"),
+    ("hf-repo-repo", "HF repo exposure", "$",
+     "FPF-ASSETCLASS_REPO_REPO_SUM", "+"),
+    ("hf-repo-rrepo", "HF reverse-repo exposure", "$",
+     "FPF-ASSETCLASS_REPO_REVERSEREPO_SUM", "+"),
+    ("hf-lev-11to50", "HF leverage: funds 11-50", "x",
+     "FPF-ALLQHF_GAVN11TO50_LEVERAGERATIO_AVERAGE", "+"),
+    ("hf-lev-51p", "HF leverage: funds 51+", "x",
+     "FPF-ALLQHF_GAVN51_LEVERAGERATIO_AVERAGE", "+"),
+    ("hf-rv-cash", "RV HF unencumbered cash % of NAV", "%",
+     "FPF-STRATEGY_RV_CASHRATIO_NAVWMEAN", "-"),
+    ("hf-multi-cash", "Multi-strat HF unencumbered cash % of NAV", "%",
+     "FPF-STRATEGY_MULTI_CASHRATIO_NAVWMEAN", "-"),
+    ("hf-cds-stress-p5", "HF +250bp credit shock: 5th pct", "%",
+     "FPF-ALLQHF_CDSUP250BPS_P5", "+"),
+    ("hf-cds-stress-p50", "HF +250bp credit shock: median", "%",
+     "FPF-ALLQHF_CDSUP250BPS_P50", "+"),
+]
+
+# 16.4 ETF momentum set. Price closes live at cycle:etf-<T>-price (Yahoo, 1Y)
+# from fetchers/ishares_etf.py for these 13 (verified in ETF_UNIVERSE).
+ETF_MOM_TICKERS = ["SGOV", "BIL", "VGSH", "VGIT", "GOVT", "EDV", "EMB", "XLK",
+                   "XLF", "XLE", "GLD", "HYG", "LQD"]
+# Rest of the 18-ETF set: no cycle:etf-<T>-price series (not in ETF_UNIVERSE,
+# no free verified feed wired) — registered n/a.
+ETF_MOM_MISSING = ["XLI", "XLV", "SMH", "KRE", "LEMB"]
+ETF_MOM_LAGS = (1, 5)  # 1d and 5d momentum
+
+# 3.6b flows basket extension (16.4). No etf_flow_<ticker> series exist for
+# any of these (the 3.6b DERIVED shares-outstanding x NAV self-logging is not
+# built; etf.com tables are partial; vendor feeds are bot-walled) — all n/a.
+ETF_FLOW_TICKERS = ["SGOV", "BIL", "EMB", "GLD", "XLK", "XLE", "XLI", "XLV",
+                    "SMH", "VGSH", "VGIT", "GOVT", "EDV", "LEMB"]
+# Cash-like / Treasury ETFs are context only (inflows can mean flight to cash;
+# shown, excluded from composites). Risk ETFs score outflow = stress (-).
+ETF_FLOW_CONTEXT = {"SGOV", "BIL", "VGSH", "VGIT", "GOVT", "EDV"}
+
+# Market-activity log pre-transform map: registry id -> raw input series.
+# The stress job log-transforms each volume series in materialize_derived();
+# the engine's ± branch then scores |z| of log volume (16.4). Worker A's
+# stress_score.py is not touched.
+ACTIVITY_LOG_INPUTS: dict[str, str] = (
+    {rid: f"cycle:{skey}" for rid, _nm, skey, _lag in TRACE_ROWS}
+    | {rid: f"cycle:{skey}" for rid, _nm, skey in STAR_SECTIONS}
+)
+
 
 def _build_indicators() -> list[dict]:
     I = []
@@ -183,6 +308,7 @@ def _build_indicators() -> list[dict]:
                   "core", None, "PROXY: realized vol of 10Y yield changes", "proxy",
                   inputs=["cycle:us10y"],
                   formula="21d realized vol of FRED DGS10 daily changes",
+                  redistributable="yes",  # pure transform of FRED DGS10
                   note="PROXY for ICE BofA MOVE: Yahoo ^MOVE is dead (voldash.py:4-9). "
                        "Hatched border; excluded from composites unless include-proxies is on"))
     I.append(_ind("ovx", "Volatility", "OVX (oil vol)", "idx", "+", "D", "extended",
@@ -247,7 +373,9 @@ def _build_indicators() -> list[dict]:
     I.append(_ind("tga", "Funding", "Treasury General Account", "$m", "+", "W",
                   "extended", "cycle:tga", "FRED WTREGEN", "primary", **LAG_W))
     I.append(_ind("reserves", "Funding", "Reserve balances", "$m", "-", "W", "extended",
-                  "cycle:fed-reserve-balances", "FRED WRESBAL", "primary", **LAG_W))
+                  "macro:fed-reserve-balances", "FRED WRESBAL", "primary", **LAG_W,
+                  note="stored as macro:fed-reserve-balances by the FRED job "
+                       "(config `series:` section)"))
     I.append(_ind("disc_window", "Funding", "Primary credit (discount window) borrowing",
                   "$m", "+", "W", "extended", "cycle:disc-window", "FRED WLCFLPCL",
                   "primary", **LAG_W,
@@ -297,8 +425,43 @@ def _build_indicators() -> list[dict]:
                       f"Auction bid-to-cover: {b}", "x", "-", "E", "extended",
                       f"auction:{b}:bid_to_cover", "Treasury FiscalData auctions API",
                       "primary", **LAG_E,
-                      note="sibling series auction:<bucket>:{indirect_pct,direct_pct,dealer_pct,offering} "
-                           "exist for scoring"))
+                      note="FiscalData backfills to 1979 (bid-to-cover published only "
+                           "from ~2000); sibling series auction:<bucket>:{indirect_pct,"
+                           "direct_pct,dealer_pct,offering,high_yield} are stored by "
+                           "the auctions job"))
+
+    # ---- Auction detail (16.4): takedown splits per bucket -----------------------
+    # All stored by the auctions job from FiscalData (deep backfill to 1979; the
+    # "about 5 weeks" gap in 16.8 is closed — full history is pulled). Tail has
+    # no free source: FiscalData publishes high yield but no when-issued
+    # benchmark, so tail = high yield − WI cannot be computed or backfilled.
+    for b in AUCTION_BUCKETS:
+        bl = b.lower().replace("-", "_")
+        I.append(_ind(f"auction_ind_{bl}", "Treasury plumbing",
+                      f"Auction indirect takedown: {b}", "%", "-", "E", "extended",
+                      f"auction:{b}:indirect_pct", "Treasury FiscalData auctions API",
+                      "primary", **LAG_E,
+                      note="share of accepted going to indirect bidders (foreign + "
+                           "domestic end-users); a falling share is stress"))
+        I.append(_ind(f"auction_dir_{bl}", "Treasury plumbing",
+                      f"Auction direct takedown: {b}", "%", "±", "E", "extended",
+                      f"auction:{b}:direct_pct", "Treasury FiscalData auctions API",
+                      "primary", **LAG_E,
+                      note="share of accepted going to direct bidders (domestic "
+                           "end-users); two-sided — both collapse and surge are "
+                           "informative about demand composition"))
+        I.append(_ind(f"auction_dlr_{bl}", "Treasury plumbing",
+                      f"Auction dealer takedown: {b}", "%", "+", "E", "extended",
+                      f"auction:{b}:dealer_pct", "Treasury FiscalData auctions API",
+                      "primary", **LAG_E,
+                      note="share of accepted going to primary dealers; a high "
+                           "dealer share means weak real-money demand"))
+        I.append(_na(f"auction_tail_{bl}", "Treasury plumbing",
+                     f"Auction tail: {b}", "bp", "+", "E",
+                     "no free when-issued yield feed: Treasury FiscalData publishes "
+                     "high yield (high_investment_rate for bills) but no WI benchmark, "
+                     "so tail = high yield − WI cannot be computed from any free "
+                     "source; no backfill possible"))
 
     # ---- Equity internals (+ sentiment folded in per 16.5) --------------------
     I.append(_ind("spx_vs_high", "Equity internals", "SPX vs 52w high", "%", "-", "D",
@@ -326,9 +489,58 @@ def _build_indicators() -> list[dict]:
     I.append(_ind("put_call", "Equity internals", "Put/call SPX+SPXW", "ratio", "+", "D",
                   "extended", "cycle:pc-spx", "Cboe", "primary",
                   note="history building (~22 obs; percentile needs 60+, confidence 252)"))
+    for pid, nm, skey in (
+        ("put_call_total", "Put/call total", "cycle:pc-total"),
+        ("put_call_equity", "Put/call equity", "cycle:pc-equity"),
+        ("put_call_index", "Put/call index", "cycle:pc-index"),
+    ):
+        I.append(_ind(pid, "Equity internals", nm, "ratio", "+", "D", "extended",
+                      skey, "Cboe", "primary",
+                      note="history building (~22 obs; percentile needs 60+, confidence 252)"))
     I.append(_ind("umich", "Equity internals", "UMich consumer sentiment", "idx", "-",
                   "M", "extended", "cycle:umich", "FRED UMCSENT", "primary", **LAG_M,
                   note="sentiment row (16.4); folded into Equity internals per 16.5"))
+
+    # ---- ETF 1d/5d price momentum (16.4) -------------------------------------------
+    # DERIVED from Yahoo daily closes (cycle:etf-<T>-price, 1Y history); the
+    # stress job computes them in materialize_derived(). Cash-like SGOV/BIL are
+    # context only (inflows can mean flight to cash). Direction −: falling
+    # momentum is stress.
+    for t in ETF_MOM_TICKERS:
+        for lag in ETF_MOM_LAGS:
+            I.append(_ind(f"etf_mom{lag}d_{t.lower()}", "Equity internals",
+                          f"{t} {lag}d price momentum", "%", "-", "D", "extended",
+                          None, f"DERIVED: Yahoo {t} closes", "derived",
+                          inputs=[f"cycle:etf-{t}-price"],
+                          formula=f"last / {lag}-obs-ago − 1",
+                          note="computed by the stress job from Yahoo daily closes" +
+                               ("; cash-like: context only, inflows can mean flight "
+                                "to cash" if t in {"SGOV", "BIL"} else "")))
+    for t in ETF_MOM_MISSING:
+        for lag in ETF_MOM_LAGS:
+            I.append(_na(f"etf_mom{lag}d_{t.lower()}", "Equity internals",
+                         f"{t} {lag}d price momentum", "%", "-", "D",
+                         f"no cycle:etf-{t}-price series: {t} is not in the ETF price "
+                         f"universe (fetchers/ishares_etf.py ETF_UNIVERSE); no free "
+                         f"verified feed wired"))
+
+    # ---- ETF flows basket extension (16.4 / 3.6b) -----------------------------------
+    # No etf_flow_<ticker> series exist for any of these: the 3.6b DERIVED
+    # shares-outstanding x NAV self-logging is not built; etf.com daily tables
+    # are partial (a ticker not listed that day is "not listed", never zero);
+    # stockanalysis / iShares / etfdb are bot-walled. All n/a, tracked in the
+    # Data Gaps list until a feed exists.
+    for t in ETF_FLOW_TICKERS:
+        ctx = t in ETF_FLOW_CONTEXT
+        I.append(_na(f"etf_flow_{t.lower()}", "Equity internals",
+                     f"{t} ETF net creations (est.)", "$", "±" if ctx else "-",
+                     "D",
+                     ("context only (cash-like/Treasury ETF; inflows can mean "
+                      "flight to cash — shown, excluded from composites). "
+                      if ctx else "outflow = stress. ") +
+                     "no free daily flows feed wired: 3.6b DERIVED "
+                     "shares-outstanding x NAV self-logging is not built; "
+                     "etf.com daily tables are partial; vendor feeds are bot-walled"))
 
     # ---- Banks ----------------------------------------------------------------
     I.append(_ind("kre_dd", "Banks", "KRE drawdown from 52w high", "%", "+", "D",
@@ -336,8 +548,9 @@ def _build_indicators() -> list[dict]:
                   inputs=["cycle:etf-kre"], formula="last / trailing-252d max − 1"))
     I.append(_ind("mtg_spread", "Banks", "30Y mortgage rate minus 10Y UST", "pp", "+",
                   "W", "extended", None, "DERIVED: FRED MORTGAGE30US − DGS10", "derived",
-                  inputs=["cycle:us-mortgage-30y", "cycle:us10y"],
-                  formula="MORTGAGE30US − DGS10", **LAG_W))
+                  inputs=["macro:us-mortgage-30y", "cycle:us10y"],
+                  formula="MORTGAGE30US − DGS10", **LAG_W,
+                  note="MORTGAGE30US stored as macro:us-mortgage-30y by the FRED job"))
     I.append(_ind("claims", "Banks", "Initial jobless claims", "k", "+", "W", "core",
                   "cycle:claims", "FRED ICSA", "primary", **LAG_W))
 
@@ -345,46 +558,61 @@ def _build_indicators() -> list[dict]:
     I.append(_ind("usd_broad", "Global", "Broad dollar index", "idx", "+", "D",
                   "extended", "cycle:usd-broad", "FRED DTWEXBGS", "primary"))
     I.append(_ind("brent", "Global", "Brent crude", "$", "±", "D", "extended",
-                  "cycle:brent-crude", "FRED DCOILBRENTEU", "primary"))
+                  "macro:brent-crude", "FRED DCOILBRENTEU", "primary",
+                  note="stored as macro:brent-crude by the FRED job (config `series:` section)"))
     I.append(_ind("epu", "Global", "Economic Policy Uncertainty (daily)", "idx", "+",
                   "D", "extended", "cycle:epu", "FRED USEPUINDXD", "primary",
                   note="fetched by the stress job (FRED USEPUINDXD)"))
 
     # ---- Rates levels (16.4) -----------------------------------------------------
+    # abs_velocity=True: velocity alerts use the absolute value (a fast fall is
+    # a flight-to-quality shock, not calm). The engine's velocity layer already
+    # ranks |raw| change percentiles (stress_score.velocity); the flag is the
+    # registry-level declaration of the 16.4 rule — no engine change.
     for rid, nm, sid, frd in (
         ("us2y", "US 2Y yield", "cycle:us2y", "FRED DGS2"),
         ("us10y", "US 10Y yield", "cycle:us10y", "FRED DGS10"),
-        ("us30y", "US 30Y yield", "cycle:us30y", "FRED DGS30"),
+        ("us30y", "US 30Y yield", "cycle:ust30y", "FRED DGS30"),
         ("sofr", "SOFR", "cycle:sofr", "FRED SOFR"),
     ):
         I.append(_ind(rid, "Treasury plumbing", nm, "%", "+", "D", "core", sid, frd,
-                      "primary",
+                      "primary", abs_velocity=True,
                       note="16.4 rate level: velocity alerts use the absolute value "
-                           "(a fast fall = flight-to-quality shock)"))
+                           "(a fast fall = flight-to-quality shock, not calm)"))
 
     # ---- CDX (16.4) — pending daybook handoff ------------------------------------
     I.append(_na("cdx_ig_spread", "Credit", "CDX IG spread", "bp", "+", "D",
                  "awaiting daybook handoff: ~/workspace/cdx-capture/cdx_ig.csv lives on "
                  "Harry's machine; publish path undecided (spec 16.9)",
-                 rung="rung 5/6: MANUAL/self-logged once the handoff lands — no backfill, no proxy"))
+                 rung="rung 5/6: MANUAL/self-logged once the handoff lands — no backfill, no proxy",
+                 redistributable="no"))  # 16.9: the daybook capture stays non-redistributable
     I.append(_na("cdx_hy_price", "Credit", "CDX HY price", "pts", "-", "D",
                  "awaiting daybook handoff (spec 16.9); keep as price, direction −, "
                  "never convert to spread without a documented formula",
-                 rung="rung 5/6: MANUAL/self-logged once the handoff lands — no backfill, no proxy"))
+                 rung="rung 5/6: MANUAL/self-logged once the handoff lands — no backfill, no proxy",
+                 redistributable="no"))
 
-    # ---- Market activity & liquidity (16.4) — two-sided ±, absolute-z scoring -------
+    # ---- Market activity & liquidity (16.4) — two-sided ±, |z| of log volume ----
+    # The engine's ± branch scores |z| but cannot log-transform (stress_score.py
+    # is owned by Worker A), so every activity series is registered DERIVED: the
+    # stress job log-transforms the raw $m volume in materialize_derived() and
+    # the engine scores |z| of log volume against its window. No engine change.
     for rid, nm, skey, lag in TRACE_ROWS:
-        I.append(_ind(rid, "Market activity", nm, "$m", "±", "D" if lag is LAG_D else "M",
-                      "extended", f"cycle:{skey}", "FINRA TRACE", "primary", **lag,
-                      note="direction ±: scored by absolute z of log volume vs window. "
-                           "Monthly-product rows lag; history from Oct 2023 (~3Y window max). "
+        I.append(_ind(rid, "Market activity", nm, "log($m)", "±",
+                      "D" if lag is LAG_D else "M", "extended", None,
+                      "DERIVED: log of FINRA TRACE volume", "derived",
+                      inputs=[f"cycle:{skey}"], formula="log(volume)", **lag,
+                      note="log pre-transform by the stress job; engine scores |z| "
+                           "of log volume (16.4). Monthly-product rows lag; history "
+                           "from Oct 2023 (~3Y window max, later episodes only). "
                            "Treasury venue is ATS vs dealer-to-customer only: no "
                            "interdealer split exists in the file"))
     for rid, nm, skey in STAR_SECTIONS:
-        I.append(_ind(rid, "Market activity", nm, "$m", "±", "D", "extended",
-                      f"cycle:{skey}", "FINRA Structured Product Activity Reports",
-                      "primary", **LAG_STAR,
-                      note="direction ±: absolute-z scoring; 7-day publication lag (16.6)"))
+        I.append(_ind(rid, "Market activity", nm, "log($m)", "±", "D", "extended",
+                      None, "DERIVED: log of FINRA STAR volume", "derived",
+                      inputs=[f"cycle:{skey}"], formula="log(volume)", **LAG_STAR,
+                      note="log pre-transform by the stress job; engine scores |z| "
+                           "of log volume (16.4). 7-day publication lag (16.6)"))
     I.append(_ind("offrun_share", "Market activity",
                   "Off-the-run share of Treasury volume", "%", "+", "D", "extended",
                   None, "DERIVED: FINRA TRACE", "derived",
@@ -393,22 +621,40 @@ def _build_indicators() -> list[dict]:
                   note="liquidity-preference proxy, not an on/off-the-run spread"))
 
     # ---- Hedge fund leverage (16.4; Q tag, no velocity) ----------------------------
+    # 40 indicators, all mnemonics verified against the hf/v1 metadata endpoint
+    # 2026-10-08. Q-tag: the engine skips velocity for freq "Q"
+    # (stress_score.FREQ_NO_VELOCITY). Source table on every cell: OFR Hedge
+    # Fund Monitor, dataset=fpf (SEC Form PF aggregates); the cycle:<id> rows
+    # are the same dataset via the cycle job's ofr: source key.
     for hid, nm, unit, mn, dirc in OFR_HF:
         I.append(_ind(hid, "Hedge fund leverage", nm, unit, dirc, "Q", "extended",
                       f"ofr:{mn}", "OFR Hedge Fund Monitor (SEC Form PF aggregates)",
                       "primary", **LAG_Q,
-                      note="quarterly, published with a lag; Q tag, no velocity; "
-                           "4-quarter change on tap"))
-    for hid, nm, unit, dirc in (
-        ("hf-repo-borrow", "HF repo borrowing", "$", "+"),
-        ("hf-repo-share-top10", "HF repo borrowing: top-10 share", "%", "+"),
-        ("hf-repo-share-11to50", "HF repo borrowing: 11–50 share", "%", "+"),
-        ("hf-repo-share-51p", "HF repo borrowing: 51+ share", "%", "+"),
+                      note=f"mnemonic {mn}; OFR Hedge Fund Monitor dataset=fpf (SEC "
+                           f"Form PF aggregates); quarterly, published with a lag; "
+                           f"Q tag, no velocity; 4-quarter change on tap"))
+    for hid, nm, unit, mn, dirc in (
+        ("hf-repo-borrow", "HF repo borrowing", "$", "FPF-BORROW_REPO_SUM", "+"),
+        ("hf-repo-share-top10", "HF repo borrowing: top-10 share", "%",
+         "FPF-BORROW_REPO_GAVN10_PERCENT", "+"),
+        ("hf-repo-share-11to50", "HF repo borrowing: 11–50 share", "%",
+         "FPF-BORROW_REPO_GAVN11TO50_PERCENT", "+"),
+        ("hf-repo-share-51p", "HF repo borrowing: 51+ share", "%",
+         "FPF-BORROW_REPO_GAVN51_PERCENT", "+"),
     ):
         I.append(_ind(hid, "Hedge fund leverage", nm, unit, dirc, "Q", "extended",
-                      f"cycle:{hid}", "OFR Hedge Fund Monitor via cycle job",
+                      f"cycle:{hid}", "OFR Hedge Fund Monitor (SEC Form PF aggregates)",
                       "primary", **LAG_Q,
-                      note="Q tag, no velocity"))
+                      note=f"mnemonic {mn}; OFR Hedge Fund Monitor dataset=fpf via "
+                           f"the cycle job; Q tag, no velocity; 4-quarter change "
+                           f"on tap"))
+    for hid, nm, unit, mn, dirc in HF_CYCLE:
+        I.append(_ind(hid, "Hedge fund leverage", nm, unit, dirc, "Q", "extended",
+                      f"cycle:{hid}", "OFR Hedge Fund Monitor (SEC Form PF aggregates)",
+                      "primary", **LAG_Q,
+                      note=f"mnemonic {mn}; OFR Hedge Fund Monitor dataset=fpf via "
+                           f"the cycle job; Q tag, no velocity; 4-quarter change "
+                           f"on tap"))
 
     # DERIVED/PROXY rows are materialized by materialize_derived() into
     # stress:<id> series so the scoring engine can read them like primaries.
@@ -520,11 +766,20 @@ def _momentum(cl: dict, lag: int = 60) -> dict:
     return out
 
 
+def _log(cl: dict) -> dict:
+    """Natural log of positive values — the 16.4 pre-transform for Market
+    activity rows. Non-positive points are dropped (volumes are $m > 0)."""
+    import math
+    return {d: math.log(v) for d, v in cl.items() if v and v > 0}
+
+
 def materialize_derived(store: Store) -> dict[str, str]:
     """Compute every DERIVED/PROXY indicator from its input series.
 
     Returns {indicator_id: "ok (N pts)" | "skipped: ..."}; per-indicator
-    isolation — one bad input degrades only that row.
+    isolation — one bad input degrades only that row. Includes the 16.4
+    log-volume pre-transforms (Market activity) and the ETF 1d/5d momentum
+    rows; the engine then scores them with its existing ±/direction logic.
     """
     results: dict[str, str] = {}
     get = store.points
@@ -553,6 +808,19 @@ def materialize_derived(store: Store) -> dict[str, str]:
                              for d in _inner(off, on) if off[d] + on[d] > 0}
         )(get("cycle:trace-ust-offrun-par"), get("cycle:trace-ust-onrun-par")),
     }
+
+    def _activity_log(key: str):
+        return lambda: _log(get(key))
+
+    def _etf_mom(ticker: str, lag: int):
+        return lambda: _momentum(get(f"cycle:etf-{ticker}-price"), lag)
+
+    # 16.4: log-volume pre-transforms for Market activity; 1d/5d ETF momentum.
+    for _aid, _akey in ACTIVITY_LOG_INPUTS.items():
+        builders.setdefault(_aid, _activity_log(_akey))
+    for _t in ETF_MOM_TICKERS:
+        for _lag in ETF_MOM_LAGS:
+            builders.setdefault(f"etf_mom{_lag}d_{_t.lower()}", _etf_mom(_t, _lag))
     for entry in INDICATORS:
         if entry["tag"] not in {"derived", "proxy"}:
             continue
