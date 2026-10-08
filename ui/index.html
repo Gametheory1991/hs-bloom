@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#171410">
+  <title>HSugama Dash</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="vendor/uplot/uPlot.min.css">
+  <link rel="modulepreload" href="js/main.js">
+  <link rel="stylesheet" href="css/terminal.css">
+</head>
+<body>
+  <header>
+    <span class="brand"><span class="sigdot" aria-hidden="true"></span>HSUGAMA DASH</span>
+    <span id="clock" class="muted"></span>
+    <span id="banner" class="banner hidden"></span>
+    <button id="alerts-toggle" class="header-btn" type="button">ENABLE ALERTS</button>
+  </header>
+  <nav class="hub-row" id="hub-row" aria-label="hubs">
+    <button type="button" data-hub-link="pulse" class="active">PULSE</button>
+    <button type="button" data-hub-link="macro">MACRO</button>
+    <button type="button" data-hub-link="markets">MARKETS</button>
+    <button type="button" data-hub-link="positioning">POSITIONING</button>
+    <button type="button" data-hub-link="structure">FLOW</button>
+    <button type="button" data-hub-link="desk">DESK</button>
+    <button type="button" data-hub-link="regwatch">REG WATCH</button>
+    <button type="button" data-hub-link="equity">EQUITY</button>
+  </nav>
+  <nav class="sub-row" id="sub-row" aria-label="subtabs"></nav>
+  <script>
+  // Early hub-button handler: main.js is a deferred module, so on cold start
+  // the buttons render before its click handlers attach. This inline script
+  // runs immediately and uses delegation, so hub clicks work from first paint.
+  // tabs.js initTabs() re-attaches its own handlers later (idempotent).
+  document.addEventListener("click", function (e) {
+    var b = e.target && e.target.closest ? e.target.closest("[data-hub-link]") : null;
+    if (!b) return;
+    var target = "#/" + b.getAttribute("data-hub-link");
+    if (location.hash !== target) location.hash = target;
+  });
+  </script>
+  <div id="health-strip" class="health-strip" title="per-feed health: green ok · amber recovered · red failing"></div>
+
+  <!-- ============ PULSE — the 60-second conference view (Phase 2) ============ -->
+  <main class="grid" data-hub="pulse" data-sub="snapshot" style="grid-template-columns: 1fr;">
+    <section class="panel" id="panel-pulse-tiles">
+      <div class="panel-title">PULSE — KPI TILES <span class="muted" id="pulse-tiles-asof"></span></div>
+      <div class="panel-body"><div class="kpis" id="pulse-tiles"><p class="muted">Loading tiles…</p></div></div>
+    </section>
+    <section class="panel" id="panel-pulse-range">
+      <div class="panel-title">RANGE CHECK — NOW vs HISTORY <span class="note">dotted Low→High · <span style="color:#e8c96a">●</span> now · <span style="color:#f59e0b">◆</span> hist avg</span></div>
+      <div class="panel-body" id="pulse-rangecheck"><p class="muted">Loading…</p></div>
+      <div class="panel-foot muted">BLOOMBERG-STYLE RANGE COLUMNS · percentile + z-score · 1Y window</div>
+    </section>
+    <section class="panel" id="panel-pulse-stress">
+      <div class="panel-title">MACRO STRESS — SPREADS · INFLATION · JOBS · HOUSING · DISTRESS <span class="note">sources: FRED + NY Fed CMDI</span></div>
+      <div class="panel-body"><div class="kpis" id="pulse-stress"><p class="muted">Loading…</p></div></div>
+      <div class="panel-foot muted">CCC OAS daily · CPI/jobs monthly · 30Y mtg weekly · CMDI weekly (NY Fed) · higher CMDI = more distress</div>
+    </section>
+    <div class="grid2">
+      <section class="panel" id="panel-pulse-talk">
+        <div class="panel-title">TALK TRACK — 60-SECOND BRIEF <span class="note">auto-built from live data</span></div>
+        <div class="panel-body" id="pulse-talktrack"><p class="muted">Building bullets…</p></div>
+        <div class="panel-foot muted">SOURCE: terminal API</div>
+      </section>
+      <section class="panel" id="panel-pulse-movers">
+        <div class="panel-title">TOP MOVERS — σ MOVES <span class="note">1D</span></div>
+        <div class="panel-body" id="pulse-movers"><p class="muted">Loading…</p></div>
+        <div class="panel-foot muted">FULL TABLE → MARKETS / MOVERS</div>
+      </section>
+    </div>
+    <div class="grid3">
+      <section class="panel" id="panel-pulse-econ">
+        <div class="panel-title">TODAY — ECON</div>
+        <div class="panel-body" id="pulse-econ"><p class="muted">Loading…</p></div>
+        <div class="panel-foot muted">FULL WEEK → MACRO / CALENDAR</div>
+      </section>
+      <section class="panel" id="panel-pulse-auctions">
+        <div class="panel-title">NEXT — UST AUCTIONS</div>
+        <div class="panel-body" id="pulse-auctions"><p class="muted">Loading…</p></div>
+        <div class="panel-foot muted">RESULTS → MACRO / AUCTIONS</div>
+      </section>
+      <section class="panel" id="panel-pulse-gauges">
+        <div class="panel-title">RISK GAUGES</div>
+        <div class="panel-body" id="pulse-gauges"><p class="muted">Loading…</p></div>
+        <div class="panel-foot muted">ENGINE → POSITIONING</div>
+      </section>
+    </div>
+    <div class="grid3">
+      <section class="panel" id="panel-radar">
+        <div class="panel-title">MARKET RADAR</div>
+        <div class="panel-body"></div>
+        <div class="panel-foot muted"></div>
+      </section>
+      <section class="panel" id="panel-news">
+        <div class="panel-title">TOP NEWS</div>
+        <div class="panel-body"></div>
+        <div class="panel-foot muted"></div>
+      </section>
+      <section class="panel" id="panel-insights">
+        <div class="panel-title">ALERTS / NEWSLETTER</div>
+        <div class="panel-body"></div>
+        <div class="panel-foot muted"></div>
+      </section>
+    </div>
+  </main>
+  <main class="grid hidden" data-hub="pulse" data-sub="scorecard" style="grid-template-columns: 1fr;">
+    <section class="panel" id="panel-scorecard">
+      <div class="panel-title">SCORECARD — 1D/1M/3M/1Y + 1Y Z</div>
+      <div class="panel-body"></div>
+      <div class="panel-foot muted"></div>
+    </section>
+  </main>
+
+  <!-- ============ MACRO ============ -->
+  <main class="grid hidden" data-hub="macro" data-sub="calendar" style="grid-template-columns: 1fr;">
+    <section class="panel" id="panel-macro">
+      <div class="panel-title">MACRO — THIS WEEK</div>
+      <div class="panel-body"></div>
+      <div class="panel-foot muted"></div>
+    </section>
+  </main>
+  <main class="grid hidden" data-hub="macro" data-sub="central" style="grid-template-columns: 1fr;">
+    <section class="panel" id="panel-central">
+      <div class="panel-title">CENTRAL — FED WATCH</div>
+      <div class="panel-body"></div>
+      <div class="panel-foot muted"></div>
+    </section>
+  </main>
+  <main class="grid hidden" data-hub="macro" data-sub="auctions" style="grid-template-columns: 1fr;">
+    <section class="panel" id="panel-auctions">
+      <div class="panel-title">UST AUCTIONS</div>
+      <div class="panel-body"></div>
+      <div class="panel-foot muted"></div>
+    </section>
+  </main>
+  <main class="grid hidden" data-hub="macro" data-sub="bonds" style="grid-template-columns: 1fr;">
+    <section class="panel" id="panel-bonds">
+      <div class="panel-title">WORLD BONDS</div>
+      <div class="panel-body"></div>
+      <div class="panel-foot muted"></div>
+    </section>
+  </main>
+  <main class="grid hidden" data-hub="macro" data-sub="credit" style="grid-template-columns: 1fr;">
+    <section class="panel" id="panel-credit">
+      <div class="panel-title">CREDIT — SEGMENTS · UST · STAR · Z-SCORES</div>
+      <div class="panel-body"><p class="muted">Credit panel wiring in progress…</p></div>
+      <div class="panel-foot muted"></div>
+    </section>
+  </main>
+  <main class="grid grid-cycle hidden" data-hub="macro" data-sub="cycle" id="cycle-econ"></main>
+  <main class="grid grid-cycle hidden" data-hub="macro" data-sub="cycle" id="cycle-profit"></main>
+  <main class="grid grid-cycle hidden" data-hub="macro" data-sub="cycle" id="cycle-credit"></main>
+
+  <!-- ============ MARKETS ============ -->
+  <main class="grid hidden" data-hub="markets" data-sub="equities" style="grid-template-columns: 1fr;">
+    <section class="panel" id="panel-movers">
+      <div class="panel-title">MOVERS — SINGLE-STOCK SIGMA MOVES</div>
+      <div class="panel-body"></div>
+      <div class="panel-foot muted"></div>
+    </section>
+  </main>
+  <main class="grid hidden" data-hub="markets" data-sub="volcorr" style="grid-template-columns: 1fr 1fr;">
+    <section class="panel" id="panel-vol">
+      <div class="panel-title">VOL — MACRO VOLATILITY DIGEST</div>
+      <div class="panel-body"></div>
+      <div class="panel-foot muted"></div>
+    </section>
+    <section class="panel" id="panel-xcorr">
+      <div class="panel-title">X-CORR — CROSS-ASSET CORRELATION &amp; VOL</div>
+      <div class="panel-body"></div>
+      <div class="panel-foot muted"></div>
+    </section>
+  </main>
+  <main class="grid hidden" data-hub="markets" data-sub="futures" style="grid-template-columns: 1fr;">
+    <section class="panel" id="panel-futures">
+      <div class="panel-title">FUTURES — FRONT-MONTH</div>
+      <div class="panel-body"></div>
+      <div class="panel-foot muted"></div>
+    </section>
+  </main>
+  <main class="grid grid-cycle hidden" data-hub="markets" data-sub="etfs" id="cycle-etf"></main>
+  <main class="grid grid-defi hidden" data-hub="markets" data-sub="digital">
+    <section class="panel" id="panel-defi">
+      <div class="panel-title"><span id="defi-view-title">CURATED VAULTS — USDC</span><span class="view-toggle"><button type="button" data-view="vaults" class="active" aria-pressed="true">VAULTS</button><button type="button" data-view="markets" aria-pressed="false">MARKETS</button><button type="button" data-view="crypto" aria-pressed="false">CRYPTO</button><button type="button" data-view="rwa" aria-pressed="false">RWA</button></span></div>
+      <div class="panel-body"></div>
+      <div class="panel-foot muted"></div>
+    </section>
+    <section class="col-right">
+      <div class="panel" id="panel-midnight">
+        <div class="panel-title">MIDNIGHT — USDC FIXED TERM</div>
+        <div class="panel-body"></div>
+        <div class="panel-foot muted"></div>
+      </div>
+      <div class="panel" id="panel-refs">
+        <div class="panel-title">RATE REFS</div>
+        <div class="panel-body"></div>
+        <div class="panel-foot muted"></div>
+      </div>
+    </section>
+  </main>
+  <main class="grid hidden" data-hub="markets" data-sub="options" style="grid-template-columns: 1fr;">
+    <section class="panel" id="panel-options">
+      <div class="panel-title">OPTIONS — GAMMA & FLOW</div>
+      <div class="panel-body"></div>
+      <div class="panel-foot muted"></div>
+    </section>
+  </main>
+
+  <!-- ============ POSITIONING ============ -->
+  <main class="grid grid-cycle hidden" data-hub="positioning" data-sub="positions" id="cycle-pos"></main>
+  <main class="grid grid-cycle hidden" data-hub="positioning" data-sub="positions" id="cycle-quant"></main>
+  <main class="grid grid-cycle hidden" data-hub="positioning" data-sub="positions" id="cycle-ice"></main>
+  <main class="grid grid-cycle hidden" data-hub="positioning" data-sub="positions" id="cycle-risk"></main>
+  <main class="grid hidden" data-hub="positioning" data-sub="tff" style="grid-template-columns: 1fr;">
+    <section class="panel" id="panel-tff">
+      <div class="panel-title">TFF — TRADERS IN FINANCIAL FUTURES (OFR)</div>
+      <div class="panel-body"></div>
+      <div class="panel-foot muted"></div>
+    </section>
+  </main>
+  <main class="grid hidden" data-hub="positioning" data-sub="flows" style="grid-template-columns: 1fr;">
+    <section class="panel" id="panel-flows">
+      <div class="panel-title">FLOWS — 13F NET FLOWS</div>
+      <div class="panel-body"></div>
+      <div class="panel-foot muted"></div>
+    </section>
+  </main>
+  <main class="grid hidden" data-hub="positioning" data-sub="predict" style="grid-template-columns: 1fr;">
+    <section class="panel" id="panel-predict">
+      <div class="panel-title">PREDICT — MARKETS &amp; EDGE ESTIMATES</div>
+      <div class="panel-body"></div>
+      <div class="panel-foot muted"></div>
+    </section>
+  </main>
+
+  <!-- ============ FLOW ============ -->
+  <main class="grid hidden" data-hub="structure" data-sub="trace" style="grid-template-columns: 1fr;">
+    <section class="panel" id="panel-koi">
+      <div class="panel-title">KOI — FINRA/TRACE Y/Y SCORECARD</div>
+      <div class="panel-body"></div>
+      <div class="panel-foot muted"></div>
+    </section>
+    <section class="panel" id="panel-finra">
+      <div class="panel-title">FINRA — SHORTS · BREADTH · CORPORATE · TRACE</div>
+      <div class="panel-body"></div>
+      <div class="panel-foot muted"></div>
+    </section>
+  </main>
+  <main class="grid grid-cycle hidden" data-hub="structure" data-sub="trace" id="cycle-struct"></main>
+  <main class="grid hidden" data-hub="structure" data-sub="finance" style="grid-template-columns: 1fr;">
+    <section class="panel" id="panel-finance">
+      <div class="panel-title">FINANCE — BANKS · PRIMARY DEALERS · BROKER-DEALERS · ATS · DEPOSITORY INSTITUTIONS</div>
+      <div class="panel-body"><p class="muted">Loading…</p></div>
+      <div class="panel-foot muted"></div>
+    </section>
+  </main>
+  <main class="grid hidden" data-hub="structure" data-sub="factbook" style="grid-template-columns: 1fr;">
+    <section class="panel" id="panel-factbook">
+      <div class="panel-title">TRACE FACT BOOK</div>
+      <div class="panel-body"></div>
+      <div class="panel-foot muted"></div>
+    </section>
+  </main>
+  <main class="grid hidden" data-hub="structure" data-sub="star" style="grid-template-columns: 1fr;">
+    <section class="panel" id="panel-star">
+      <div class="panel-title">STAR — STRUCTURED PRODUCT ACTIVITY</div>
+      <div class="panel-body"></div>
+      <div class="panel-foot muted"></div>
+    </section>
+  </main>
+
+  <main class="grid hidden" data-hub="structure" data-sub="maps" style="grid-template-columns: 1fr 1fr;">
+    <section class="panel" id="panel-riskmap">
+      <div class="panel-title">RISK MAP — WORLD</div>
+      <div class="panel-body"></div>
+      <div class="panel-foot muted"></div>
+    </section>
+    <section class="panel" id="panel-ai-flow">
+      <div class="panel-title">COVERAGE MAPS — UNIVERSE &amp; MONEY FLOW</div>
+      <div class="panel-body"></div>
+      <div class="panel-foot muted"></div>
+    </section>
+  </main>
+  <main class="grid hidden" data-hub="structure" data-sub="desks" style="grid-template-columns: 1fr 1fr;">
+    <section class="panel" id="panel-hyper">
+      <div class="panel-title">HYPER — HYPERSCALER DESK</div>
+      <div class="panel-body"></div>
+      <div class="panel-foot muted"></div>
+    </section>
+    <section class="panel" id="panel-tsv">
+      <div class="panel-title">TSV — TOKENIZED SECURITIES VENUE WATCH</div>
+      <div class="panel-body"></div>
+      <div class="panel-foot muted"></div>
+    </section>
+  </main>
+  <main class="grid hidden" data-hub="structure" data-sub="etfflows" style="grid-template-columns: 1fr;">
+    <section class="panel" id="panel-etfflows">
+      <div class="panel-title">ETF FLOWS — AUM & CREATIONS/REDEMPTIONS</div>
+      <div class="panel-body"></div>
+      <div class="panel-foot muted"></div>
+    </section>
+  </main>
+
+  <!-- ============ DESK ============ -->
+  <main class="grid hidden" data-hub="desk" data-sub="alerts" style="grid-template-columns: 1fr;">
+    <section class="panel" id="panel-alerts">
+      <div class="panel-title">ALERT TUNING</div>
+      <div class="panel-body"></div>
+    </section>
+  </main>
+  <main class="grid hidden" data-hub="desk" data-sub="briefcheck" style="grid-template-columns: 1fr;">
+    <section class="panel" id="panel-briefcheck">
+      <div class="panel-title">BRIEFING × TERMINAL CHECK</div>
+      <div class="panel-body"></div>
+      <div class="panel-foot muted"></div>
+    </section>
+  </main>
+  <main class="grid hidden" data-hub="desk" data-sub="analyst" style="grid-template-columns: 1fr;">
+    <section class="panel">
+      <div class="panel-title">ANALYST</div>
+      <div class="panel-body">
+        <p class="muted" style="margin-bottom:10px">Bloom Analyst — grounded Q&amp;A over the terminal's own data. Lives in the slide-over drawer.</p>
+        <button id="analyst-open" class="header-btn" type="button">OPEN ANALYST CHAT</button>
+      </div>
+    </section>
+  </main>
+  <main class="grid hidden" data-hub="desk" data-sub="usage" style="grid-template-columns: 1fr;">
+    <section class="panel" id="panel-usage">
+      <div class="panel-title">USAGE ANALYTICS</div>
+      <div class="panel-body"></div>
+      <div class="panel-foot muted"></div>
+    </section>
+  </main>
+  <main class="grid hidden" data-hub="desk" data-sub="talktrack" style="grid-template-columns: 1fr;">
+    <section class="panel">
+      <div class="panel-title">TALK TRACK</div>
+      <div class="panel-body"><p class="muted">Phase 2 — auto-built 60-second briefing bullets, generated from the snapshot tiles. Read straight off the phone.</p></div>
+    </section>
+  </main>
+  <main class="grid hidden" data-hub="desk" data-sub="deck" style="grid-template-columns: 1fr;">
+    <section class="panel">
+      <div class="panel-title">DECK MODE</div>
+      <div class="panel-body"><p class="muted">Phase 2 — light-theme one-pager with print CSS. Screenshot straight into the deck.</p></div>
+    </section>
+  </main>
+
+  <!-- ============ REG WATCH ============ -->
+  <main class="grid hidden" data-hub="regwatch" data-sub="news" style="grid-template-columns: 1fr;">
+    <section class="panel" id="panel-regwatch-news">
+      <div class="panel-title">REG WATCH — NEWS FEED</div>
+      <div class="panel-body"></div>
+      <div class="panel-foot muted"></div>
+    </section>
+  </main>
+  <main class="grid hidden" data-hub="regwatch" data-sub="rules" style="grid-template-columns: 1fr;">
+    <section class="panel" id="panel-regwatch-rules">
+      <div class="panel-title">REG WATCH — RULEMAKING TRACKER</div>
+      <div class="panel-body"></div>
+      <div class="panel-foot muted"></div>
+    </section>
+  </main>
+  <main class="grid hidden" data-hub="regwatch" data-sub="topics" style="grid-template-columns: 1fr;">
+    <section class="panel" id="panel-regwatch-topics">
+      <div class="panel-title">REG WATCH — TOPIC WATCH</div>
+      <div class="panel-body"></div>
+      <div class="panel-foot muted"></div>
+    </section>
+  </main>
+
+  <!-- ============ EQUITY ============ -->
+  <main class="grid hidden" data-hub="equity" data-sub="overview" style="grid-template-columns: 1fr;">
+    <section class="panel" id="panel-equity">
+      <div class="panel-title">EQTY</div>
+      <div class="panel-body"></div>
+      <div class="panel-foot muted"></div>
+    </section>
+  </main>
+  <main class="grid hidden" data-hub="equity" data-sub="shortvol" style="grid-template-columns: 1fr;">
+    <section class="panel" id="panel-shortvol">
+      <div class="panel-title">SHORT VOLUME — REG SHO DAILY</div>
+      <div class="panel-body"></div>
+      <div class="panel-foot muted"></div>
+    </section>
+  </main>
+  <main class="grid hidden" data-hub="equity" data-sub="margin" style="grid-template-columns: 1fr;">
+    <section class="panel" id="panel-margin">
+      <div class="panel-title">MARGIN DEBT — FINRA</div>
+      <div class="panel-body"></div>
+      <div class="panel-foot muted"></div>
+    </section>
+  </main>
+  <main class="grid hidden" data-hub="equity" data-sub="shortint" style="grid-template-columns: 1fr;">
+    <section class="panel" id="panel-shortint">
+      <div class="panel-title">SHORT INTEREST — FINRA SETTLEMENT</div>
+      <div class="panel-body"></div>
+      <div class="panel-foot muted"></div>
+    </section>
+  </main>
+  <main class="grid hidden" data-hub="equity" data-sub="tape" style="grid-template-columns: 1fr;">
+    <section class="panel" id="panel-tape">
+      <div class="panel-title">TAPE VOLUME — NASDAQTRADER VENUE × TAPE</div>
+      <div class="panel-body"></div>
+      <div class="panel-foot muted"></div>
+    </section>
+  </main>
+  <main class="grid hidden" data-hub="equity" data-sub="ats" style="grid-template-columns: 1fr;">
+    <section class="panel" id="panel-ats">
+      <div class="panel-title">FINRA ATS TRANSPARENCY — DARK POOLS</div>
+      <div class="panel-body"></div>
+      <div class="panel-foot muted"></div>
+    </section>
+  </main>
+  <main class="grid hidden" data-hub="equity" data-sub="otc" style="grid-template-columns: 1fr;">
+    <section class="panel" id="panel-otc">
+      <div class="panel-title">FINRA OTC MARKET — OVER-THE-COUNTER EQUITIES</div>
+      <div class="panel-body"></div>
+      <div class="panel-foot muted"></div>
+    </section>
+  </main>
+
+  <div id="chart-overlay" class="overlay hidden">
+    <div class="overlay-box">
+      <div class="overlay-head"><span id="chart-title"></span><button id="chart-close">✕</button></div>
+      <div id="chart-root"></div>
+    </div>
+  </div>
+  <script defer src="vendor/uplot/uPlot.iife.min.js"></script>
+  <!-- xlsx.full.min.js lazy-loads on first XLSX export via export.js ensureXLSX()
+       (was render-blocking at 951KB) -->
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
