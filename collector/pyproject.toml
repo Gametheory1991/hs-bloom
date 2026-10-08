@@ -15,6 +15,7 @@ dependencies = [
     "xlrd>=2",  # AAII sentiment survey ships as legacy .xls
     "lxml>=5",  # finance_dirs.py scrapes FINRA ATS/MPID lists
     "pydantic>=2",  # api.py imports BaseModel directly; not only via fastapi
+    "google-auth>=2.30",  # fetchers/imf.py: Sheets API service-account JWT (no google-api-python-client; REST via httpx)
 ]
 
 [project.optional-dependencies]
