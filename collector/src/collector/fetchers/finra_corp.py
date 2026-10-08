@@ -67,7 +67,36 @@ TREASURY_CURVE = (
     (30.0, "us-30y-yield"),
 )
 
-HIST_CAP = 400  # max per-CUSIP history entries kept in the doc
+def merge_bond_history(prev_hist: dict, lists: dict[str, list[dict]]
+                       ) -> dict:
+    """Accumulate per-CUSIP price/yield history from daily bond lists.
+
+    `lists` is {iso_date: [bond, ...]} (all dates from this fetch).
+    Keeps the FULL per-CUSIP history (no cap): every day ever seen stays
+    in the doc, newest last. Returns the merged history dict
+    {cusip: {"d": [...], "p": [...], "y": [...]}}.
+    """
+    hist: dict[str, dict] = {}
+    if isinstance(prev_hist, dict):
+        for cusip, h in prev_hist.items():
+            if isinstance(h, dict):
+                hist[cusip] = {
+                    "d": list(h.get("d", [])),
+                    "p": list(h.get("p", [])),
+                    "y": list(h.get("y", [])),
+                }
+    for day in sorted(lists):
+        for b in lists[day]:
+            cusip = b.get("symbol")
+            if not cusip:
+                continue
+            h = hist.setdefault(cusip, {"d": [], "p": [], "y": []})
+            if h["d"] and h["d"][-1] >= day:
+                continue  # already have this day (or newer)
+            h["d"].append(day)
+            h["p"].append(b.get("last"))
+            h["y"].append(b.get("yield"))
+    return hist
 
 
 def treasury_yield_at(store, years: float, asof: date) -> float | None:
@@ -161,37 +190,6 @@ def _week52_stats(hist: dict) -> dict:
     }
 
 
-def merge_bond_history(prev_hist: dict, lists: dict[str, list[dict]]
-                       ) -> dict:
-    """Accumulate per-CUSIP price/yield history from daily bond lists.
-
-    `lists` is {iso_date: [bond, ...]} (all dates from this fetch).
-    Keeps trailing HIST_CAP entries per CUSIP, FIFO. Returns the merged
-    history dict {cusip: {"d": [...], "p": [...], "y": [...]}}.
-    """
-    hist: dict[str, dict] = {}
-    if isinstance(prev_hist, dict):
-        for cusip, h in prev_hist.items():
-            if isinstance(h, dict):
-                hist[cusip] = {
-                    "d": list(h.get("d", []))[-HIST_CAP:],
-                    "p": list(h.get("p", []))[-HIST_CAP:],
-                    "y": list(h.get("y", []))[-HIST_CAP:],
-                }
-    for day in sorted(lists):
-        for b in lists[day]:
-            cusip = b.get("symbol")
-            if not cusip:
-                continue
-            h = hist.setdefault(cusip, {"d": [], "p": [], "y": []})
-            if h["d"] and h["d"][-1] >= day:
-                continue  # already have this day (or newer)
-            h["d"].append(day)
-            h["p"].append(b.get("last"))
-            h["y"].append(b.get("yield"))
-            for k in ("d", "p", "y"):
-                if len(h[k]) > HIST_CAP:
-                    h[k] = h[k][-HIST_CAP:]
     return hist
 
 
@@ -201,9 +199,7 @@ def merge_bond_history(prev_hist: dict, lists: dict[str, list[dict]]
 # The most-active lists are a *sample* of the bond universe (30 issues/day),
 # but accumulated over time the registry grows into a useful panel of
 # tracked issues. The wall is labeled as a sample everywhere it renders.
-# ---------------------------------------------------------------------------
-
-REGISTRY_CAP = 5000  # max CUSIPs kept; evict stalest last_seen first
+# Every CUSIP ever seen is kept (no cap).
 
 # (label, min_years_inclusive, max_years_exclusive)
 MAT_BUCKETS = (
@@ -254,8 +250,8 @@ def merge_cusip_registry(prev: dict | None,
     """Accumulate per-CUSIP attributes across every fetch.
 
     Registry entry: issuer, coupon, maturity, moodys, sp, cat, yield,
-    price, spread_bps (latest seen), last_seen. Capped at REGISTRY_CAP
-    with stalest-last_seen eviction.
+    price, spread_bps (latest seen), last_seen. Every CUSIP ever seen is
+    kept (no cap).
     """
     reg: dict[str, dict] = {}
     if isinstance(prev, dict):
@@ -279,9 +275,6 @@ def merge_cusip_registry(prev: dict | None,
             if isinstance(b.get("spread_bps"), (int, float)):
                 e["spread_bps"] = b["spread_bps"]
             e["last_seen"] = day
-    if len(reg) > REGISTRY_CAP:
-        ordered = sorted(reg.items(), key=lambda kv: kv[1].get("last_seen", ""))
-        reg = dict(ordered[len(reg) - REGISTRY_CAP:])
     return reg
 
 

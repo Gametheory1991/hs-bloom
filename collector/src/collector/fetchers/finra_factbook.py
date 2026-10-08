@@ -112,7 +112,22 @@ INDEX_URL = "https://www.finra.org/filing-reporting/trace/trace-fact-book"
 SOURCE = "finra-factbook"
 CONTACT_UA = "os-bloom/1.0 contact harrysugamakc@gmail.com"
 REQUEST_GAP = 2.0  # polite: <=1 req/2s, same posture as the SEC fetchers
-BACKFILL_QUARTERS = 12
+# Backfill budget per run; None = every quarter the index lists. The FINRA
+# index carries quarterly workbooks back to Q2 2014, and the fetcher pulls
+# all of them (no history cap). Missing quarters are detected per kind from
+# stored series plus the doc's fetched-quarter log, so already-populated
+# stores extend their history and interrupted runs resume where they left
+# off. Upserts are idempotent at quarter-end.
+BACKFILL_QUARTERS: int | None = None
+
+# Per-kind "canary" series used to detect which quarters are already stored.
+# Verified against real parses: each of these is written every quarter its
+# kind's workbook exists.
+_KIND_CANARIES = {
+    "corp": ("cycle:fb-ig-trades",),
+    "agency": ("cycle:fb-agency-trades",),
+    "sec": ("cycle:fb-tba-trades",),
+}
 
 # href="...Q22026-Corporate-Bond-Tables.xlsx" (2-digit years seen pre-2020)
 XLSX_RE = re.compile(r'href="([^"]*?Q([1-4])(\d{2,4})[^"]*?\.xlsx)"', re.IGNORECASE)
@@ -1353,13 +1368,17 @@ async def fetch_finra_factbook_annual(store: Store, get_text: GetText,
 async def fetch_finra_factbook(store: Store, get_text: GetText,
                                get_bytes: GetBytes,
                                today: date | None = None,
-                               backfill_quarters: int = BACKFILL_QUARTERS) -> str:
+                               backfill_quarters: int | None = BACKFILL_QUARTERS) -> str:
     """Quarterly job: FINRA TRACE Fact Book workbooks.
 
-    Resolves the latest quarter's 3 workbooks from the index page; on an
-    empty store, also backfills the previous `backfill_quarters` quarters
-    (idempotent upserts at quarter-end). Writes quarterly cycle series and
-    a "finra_factbook" snapshot doc with the latest quarter's top-50 lists.
+    Resolves the latest quarter's 3 workbooks from the index page, then
+    extends history with every older quarter the index lists (back to
+    Q2 2014). Missing quarters are detected per kind from stored series
+    plus the doc's fetched-quarter log, so already-populated stores
+    extend their history and interrupted runs resume where they left off.
+    Upserts are idempotent at quarter-end. Writes quarterly cycle series
+    and a "finra_factbook" snapshot doc with the latest quarter's top-50
+    lists.
     """
     today = today or date.today()
     headers = {"User-Agent": CONTACT_UA}
@@ -1369,18 +1388,54 @@ async def fetch_finra_factbook(store: Store, get_text: GetText,
     if not urls:
         raise ValueError("no fact-book workbook links on the index page")
 
-    # latest quarter per kind first (snapshot doc source), then backfill
+    try:
+        prev = store.doc("finra_factbook")
+        prev_p: dict = prev.payload if prev and isinstance(prev.payload, dict) else {}
+    except Exception:  # noqa: BLE001 — a doc read failure must not fail the run
+        prev_p = {}
+
+    # latest quarter per kind first (snapshot doc source)
     jobs: list[tuple[str, str, int, int]] = []
+    seen: set[tuple[str, int, int]] = set()
     for kind, lst in urls.items():
-        jobs.append((kind, lst[0][0], lst[0][1], lst[0][2]))
-    backfill = len(store.points("cycle:fb-ig-trades")) < 4
-    if backfill and backfill_quarters > 1:
-        for kind, lst in urls.items():
-            for url, y, q in lst[1:backfill_quarters]:
-                jobs.append((kind, url, y, q))
+        url, y, q = lst[0]
+        jobs.append((kind, url, y, q))
+        seen.add((kind, y, q))
+
+    # extend/repair: every older quarter the index lists that was never
+    # successfully fetched (doc log) and whose quarter-end is missing from
+    # the kind's stored series.
+    fetched: set[str] = set(prev_p.get("quarters_fetched") or [])
+    have: dict[str, set[date]] = {}
+    for kind, canaries in _KIND_CANARIES.items():
+        qdates: set[date] = set()
+        for sid in canaries:
+            try:
+                qdates.update(store.points(sid))
+            except Exception:  # noqa: BLE001 — treat as missing
+                pass
+        have[kind] = qdates
+    missing: list[tuple[str, str, int, int]] = []
+    for kind, lst in urls.items():
+        for url, y, q in lst:
+            if (kind, y, q) in seen:
+                continue
+            if f"{kind}:{y}-Q{q}" in fetched:
+                continue
+            if quarter_end(y, q) in have.get(kind, set()):
+                continue
+            missing.append((kind, url, y, q))
+    if backfill_quarters is not None:
+        missing = missing[:backfill_quarters]
+    for kind, url, y, q in missing:
+        jobs.append((kind, url, y, q))
+        seen.add((kind, y, q))
+    if missing:
+        log.info("factbook: extending history with %d older workbooks", len(missing))
 
     latest: dict[str, dict] = {}
     quarters: list[dict] = []
+    fetched_now: set[str] = set()
     for kind, url, y, q in jobs:
         try:
             data = await get_bytes(url, headers=headers)
@@ -1395,6 +1450,7 @@ async def fetch_finra_factbook(store: Store, get_text: GetText,
         if p["qdate"] is None:
             log.warning("factbook %s: no quarter label found", url)
             continue
+        fetched_now.add(f"{kind}:{y}-Q{q}")
         for suffix, v in p["series"].items():
             store.upsert_points(f"cycle:{suffix}", [(p["qdate"], v)])
         if kind not in latest:
@@ -1446,14 +1502,13 @@ async def fetch_finra_factbook(store: Store, get_text: GetText,
         "buy_sell_latest": bs_latest,
         "buckets_latest": buckets_latest,
         "quarters": quarters,
+        # Log of every (kind, quarter) successfully fetched from the index,
+        # carried forward so the extend/repair scan never re-downloads a
+        # quarter whose workbook label did not match its URL quarter.
+        "quarters_fetched": sorted(fetched | fetched_now),
     }
     # The annual job merges annual_top/interval into this doc; carry those
     # keys forward so the quarterly refresh never clobbers them.
-    try:
-        prev = store.doc("finra_factbook")
-        prev_p = prev.payload if prev and isinstance(prev.payload, dict) else {}
-    except Exception:  # noqa: BLE001 — a doc read failure must not fail the run
-        prev_p = {}
     for k in ANNUAL_DOC_KEYS:
         if k in prev_p and k not in payload:
             payload[k] = prev_p[k]
