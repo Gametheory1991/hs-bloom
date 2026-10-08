@@ -162,6 +162,14 @@ const UNIVERSE_OPTS = {
       ],
     },
   },
+  tokenized_securities: {
+    tabLabel: "TOKENIZED SECURITIES",
+    hubs: ["coinbase", "securitize", "ondo", "robinhood", "kraken"],
+    ego: "coinbase",
+    chartTitle: "TSV WATCHLIST — COVERAGE",
+    chartNote: "Tokenized-securities venue watch: operators, issuers, covered firms and adjacent market infrastructure. Graph doc refreshed weekly.",
+    legend: `<span style="color:#7fd4a8">—</span> operates &nbsp;<span style="color:#8fa8d8">—</span> issues &nbsp;<span style="color:#e8c96a">- -</span> provides liquidity`,
+  },
 };
 const optsFor = (doc) => UNIVERSE_OPTS[doc.universe_id] || {
   tabLabel: (doc.universe_id || "UNIVERSE").toUpperCase().replace(/_/g, " "),
@@ -568,7 +576,7 @@ export function renderUniverseSelector(...docs) {
   const body = document.querySelector("#panel-ai-flow .panel-body");
   const footEl = document.querySelector("#panel-ai-flow .panel-foot");
   if (!body) return;
-  const FALLBACK_IDS = ["ai_buildout", "market_structure", "bank_fixed_income", "technology", "vendor", "etf", "crypto", "private_credit"];
+  const FALLBACK_IDS = ["ai_buildout", "market_structure", "bank_fixed_income", "technology", "vendor", "etf", "crypto", "private_credit", "tokenized_securities"];
   docs = docs.map((d, i) => (d && d.universe_id ? d : { ...EMPTY, universe_id: FALLBACK_IDS[i] || `universe_${i}` }));
   const has = docs.map((d) => (d.verticals || []).length > 0);
   if (!has.some(Boolean)) {
