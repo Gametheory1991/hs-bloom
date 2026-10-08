@@ -284,6 +284,15 @@ class Store:
             return None
         return Doc(payload=payload, updated_at=row[1], source=row[2])
 
+    def doc_keys(self, prefix: str) -> list[str]:
+        """Doc keys starting with ``prefix`` (for archival enumeration)."""
+        rows = self._execute(
+            "SELECT key FROM docs WHERE key LIKE ? ESCAPE '\\' ORDER BY key",
+            (prefix.replace("\\", "\\\\").replace("%", "\\%")
+             .replace("_", "\\_") + "%",),
+        )
+        return [r[0] for r in rows]
+
     # -- fetcher health --------------------------------------------------
     def record_success(self, name: str, active_source: str) -> None:
         self._execute(

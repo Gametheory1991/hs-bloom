@@ -613,7 +613,10 @@ def create_app(store: Store, cfg: Config) -> FastAPI:
         "finra_corp", "finra_factbook", "finra_breadth", "regsho_daily",
         "regsho_threshold", "finra_short", "trace_treasury", "trace_monthly",
         "finra_ids_star", "finra_ats", "finra_margin", "finra_capped",
+        "tape",  # NasdaqTrader venues incl. FINRA TRFs
     )
+    # Doc key prefixes also archived (dynamic per-period keys).
+    FINRA_DOC_PREFIXES = ("otc-",)  # otc-top100-{m}, otc-dailylist-{ds}, ...
 
     @app.get("/api/finra/docs")
     def finra_docs() -> dict:
@@ -625,7 +628,10 @@ def create_app(store: Store, cfg: Config) -> FastAPI:
         already shown on this public terminal.
         """
         docs: dict[str, dict] = {}
-        for key in FINRA_DOC_KEYS:
+        keys = list(FINRA_DOC_KEYS)
+        for prefix in FINRA_DOC_PREFIXES:
+            keys.extend(store.doc_keys(prefix))
+        for key in dict.fromkeys(keys):
             d = store.doc(key)
             if d is None:
                 continue
