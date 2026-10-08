@@ -16,6 +16,7 @@ dependencies = [
     "lxml>=5",  # finance_dirs.py scrapes FINRA ATS/MPID lists
     "pydantic>=2",  # api.py imports BaseModel directly; not only via fastapi
     "google-auth>=2.30",  # fetchers/imf.py: Sheets API service-account JWT (no google-api-python-client; REST via httpx)
+    "python-multipart>=0.0.9",  # Starlette request.form() for the /login passphrase POST
 ]
 
 [project.optional-dependencies]
