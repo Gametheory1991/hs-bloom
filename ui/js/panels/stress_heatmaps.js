@@ -5,6 +5,8 @@
 // H5/H6: velocity z-score (sigmas vs trailing 1Y) — 7D / 30D
 // H7/H8: level z-score vs trailing history — 1Y / full
 // Warm-dark theme: bg #171410, amber #e8c96a, soft teal #7fc9b5.
+// Heatmap cells use a light theme per Harry 2026-10-08: white cells,
+// green text = calm, red text = stressed.
 import { getStressHeatmaps } from "../api.js";
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
@@ -21,21 +23,35 @@ const PANELS = [
   { key: "lvlzfull", title: "H8 · Level z-score vs full history", kind: "zdiv" },
 ];
 
-// Warm-dark cell backgrounds. Returns {bg, fg}.
+// Light theme: white cells, text color carries the signal.
+// Green = calm, red = stressed. Returns {bg, fg}.
 function cellStyle(kind, v, rowMin, rowMax, absMax) {
-  if (v == null || !isFinite(v)) return { bg: "rgba(255,255,255,0.03)", fg: "#6b6252" };
+  if (v == null || !isFinite(v)) return { bg: "#ffffff", fg: "#b0b0b0" };
+  let t; // 0 = calm (green) → 1 = stressed (red)
   if (kind === "seq") {
-    // per-row min → max on an amber ramp
-    const t = rowMax > rowMin ? (v - rowMin) / (rowMax - rowMin) : 0.5;
-    const a = (0.06 + t * 0.55).toFixed(2);
-    return { bg: `rgba(232,201,106,${a})`, fg: t > 0.55 ? "#171410" : "#ece4d3" };
+    // per-row min → max
+    t = rowMax > rowMin ? (v - rowMin) / (rowMax - rowMin) : 0.5;
+  } else {
+    // diverging: intensity by |v|; sign kept in the +/- prefix
+    const m = kind === "zdiv" ? 3 : (absMax || 1);
+    t = Math.min(Math.abs(v) / m, 1);
   }
-  // diverging: teal = negative, amber/red = positive
-  const m = kind === "zdiv" ? 3 : (absMax || 1);
-  const frac = Math.min(Math.abs(v) / m, 1);
-  const a = (0.06 + frac * 0.5).toFixed(2);
-  const rgb = v > 0 ? "232,120,60" : "127,201,181";
-  return { bg: `rgba(${rgb},${a})`, fg: frac > 0.55 ? "#171410" : "#ece4d3" };
+  // green (#1a8f3c) → amber (#c78a00) → red (#d42a1e)
+  let r, g, b;
+  if (t < 0.5) {
+    const k = t / 0.5;
+    r = Math.round(26 + (199 - 26) * k);
+    g = Math.round(143 + (138 - 143) * k);
+    b = Math.round(60 + (0 - 60) * k);
+  } else {
+    const k = (t - 0.5) / 0.5;
+    r = Math.round(199 + (212 - 199) * k);
+    g = Math.round(138 + (42 - 138) * k);
+    b = Math.round(0 + (30 - 0) * k);
+  }
+  // faint tint behind the text so the grid still reads as a heatmap
+  const tint = Math.round(t * 22);
+  return { bg: `rgb(${255 - tint},${255 - tint},${255 - tint})`, fg: `rgb(${r},${g},${b})` };
 }
 
 function fmtCell(panel, v, text) {
@@ -97,9 +113,9 @@ export async function renderStressHeatmaps() {
   const asof = data.asof ? ` · as of ${esc(data.asof)}` : "";
   body.innerHTML =
     `<div class="stress-intro muted">Levels in native units · velocity signed · z-scores in σ — columns: 8 stress episodes + NOW. n/a = no history.${asof}</div>` +
-    `<div class="stress-legend"><span class="sl-sw" style="background:rgba(232,201,106,.5)"></span>high` +
-    ` <span class="sl-sw" style="background:rgba(232,120,60,.5)"></span>+ move` +
-    ` <span class="sl-sw" style="background:rgba(127,201,181,.5)"></span>− move</div>` +
+    `<div class="stress-legend"><span class="sl-sw" style="background:#d42a1e"></span>stressed` +
+    ` <span class="sl-sw" style="background:#c78a00"></span>elevated` +
+    ` <span class="sl-sw" style="background:#1a8f3c"></span>calm</div>` +
     PANELS.map((p) => renderOne(p, data)).join("");
   if (foot) {
     const upd = data.updated_at ? new Date(data.updated_at).toLocaleString() : "—";
