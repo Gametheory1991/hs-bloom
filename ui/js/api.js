@@ -1,5 +1,5 @@
-// Same-origin by default (nginx proxies /api). Set window.OSBLOOM_API to point elsewhere.
-const BASE = window.OSBLOOM_API ?? "";
+// Same-origin by default (nginx proxies /api). Set window.HSBLOOM_API to point elsewhere.
+const BASE = window.HSBLOOM_API ?? "";
 
 async function getJson(path, retries = 8) {
   // Retry transient gateway failures (502/503/504) and network errors with

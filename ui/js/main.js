@@ -222,7 +222,7 @@ async function tick() {
     safeRender("regwatch-news-foot", () => foot("regwatch-news", "regwatch", p.regwatch ?? {}));
     safeRender("regwatch-rules-foot", () => foot("regwatch-rules", "regwatch", p.regwatch ?? {}));
     safeRender("regwatch-topics-foot", () => foot("regwatch-topics", "regwatch", p.regwatch ?? {}));
-    safeRender("usage-foot", () => foot("usage", "usage", { source: "os-bloom", updated_at: new Date().toISOString() }));
+    safeRender("usage-foot", () => foot("usage", "usage", { source: "hs-bloom", updated_at: new Date().toISOString() }));
     safeRender("riskmap-foot", () => foot("riskmap", "riskmap", p.riskmap ?? { updated_at: null, source: null }));
     safeRender("radar-foot", () => foot("radar", "radar", p.radar ?? { updated_at: null, source: null }));
     safeRender("hyper-foot", () => foot("hyper", "hyper", p.hyper ?? { updated_at: null, source: null }));

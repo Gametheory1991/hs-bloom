@@ -1,4 +1,4 @@
-const STORAGE_KEY = "osbloom:last-insight";
+const STORAGE_KEY = "hsbloom:last-insight";
 
 let registrationPromise = null;
 const supportsNotifications = () => ("Notification" in window) && ("serviceWorker" in navigator);
@@ -46,9 +46,9 @@ export async function notifyInsights(panel) {
   const registration = await registrationPromise;
   if (!registration) return;
   try {
-    await registration.showNotification("os-bloom digest", {
+    await registration.showNotification("hs-bloom digest", {
       body: lead ? `${lead.name}: ${lead.summary}` : (panel.newsletter?.headline ?? "Digest updated"),
-      tag: "osbloom-digest",
+      tag: "hsbloom-digest",
       data: { url: "/#/pulse/snapshot" },
     });
     localStorage.setItem(STORAGE_KEY, signature);
