@@ -23,6 +23,7 @@ import { renderFutures, FUTURES } from "./panels/futures.js";
 import { renderFlows } from "./panels/flows.js";
 import { renderTff } from "./panels/tff.js";
 import { renderScorecard } from "./panels/scorecard.js";
+import { renderStress } from "./panels/stress.js";
 import { renderCentral } from "./panels/central.js";
 import { renderPredict } from "./panels/predict.js";
 import { renderFinra } from "./panels/finra.js";
@@ -71,6 +72,7 @@ const PANEL_ENTRIES = [
   ["TFF — TRADERS IN FINANCIAL FUTURES", "positioning/tff"],
   ["OPTIONS — GAMMA & FLOW", "markets/options"], ["ETF FLOWS — AUM & CREATIONS", "structure/etfflows"],
   ["SCORECARD — 1D/1M/3M/1Y + 1Y Z", "pulse/scorecard"],
+  ["STRESS — MATRIX · VELOCITY", "pulse/stress"],
   ["CURATED VAULTS — USDC", "markets/digital"],
   ["PREDICT — MARKETS & EDGE", "positioning/predict"],
   ["FINRA — BREADTH · CORPORATE · TRACE", "structure/trace"],
@@ -250,9 +252,10 @@ renderScorecard();
 renderCentral();
 renderAlerts();
 renderBriefcheck();
+renderStress();
 renderUsage();
 refreshSearchIndex();
-setInterval(() => { renderFutures(); renderFlows(); renderScorecard(); renderCentral(); renderBriefcheck(); renderKoi(); refreshSearchIndex(); }, 15 * 60_000);
+setInterval(() => { renderFutures(); renderFlows(); renderScorecard(); renderCentral(); renderBriefcheck(); renderKoi(); renderStress(); refreshSearchIndex(); }, 15 * 60_000);
 initDefiViewToggle(() => {
   if (lastDash) renderDefiPanel(lastDash.panels);
 });
