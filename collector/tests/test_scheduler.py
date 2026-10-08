@@ -101,5 +101,5 @@ def test_main_builds_app(tmp_path, monkeypatch):
     from collector.main import build
 
     app, scheduler = build()
-    assert app.title == "os-bloom collector"
+    assert app.title == "hs-bloom collector"
     assert len(scheduler.get_jobs()) == 92  # +2 bank_financials/finance_dirs (finance batch), +2 bdc_financials/bdc_universe, +1 fed_meetings (pred batch), +1 etf_holders_13f, +2 ici_flows/nport_flows (was 84: +1 finra_otc (was 83: +1 ofr_tff (was 81: +1 sec_xbrl_etf, +1 nasdaq_tape (was 79: +3 cboe_options, ishares_etf, nyfed_cmdi (was 76: +1 defillama_rwa (was 75: +1 regwatch (was 74: +1 finra_breadth, +1 finra_corp, +1 finra_regsho, +1 finra_capped, +1 finra_ids_star, +1 ticker_stats, +2 bank universe, +4 tech/vendor universes, +2 etf universe, +2 crypto universe, +2 factbook, +9 batch13 (ofr_stfm, frb_ddp, sec_ncen, sec_nport, sec_pfs, z1_holdings, mspd, soma_cusip, debt_cube))))

@@ -92,7 +92,7 @@ async def fake_get_text(url, headers=None, **kw):
 async def test_fetch_sec_xbrl_etf(tmp_path):
     store = Store(str(tmp_path / "t.db"))
     res = await fetch_sec_xbrl_etf(store, fake_get_text,
-                                   "os-bloom/1.0 contact harrysugamakc@gmail.com")
+                                   "hs-bloom/1.0 contact harrysugamakc@gmail.com")
     assert "quarterly checkpoints" in res
     # same series the daily job writes
     assert store.points("cycle:etf-IBIT-shares")[date(2024, 3, 31)] == 442400000.0

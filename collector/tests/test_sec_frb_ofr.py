@@ -24,7 +24,7 @@ from collector.store import Store
 
 REPO_ROOT = __import__("pathlib").Path(__file__).resolve().parents[2]
 
-UA = "os-bloom/1.0 contact harrysugamakc@gmail.com"
+UA = "hs-bloom/1.0 contact harrysugamakc@gmail.com"
 
 
 def test_sec_flag_truthy_contract():
