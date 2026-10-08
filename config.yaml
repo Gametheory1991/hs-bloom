@@ -57,6 +57,7 @@ cadences:          # seconds between fetcher runs
   sec_ncen: 2592000    # SEC N-CEN registered-fund census; monthly poll, quarterly receipt batches (~8-16MB)
   sec_nport: 2592000   # SEC N-PORT holdings aggregates (selective ZIP extraction); monthly poll, quarterly batches
   sec_pfs: 2592000     # SEC Private Fund Statistics supporting XLSX; monthly poll, quarterly report
+  sec_ftd: 1296000    # SEC CNS fails-to-deliver (cnsfails YYYYMM a/b zips); twice-monthly poll, deep backfill to 2004 on first run
   z1_holdings: 2592000  # FRED Z.1 holdings-by-holder; monthly poll, quarterly data
   mspd: 2592000        # MSPD Tables 1+3 debt outstanding; monthly poll
   soma_cusip: 604800   # NY Fed SOMA holdings by CUSIP; weekly poll
@@ -368,6 +369,9 @@ cycle_series:      # market-cycle series (spec 2026-08-24); exactly one source k
   - { id: pfs-hf-borrowing,    name: "PFS: HF total borrowing $",             unit: "$",  external: true }
   - { id: pfs-hf-gne-nav,      name: "PFS: HF gross notional / NAV",          unit: "x",  external: true }
   - { id: pfs-hf-liq-mismatch, name: "PFS: HF liquidity mismatch (pp)",      unit: "pp", external: true }
+  # ---- batch: SEC CNS fails-to-deliver (dedicated twice-monthly batch; daily settlement-date aggregates) ----
+  - { id: ftd-dollar-volume, name: "FTD $ volume (SEC CNS)",    unit: "$",  external: true }
+  - { id: ftd-share-count,   name: "FTD failed shares (SEC CNS)", unit: "sh", external: true }
   # ---- batch 13: FRED Z.1 holdings-by-holder (dedicated quarterly job; levels $mn) ----
   - { id: z1-ust-fed,           name: "UST held: Fed SOMA (Z.1, Q)",                       unit: "$m", external: true }
   - { id: z1-ust-banks,         name: "UST held: U.S. banks (Z.1, Q)",                     unit: "$m", external: true }

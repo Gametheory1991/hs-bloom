@@ -80,6 +80,7 @@ from collector.fetchers.sec_nport import fetch_sec_nport
 from collector.fetchers.nport_flows import fetch_nport_flows
 from collector.fetchers.ici_mutual_flows import fetch_ici_mutual_flows
 from collector.fetchers.sec_pfs import fetch_sec_pfs
+from collector.fetchers.sec_ftd import fetch_sec_ftd
 from collector.fetchers.z1_holdings import fetch_z1_holdings
 from collector.fetchers.mspd import fetch_mspd
 from collector.fetchers.soma_cusip import fetch_soma_cusip
@@ -566,6 +567,13 @@ def register_jobs(
         # resolved at runtime from the index page; anchor-driven table parse.
         "sec_pfs": (cfg.cadences.get("sec_pfs", 2592000), partial(fetch_sec_pfs, cfg.sec_data, store, get_bytes),
                  start + timedelta(seconds=9600)),
+        # batch: SEC CNS fails-to-deliver — twice-monthly half-month zips
+        # (1st-half avail ~end of month M, 2nd-half ~15th of M+1). Polls
+        # twice-monthly; the fetcher tracks completed YYYYMMa/b in the
+        # sec_ftd_files doc, so the first run backfills 2004->present and
+        # later runs pick up only new files. Idempotent upserts.
+        "sec_ftd": (cfg.cadences.get("sec_ftd", 1296000), partial(fetch_sec_ftd, cfg.sec_data, store, get_bytes),
+                 start + timedelta(seconds=10350)),
         # batch 13: FRED Z.1 holdings-by-holder (keyless FRED CSV; quarterly
         # levels in $mn, idempotent upserts). Monthly poll; quarterly data.
         "z1_holdings": (cfg.cadences.get("z1_holdings", 2592000), partial(fetch_z1_holdings, store, get_text_curl),
