@@ -1,4 +1,4 @@
-"""Load backfilled FINRA datasets into the os-bloom Store.
+"""Load backfilled FINRA datasets into the hs-bloom Store.
 
 Reads the CSVs produced by the backfill scripts (or downloaded from Google
 Drive) and upserts them into the collector Store (SQLite by default,
