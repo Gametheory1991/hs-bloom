@@ -10,7 +10,8 @@ Endpoint (verified live 2026-10-03):
                direct_bidder_accepted, primary_dealer_accepted, offering_amt, ...}],
        "meta":{...}, "links":{...}}
 
-Only completed auctions (bid_to_cover_ratio present) are stored. Tenors are
+Only completed auctions (results posted: high yield or bid-to-cover present)
+are stored. Tenors are
 normalized so reopenings land in their benchmark bucket ("29-Year 11-Month"
 -> Bond-30Y). Metrics per configured bucket: bid-to-cover, high yield (high investment rate
 for bills), indirect/direct/dealer shares of accepted (%), and offering
@@ -166,7 +167,11 @@ def parse_detail(r: dict) -> dict | None:
             v = _num(r.get(field))
             if v is not None:
                 det[key] = v / total * 100.0
-    det["completed"] = det["bid_to_cover"] is not None
+    # An auction is completed when its results have posted. Treasury did not
+    # publish bid_to_cover_ratio before ~2000, so pre-2000 auctions (which
+    # carry yields and takedown splits) count as completed via high_yield.
+    det["completed"] = (det["bid_to_cover"] is not None
+                        or det["high_yield"] is not None)
     return det
 
 
@@ -212,6 +217,13 @@ def _results_payload(store: Store) -> dict:
     return doc.payload
 
 
+# History schema version. v1 defined `completed` as "bid_to_cover present",
+# which skipped pre-2000 auctions (Treasury didn't publish bid-to-cover that
+# far back). v2 counts them via high_yield. A v1-marked complete history
+# triggers one full re-pull so the pre-2000 records are stored.
+HISTORY_VERSION = 2
+
+
 def _pull_cutoff(store: Store, lookback_days: int) -> str | None:
     """Oldest ``record_date`` to request; None means no filter (pull all).
 
@@ -231,7 +243,11 @@ def _pull_cutoff(store: Store, lookback_days: int) -> str | None:
     """
     payload = _results_payload(store)
     if payload.get("history_complete"):
-        return (date.today() - timedelta(days=lookback_days)).isoformat()
+        if payload.get("history_version", 1) >= HISTORY_VERSION:
+            return (date.today() - timedelta(days=lookback_days)).isoformat()
+        # Complete under an older `completed` definition: re-pull everything
+        # once so pre-2000 auctions are stored.
+        return None
     dates = [r.get("auction_date") for r in payload.get("results", [])
              if isinstance(r, dict) and r.get("auction_date")]
     if not dates:
@@ -265,10 +281,13 @@ def _store_auction_docs(store: Store, details: list[dict], upcoming: list[dict],
         by_key[(d["auction_date"], d["cusip"])] = d
     merged = sorted(by_key.values(),
                     key=lambda r: r.get("auction_date", ""), reverse=True)
+    new_version = (HISTORY_VERSION if history_complete
+                   else payload.get("history_version", 1))
     store.put_doc(
         "auction_results",
         {"results": merged,
-         "history_complete": bool(history_complete or payload.get("history_complete"))},
+         "history_complete": bool(history_complete or payload.get("history_complete")),
+         "history_version": new_version},
         source="fiscaldata.treasury.gov",
     )
     upcoming_sorted = sorted(
