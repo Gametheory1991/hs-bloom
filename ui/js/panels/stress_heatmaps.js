@@ -23,35 +23,33 @@ const PANELS = [
   { key: "lvlzfull", title: "H8 · Level z-score vs full history", kind: "zdiv" },
 ];
 
-// Light theme: white cells, text color carries the signal.
-// Green = calm, red = stressed. Returns {bg, fg}.
+// Light theme: filled color blocks (Harry 2026-10-08).
+// Green = calm, orange = elevated, red = stressed.
+// Text is bold white on saturated fills, bold black on light fills (by luminance).
 function cellStyle(kind, v, rowMin, rowMax, absMax) {
-  if (v == null || !isFinite(v)) return { bg: "#ffffff", fg: "#b0b0b0" };
-  let t; // 0 = calm (green) → 1 = stressed (red)
+  if (v == null || !isFinite(v)) return { bg: "#f5f5f5", fg: "#b0b0b0" };
+  let t; // 0 = calm → 1 = stressed
   if (kind === "seq") {
-    // per-row min → max
     t = rowMax > rowMin ? (v - rowMin) / (rowMax - rowMin) : 0.5;
   } else {
-    // diverging: intensity by |v|; sign kept in the +/- prefix
     const m = kind === "zdiv" ? 3 : (absMax || 1);
     t = Math.min(Math.abs(v) / m, 1);
   }
-  // green (#1a8f3c) → amber (#c78a00) → red (#d42a1e)
+  t = Math.max(0, Math.min(1, t));
   let r, g, b;
-  if (t < 0.5) {
+  if (t < 0.5) {           // green → amber
     const k = t / 0.5;
-    r = Math.round(26 + (199 - 26) * k);
-    g = Math.round(143 + (138 - 143) * k);
-    b = Math.round(60 + (0 - 60) * k);
-  } else {
+    r = Math.round(34 + (230 - 34) * k);
+    g = Math.round(139 + (140 - 139) * k);
+    b = Math.round(34 + (0 - 34) * k);
+  } else {                 // amber → red
     const k = (t - 0.5) / 0.5;
-    r = Math.round(199 + (212 - 199) * k);
-    g = Math.round(138 + (42 - 138) * k);
+    r = Math.round(230 + (200 - 230) * k);
+    g = Math.round(140 + (30 - 140) * k);
     b = Math.round(0 + (30 - 0) * k);
   }
-  // faint tint behind the text so the grid still reads as a heatmap
-  const tint = Math.round(t * 22);
-  return { bg: `rgb(${255 - tint},${255 - tint},${255 - tint})`, fg: `rgb(${r},${g},${b})` };
+  const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+  return { bg: `rgb(${r},${g},${b})`, fg: lum < 140 ? "#ffffff" : "#1a1a1a" };
 }
 
 function fmtCell(panel, v, text) {
@@ -59,6 +57,32 @@ function fmtCell(panel, v, text) {
   if (text != null) return esc(text);
   if (panel.kind === "zdiv") return `${v >= 0 ? "+" : "−"}${Math.abs(v).toFixed(1)}σ`;
   return `${v >= 0 ? "+" : "−"}${Math.abs(v).toFixed(0)}`;
+}
+
+function overallScoreBar(data) {
+  // Mean z-score per column across all series (from H8 full-history z-scores).
+  const m = data.matrices["lvlzfull"];
+  if (!m) return "";
+  const cols = data.columns;
+  const perCol = cols.map((_, j) => {
+    const vals = m.map((row) => row[j]).filter((v) => v != null && isFinite(v));
+    if (!vals.length) return null;
+    return vals.reduce((a, b) => a + b, 0) / vals.length;
+  });
+  // reuse the green→amber→red ramp: |z| 0 → 2.5σ maps to t 0 → 1
+  let html = `<div class="stress-overall"><div class="stress-overall-title">OVERALL STRESS SCORE — mean z-score across all series (vs full history)</div><div class="stress-overall-bar">`;
+  perCol.forEach((s, j) => {
+    const now = cols[j] === "NOW";
+    if (s == null) {
+      html += `<div class="so-cell${now ? " now-col" : ""}" style="background:#f5f5f5;color:#b0b0b0">n/a</div>`;
+      return;
+    }
+    const t = Math.min(Math.abs(s) / 2.5, 1);
+    const st = cellStyle("zdiv", s >= 0 ? t * 3 : -t * 3, 0, 0, 3);
+    const sign = s >= 0 ? "+" : "−";
+    html += `<div class="so-cell${now ? " now-col" : ""}" style="background:${st.bg};color:${st.fg}" title="${esc(cols[j])}">${sign}${Math.abs(s).toFixed(2)}σ</div>`;
+  });
+  return html + `</div></div>`;
 }
 
 function renderOne(panel, data) {
@@ -113,6 +137,7 @@ export async function renderStressHeatmaps() {
   const asof = data.asof ? ` · as of ${esc(data.asof)}` : "";
   body.innerHTML =
     `<div class="stress-intro muted">Levels in native units · velocity signed · z-scores in σ — columns: 8 stress episodes + NOW. n/a = no history.${asof}</div>` +
+    overallScoreBar(data) +
     `<div class="stress-legend"><span class="sl-sw" style="background:#d42a1e"></span>stressed` +
     ` <span class="sl-sw" style="background:#c78a00"></span>elevated` +
     ` <span class="sl-sw" style="background:#1a8f3c"></span>calm</div>` +

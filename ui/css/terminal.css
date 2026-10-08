@@ -794,6 +794,12 @@ th .range-legend { margin-top: 2px; }
 .stress-hm-table td.row-label { text-align: left; font-weight: 700; font-size: 14px; color: var(--fg); white-space: nowrap; padding: 12px 16px 12px 8px; background: var(--bg) !important; position: sticky; left: 0; z-index: 1; }
 .hm-cell { text-align: center; font-size: 15px; font-weight: 700; padding: 12px 14px; white-space: nowrap; border-radius: 3px; font-variant-numeric: tabular-nums; }
 .hm-cell.now-col { font-size: 16px; }
+/* Overall stress score bar */
+.stress-overall { margin: 12px 0 16px; }
+.stress-overall-title { font-size: 13px; font-weight: 800; margin-bottom: 8px; }
+.stress-overall-bar { display: flex; gap: 3px; }
+.so-cell { flex: 1; text-align: center; font-size: 14px; font-weight: 800; padding: 12px 6px; border-radius: 4px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.so-cell.now-col { outline: 2px solid var(--amber); outline-offset: -2px; }
 /* ===== STRESS — MATRIX · VELOCITY (Phase 1) ===== */
 .stress-head { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
 .stress-gauge { text-align: center; min-width: 110px; }
