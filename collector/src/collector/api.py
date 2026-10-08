@@ -16,6 +16,7 @@ from collector.changes import apply_transform, to_bands
 from collector.chat import SYSTEM_PROMPT, ask_gemini, build_context
 from collector.config import Config
 from collector import debt_cube
+from collector.gate import GateMiddleware, add_login_routes
 from collector.panels import build_dashboard, econ_calendar_payload
 from collector.store import Store
 from collector.usage import client_ip, log_visit, record_event, usage_stats
@@ -152,6 +153,9 @@ def _dashboard_panels(store: Store, cfg: Config) -> tuple[int, dict]:
 def create_app(store: Store, cfg: Config) -> FastAPI:
     app = FastAPI(title="os-bloom collector", docs_url=None, redoc_url=None)
     app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET", "POST", "PUT"])
+    # Phase-2 WS8: passphrase login gate (fail-open unless SITE_PASSPHRASE set).
+    app.add_middleware(GateMiddleware)
+    add_login_routes(app)
     series_by_id = {s.id: s for s in cfg.series}
     cycle_by_id = {s.id: s for s in cfg.cycle_series}
     index_names = {i.symbol: i.name for i in cfg.indexes}

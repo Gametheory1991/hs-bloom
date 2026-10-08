@@ -18,8 +18,11 @@ the radar/universe panels within minutes, not over an hour.
 """
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timedelta, timezone
 from functools import partial
+
+log = logging.getLogger(__name__)
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
@@ -129,6 +132,13 @@ async def _stress_with_views(store, cfg, fred_api_key, get_text, get_bytes):
     """
     await refresh_stress_full(store, cfg, fred_api_key, get_text, get_bytes)
     refresh_stress_views(store, INDICATORS, STRESS_WEIGHTS)
+    # Phase-2 WS2: evaluate alert rules against the fresh docs. Guarded so a
+    # missing/broken alerts module never breaks the stress docs.
+    try:
+        from collector.stress_alerts import evaluate_alerts
+        evaluate_alerts(store)
+    except Exception as e:  # noqa: BLE001 - alerts are best-effort
+        log.warning("stress alerts evaluation failed: %s", e)
 
 
 def _catchup_first_runs(
