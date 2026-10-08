@@ -158,6 +158,13 @@ class Store:
             # to 30s before surfacing OperationalError. The in-process
             # threading lock still serializes our own access first.
             self.conn.execute("PRAGMA busy_timeout=30000")
+            # WAL: readers stop blocking the writer at the SQLite level.
+            # Without this, dashboard SELECTs and fetcher INSERTs serialize
+            # on the database file itself, on top of the threading lock.
+            try:
+                self.conn.execute("PRAGMA journal_mode=WAL")
+            except Exception:  # noqa: BLE001 — read-only FS etc.
+                pass
             self.conn.executescript(SCHEMA)
 
     # -- internals ------------------------------------------------------
@@ -171,13 +178,18 @@ class Store:
             self.conn.commit()
 
     def _execute(self, sql: str, args: tuple = ()) -> list[tuple]:
+        # Reads skip commit(): an fsync on every SELECT doubles I/O and,
+        # under the shared lock, is what stalled the event loop during
+        # dashboard rebuilds (Oct 8 health-check crash loop).
+        is_read = sql.lstrip()[:6].upper() == "SELECT"
         with self._lock:
             cur = self.conn.execute(self._q(sql), args)
             try:
                 rows = cur.fetchall()
             except Exception:  # noqa: BLE001 — no result set (DDL)
                 rows = []
-            self.conn.commit()
+            if not is_read:
+                self.conn.commit()
         return rows
 
     # -- time series ----------------------------------------------------

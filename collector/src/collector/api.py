@@ -4,6 +4,7 @@ from __future__ import annotations
 import os
 import re
 import threading
+import time
 from datetime import datetime, timedelta, timezone
 from typing import Literal
 
@@ -109,8 +110,14 @@ class BriefcheckReport(BaseModel):
 # fresh as_of. ETag + Cache-Control let browsers skip the request entirely
 # for 30s (shared across tabs) and revalidate with a 304 afterwards — the
 # UI needs no changes and works unchanged against an old server.
-_DASH_CACHE: dict = {"version": None, "panels": None}
+_DASH_CACHE: dict = {"version": None, "panels": None, "built_at": 0.0}
 _DASH_CACHE_LOCK = threading.Lock()
+# Minimum seconds between full dashboard rebuilds. The data version churns
+# constantly (100+ fetchers writing), so without a TTL nearly every poll
+# triggers a 65-query rebuild that hogs the store lock and stalls the event
+# loop → health-check timeouts → Render restarts. Dashboard data moves on a
+# daily cadence; 2 minutes of staleness is invisible.
+_DASH_CACHE_TTL = 120.0
 
 # Hub → panel keys. Used by ?hub= filter on /api/dashboard to avoid
 # sending 1.5MB when the user only looks at one hub. `insights` is in
@@ -132,20 +139,36 @@ def _dashboard_panels(store: Store, cfg: Config) -> tuple[int, dict]:
 
     Torn-read guard: if a write lands mid-build, the fresh build is served
     but NOT cached, so the next request rebuilds cleanly on the new version.
+
+    TTL guard: a full build is at most _DASH_CACHE_TTL old before we even
+    consider rebuilding. Without this, the constantly-churning data version
+    makes every poll rebuild 65 queries under the store lock, stalling the
+    event loop until Render's 5s health check times out (Oct 8 crash loop).
     """
+    now = time.monotonic()
+    cached = _DASH_CACHE["panels"] is not None
+    fresh = (now - _DASH_CACHE["built_at"]) < _DASH_CACHE_TTL
+    if cached and fresh:
+        return _DASH_CACHE["version"], _DASH_CACHE["panels"]
     version = store.data_version()
-    if _DASH_CACHE["version"] == version and _DASH_CACHE["panels"] is not None:
+    if cached and _DASH_CACHE["version"] == version:
         return version, _DASH_CACHE["panels"]
     with _DASH_CACHE_LOCK:
+        now = time.monotonic()
+        cached = _DASH_CACHE["panels"] is not None
+        fresh = (now - _DASH_CACHE["built_at"]) < _DASH_CACHE_TTL
+        if cached and fresh:
+            return _DASH_CACHE["version"], _DASH_CACHE["panels"]
         version = store.data_version()
-        if _DASH_CACHE["version"] == version and _DASH_CACHE["panels"] is not None:
+        if cached and _DASH_CACHE["version"] == version:
             return version, _DASH_CACHE["panels"]
         panels = build_dashboard(
             store, cfg.indexes, now=datetime.now(timezone.utc),
             cycle_series=cfg.cycle_series, cycle_tabs=cfg.cycle_tabs,
         )["panels"]
         if store.data_version() == version:
-            _DASH_CACHE.update(version=version, panels=panels)
+            _DASH_CACHE.update(version=version, panels=panels,
+                               built_at=time.monotonic())
     return version, panels
 
 
