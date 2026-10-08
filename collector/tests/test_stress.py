@@ -13,13 +13,27 @@ from collector.fetchers import stress as st
 REQUIRED_KEYS = {"id", "category", "name", "unit", "direction", "freq", "tier",
                  "series_id", "source", "tag", "inputs", "formula", "reason",
                  "rung", "note", "composite_excluded", "expected_lag_days",
-                 "max_age_days"}
+                 "max_age_days", "redistributable", "abs_velocity"}
 
 VALID_CATEGORIES = {"Volatility", "Credit", "Official refs", "Funding",
                     "Treasury plumbing", "Equity internals", "Banks", "Global",
                     "Market activity", "Hedge fund leverage"}
 
-NA_IDS = {"skew", "vix9d", "vix1d", "sox_spx", "cdx_ig_spread", "cdx_hy_price"}
+NA_IDS = {"skew", "vix9d", "vix1d", "sox_spx", "cdx_ig_spread", "cdx_hy_price",
+          # Phase 2: auction tails (no free when-issued feed), ETF momentum for
+          # tickers with no price series, ETF flows (no free daily feed)
+          "auction_tail_bill_4w", "auction_tail_bill_8w", "auction_tail_bill_13w",
+          "auction_tail_bill_17w", "auction_tail_bill_26w", "auction_tail_bill_52w",
+          "auction_tail_note_2y", "auction_tail_note_3y", "auction_tail_note_5y",
+          "auction_tail_note_7y", "auction_tail_note_10y",
+          "auction_tail_bond_20y", "auction_tail_bond_30y",
+          "etf_mom1d_xli", "etf_mom5d_xli", "etf_mom1d_xlv", "etf_mom5d_xlv",
+          "etf_mom1d_smh", "etf_mom5d_smh", "etf_mom1d_kre", "etf_mom5d_kre",
+          "etf_mom1d_lemb", "etf_mom5d_lemb",
+          "etf_flow_sgov", "etf_flow_bil", "etf_flow_emb", "etf_flow_gld",
+          "etf_flow_xlk", "etf_flow_xle", "etf_flow_xli", "etf_flow_xlv",
+          "etf_flow_smh", "etf_flow_vgsh", "etf_flow_vgit", "etf_flow_govt",
+          "etf_flow_edv", "etf_flow_lemb"}
 
 
 def test_registry_schema():

@@ -17,6 +17,7 @@ from collector.changes import apply_transform, to_bands
 from collector.chat import SYSTEM_PROMPT, ask_gemini, build_context
 from collector.config import Config
 from collector import debt_cube
+from collector.gate import GateMiddleware, add_login_routes
 from collector.panels import build_dashboard, econ_calendar_payload
 from collector.store import Store
 from collector.usage import client_ip, log_visit, record_event, usage_stats
@@ -175,6 +176,9 @@ def _dashboard_panels(store: Store, cfg: Config) -> tuple[int, dict]:
 def create_app(store: Store, cfg: Config) -> FastAPI:
     app = FastAPI(title="hs-bloom collector", docs_url=None, redoc_url=None)
     app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET", "POST", "PUT"])
+    # Phase-2 WS8: passphrase login gate (fail-open unless SITE_PASSPHRASE set).
+    app.add_middleware(GateMiddleware)
+    add_login_routes(app)
     series_by_id = {s.id: s for s in cfg.series}
     cycle_by_id = {s.id: s for s in cfg.cycle_series}
     index_names = {i.symbol: i.name for i in cfg.indexes}
@@ -722,6 +726,102 @@ def create_app(store: Store, cfg: Config) -> FastAPI:
         if d is None or not d.payload:
             return {"status": "building"}
         return d.payload
+
+    def _stress_doc(key: str) -> dict:
+        """Serve one cached Phase-2 view doc; {"status": "building"} until the
+        collector's stress job has written it."""
+        d = store.doc(key)
+        if d is None or not d.payload:
+            return {"status": "building"}
+        return d.payload
+
+    @app.get("/api/stress/horizon")
+    def stress_horizon() -> dict:
+        """Stress Monitor v2 (Phase 2, View 2): cached `stress_horizon` doc."""
+        return _stress_doc("stress_horizon")
+
+    @app.get("/api/stress/contagion")
+    def stress_contagion() -> dict:
+        """Stress Monitor v2 (Phase 2, View 3): cached `stress_contagion` doc."""
+        return _stress_doc("stress_contagion")
+
+    @app.get("/api/stress/divergence")
+    def stress_divergence() -> dict:
+        """Stress Monitor v2 (Phase 2, View 4): cached `stress_divergence` doc."""
+        return _stress_doc("stress_divergence")
+
+    @app.get("/api/stress/replay")
+    def stress_replay() -> dict:
+        """Stress Monitor v2 (Phase 2, View 5): cached `stress_replay` doc."""
+        return _stress_doc("stress_replay")
+
+    @app.get("/api/stress/quadrant")
+    def stress_quadrant() -> dict:
+        """Stress Monitor v2 (Phase 2, View 7): cached `stress_quadrant` doc."""
+        return _stress_doc("stress_quadrant")
+
+    def _deferred_stress_payload(mod_paths: tuple[str, ...], func: str,
+                               missing_note: str) -> dict:
+        """Serve a WS2/WS3 module's payload if its module is importable,
+        else the building fallback. Tries both plausible placements
+        (collector.<mod> and collector.fetchers.<mod>) because the owning
+        workers' files are still uncommitted."""
+        for mod_path in mod_paths:
+            try:
+                mod = __import__(mod_path, fromlist=[func])
+            except ImportError:
+                continue
+            fn = getattr(mod, func, None)
+            if fn is None:
+                continue
+            try:
+                return fn(store)
+            except Exception:  # noqa: BLE001 — never 500 the panel
+                return {"status": "building",
+                        "note": missing_note.replace("not present", "error")}
+        return {"status": "building", "note": missing_note}
+
+    @app.get("/api/stress/alerts")
+    def stress_alerts_route() -> dict:
+        """Stress Monitor v2 alerts (WS2's module). Building fallback until
+        the module lands."""
+        return _deferred_stress_payload(
+            ("collector.stress_alerts", "collector.fetchers.stress_alerts"),
+            "alerts_payload", "alerts module not present")
+
+    @app.get("/api/stress/validation")
+    def stress_validation_route() -> dict:
+        """Stress Monitor v2 validation (WS2's module). Same deferred pattern
+        as /api/stress/alerts."""
+        return _deferred_stress_payload(
+            ("collector.stress_validate", "collector.fetchers.stress_validate"),
+            "validation_payload", "validation module not present")
+
+    @app.get("/api/stress/imf")
+    def stress_imf_route() -> dict:
+        """IMF chart panels (WS6's module, §15). Serve-from-cache: the
+        scheduler's refresh_imf writes the `imf_panels` doc; the payload
+        degrades to "source not connected" when the Google credential is
+        absent. Never 500s the panel."""
+        try:
+            from collector.fetchers.imf import imf_payload
+            return imf_payload(store)
+        except Exception:  # noqa: BLE001 — never 500 the panel
+            return {"status": "not_connected",
+                    "note": "IMF panels need a Google service account"}
+
+    @app.get("/api/stress/episodes")
+    def stress_episodes_route() -> dict:
+        """Stress Monitor v2 episode registry (WS3's module). Serve-from-cache
+        contract like /api/stress/matrix: the scheduler's refresh_episodes
+        writes the `stress_episodes` doc; until the first run, fall back to a
+        live computation (expensive) and finally the building placeholder."""
+        d = store.doc("stress_episodes")
+        if d is not None and d.payload:
+            return d.payload
+        return _deferred_stress_payload(
+            ("collector.stress_episodes", "collector.fetchers.stress_episodes"),
+            "episodes_payload", "episodes module not present")
 
     @app.get("/api/debt-cube")
     def debt_cube_api(product: str | None = None, maturity: str | None = None,

@@ -93,7 +93,7 @@ ETF_UNIVERSE: list[tuple[str, str]] = [
     ("MTUM", "equity"), ("EMXC", "equity"), ("IDEV", "equity"),
     ("SPY", "equity"), ("QQQ", "equity"), ("DIA", "equity"), ("VTI", "equity"),
     ("VOO", "equity"), ("VEA", "equity"), ("VWO", "equity"),
-    ("XLE", "equity"), ("XLF", "equity"), ("XLK", "equity"),
+    ("XLE", "equity"), ("XLF", "equity"), ("XLK", "equity"), ("KRE", "equity"),
     # US fixed income -- Treasury sub-class (Harry 2026-10-06 expansion)
     ("TLT", "fi-treasury"), ("IEF", "fi-treasury"), ("SHY", "fi-treasury"),
     ("SHV", "fi-treasury"), ("SGOV", "fi-treasury"), ("GOVT", "fi-treasury"),

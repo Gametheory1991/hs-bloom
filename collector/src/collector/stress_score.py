@@ -20,6 +20,11 @@ import statistics
 from datetime import date, datetime, timezone
 from typing import Any
 
+from collector.stress_freshness import (  # WS5 Phase 2: lag-aware freshness
+    classify_freshness,
+    event_carried_value,
+)
+
 # --------------------------------------------------------------------------
 # constants
 # --------------------------------------------------------------------------
@@ -30,6 +35,10 @@ VEL_WINDOWS = (1, 5, 20, 60)
 TRAIL_1Y = 252               # trailing-1Y baseline for sigma / percentile
 MIN_CHANGES = 20             # minimum k-changes needed for sigma / percentile
 FREQ_NO_VELOCITY = {"Q"}     # quarterly series: no velocity per spec
+# WS5 Phase 2: step-only series (§8) — weekly series use their last two
+# observations ("weekly step"), event series their last two events
+# ("event step"). Never a 5/20/60-observation ("5d") change.
+FREQ_STEP_ONLY = {"W": "weekly_step", "E": "event_step"}
 SPEED_WEEKLY_STEP = 5        # weekly sampling of trailing dates for speed sigma
 
 # Overall Gauge default category weights (spec section 6; editable in UI)
@@ -215,6 +224,10 @@ def velocity(history: dict[Any, float], as_of: Any, freq: str = "D",
       pctile = rank of |raw| vs the last 1Y of |k-changes| ("unusually fast?")
     accel = change in 5-obs normalized velocity over the last 5 observations.
     Windows with fewer than k+1 observations are n/a (None), never interpolated.
+
+    WS5 Phase 2: freq "W"/"E" are step-only — only the last-two-observation
+    step ("weekly step" / "event step") is computed; d5/d20/d60 and accel are
+    n/a (None) and ``step`` labels the step type.
     """
     dates, values = _sorted_obs(history)
     ao = _as_of_date(as_of)
@@ -227,6 +240,8 @@ def velocity(history: dict[Any, float], as_of: Any, freq: str = "D",
         return {"raw": {}, "sigma": {}, "pctile": {}, "accel": None,
                 "status": "no_data", "n_obs": 0}
 
+    step_only = freq in FREQ_STEP_ONLY  # WS5 Phase 2: last two obs only
+
     sign = -1.0 if direction == "-" else 1.0
     raw: dict[str, float | None] = {}
     sigma: dict[str, float | None] = {}
@@ -235,6 +250,12 @@ def velocity(history: dict[Any, float], as_of: Any, freq: str = "D",
 
     for k in VEL_WINDOWS:
         key = f"d{k}"
+        if step_only and k != 1:
+            # WS5 Phase 2: no 5/20/60-observation change for weekly/event
+            # series (§8: "never compare a weekly series' 5d change").
+            raw[key] = sigma[key] = pctile[key] = None
+            _sig[key] = None
+            continue
         if i - k < 0:
             raw[key] = sigma[key] = pctile[key] = None
             _sig[key] = None
@@ -256,7 +277,9 @@ def velocity(history: dict[Any, float], as_of: Any, freq: str = "D",
 
     # acceleration: 5-obs velocity change over the last 5 observations
     accel = None
-    if _sig.get("d5") is not None and i - 5 >= 0:
+    # WS5 Phase 2: acceleration needs a 5-observation change, which does not
+    # exist for step-only (W/E) series.
+    if not step_only and _sig.get("d5") is not None and i - 5 >= 0:
         ch5_then = _k_changes(values, i - 5, 5)
         if len(ch5_then) >= MIN_CHANGES:
             sd_then = statistics.pstdev(ch5_then)
@@ -265,7 +288,8 @@ def velocity(history: dict[Any, float], as_of: Any, freq: str = "D",
                 accel = _sig["d5"] - r_then / sd_then
 
     return {"raw": raw, "sigma": sigma, "pctile": pctile, "accel": accel,
-            "status": "ok", "n_obs": i + 1}
+            "status": "ok", "n_obs": i + 1,
+            "step": FREQ_STEP_ONLY.get(freq)}  # WS5 Phase 2
 
 
 # --------------------------------------------------------------------------
@@ -410,9 +434,14 @@ def refresh_stress(store: Any, registry: list[dict],
         try:
             hist = store.points(entry["series_id"])
             sc = score_series(hist, entry["direction"], ao)
-            vel = velocity(hist, ao, freq=entry.get("freq", "D"),
+            freq = entry.get("freq", "D")
+            vel = velocity(hist, ao, freq=freq,
                            direction=entry["direction"])
-            d_scores = {f"d{k}": score_change(hist, entry["direction"], ao, k)
+            # WS5 Phase 2: step-only series (W/E) get a d1 change only — never
+            # a 5/20/60-observation ("5d") change (§8).
+            step_only = freq in FREQ_STEP_ONLY
+            d_scores = {f"d{k}": (score_change(hist, entry["direction"], ao, k)
+                                  if (k == 1 or not step_only) else None)
                         for k in VEL_WINDOWS}
 
             excluded = ((entry.get("tag") == "proxy" and not include_proxies)
@@ -429,12 +458,29 @@ def refresh_stress(store: Any, registry: list[dict],
                 if vel.get("accel") is not None:
                     cat_accel.setdefault(cat, []).append(vel["accel"])
 
+            # WS5 Phase 2: lag-aware freshness (§16.6). A stale/failed feed
+            # overrides the score status so WS2's alert engine skips the row;
+            # a building series whose feed died is still stale/failed.
+            # Healthy quarterly rows read "no_velocity" (scored, §8).
+            fresh = classify_freshness(
+                {**entry, "latest_obs": sc.get("as_of")},
+                ao.isoformat(), n_obs=sc["n_obs"],
+                score_status=sc["status"])
             status = sc["status"]
+            if fresh["status"] in ("stale", "failed"):
+                status = fresh["status"]
+            elif status == "ok" and fresh["status"] == "no_velocity":
+                status = "no_velocity"
             if sc["score"] is None:
                 reason = ("insufficient history (<252 obs)"
                           if status == "building" else
                           "no data in store" if status == "no_data" else status)
                 gaps.append({"id": iid, "reason": reason,
+                             "ladder_rung": entry.get("ladder_rung", "n/a")})
+            # WS5 Phase 2: stale/failed feeds are listed in Data Gaps (§9).
+            if status in ("stale", "failed") and not any(
+                    g["id"] == iid for g in gaps):
+                gaps.append({"id": iid, "reason": fresh["reason"],
                              "ladder_rung": entry.get("ladder_rung", "n/a")})
 
             indicators[iid] = {
@@ -448,13 +494,19 @@ def refresh_stress(store: Any, registry: list[dict],
                 "d1_score": d_scores["d1"], "d5_score": d_scores["d5"],
                 "d20_score": d_scores["d20"], "d60_score": d_scores["d60"],
                 "status": status, "window_used": sc["window_used"],
+                "freshness": fresh,  # WS5 Phase 2: WS2 contract — skip if != "ok"
                 "confidence": sc.get("confidence"), "history_n": sc["n_obs"],
             }
+            if freq == "E":
+                # WS5 Phase 2: event series carry the last event's value
+                # forward, tagged "E" + event date (§8/§16.6).
+                indicators[iid]["event_carry"] = event_carried_value(hist)
             vel_indicators[iid] = {
                 "raw": {k: vel["raw"].get(k) for k in ("d1", "d5", "d20", "d60")},
                 "sigma": {k: vel["sigma"].get(k) for k in ("d1", "d5", "d20", "d60")},
                 "pctile": {k: vel["pctile"].get(k) for k in ("d1", "d5", "d20", "d60")},
                 "accel": vel["accel"], "status": vel["status"],
+                "step": vel.get("step"),  # WS5 Phase 2: weekly_step/event_step/None
             }
         except Exception as exc:  # noqa: BLE001 — isolation is the contract
             gaps.append({"id": iid, "reason": f"compute error: {type(exc).__name__}",

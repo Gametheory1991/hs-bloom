@@ -11,7 +11,8 @@
 // Warm-dark theme throughout (#171410 / #e8c96a / #7fc9b5). heatmap.js helpers
 // are NOT used here: they are light-theme delta-intensity helpers, while this
 // panel needs fixed absolute band scales on a dark background.
-import { getStressMatrix, getStressVelocity } from "../api.js";
+import { getStressMatrix, getStressVelocity, getStressHorizon, getStressContagion,
+         getStressDivergence, getStressReplay, getStressQuadrant } from "../api.js";
 import { fmtAge } from "../fmt.js";
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
@@ -19,7 +20,7 @@ const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
 
 // --- module state (controls re-render without refetch) ----------------------
 const S = {
-  view: "time",            // "time" | "velocity"
+  view: "time",            // "time" | "velocity" | "quadrant" | "horizon" | "contagion" | "divergence" | "replay"
   sort: "category",        // "category" | "stress" | "change"
   showExtended: false,
   search: "",
@@ -27,7 +28,43 @@ const S = {
   moversOpen: true,
   matrix: null,
   velocity: null,
+  docs: {},                // phase-2 view docs, fetched lazily per view
+  replayPos: null,         // slider position for the replay view
 };
+
+// Phase-2 view -> API getter (matrix/velocity are always fetched).
+const VIEW_GET = {
+  horizon: getStressHorizon,
+  contagion: getStressContagion,
+  divergence: getStressDivergence,
+  replay: getStressReplay,
+  quadrant: getStressQuadrant,
+};
+const MORE_VIEWS = ["horizon", "contagion", "divergence", "replay"];
+const VIEW_LABEL = { horizon: "Horizon", contagion: "Contagion", divergence: "Divergence",
+                     replay: "Replay", quadrant: "Quadrant" };
+
+async function viewDoc(view) {
+  // Lazily fetch + cache the phase-2 doc for a view; {"status":"building"}
+  // (or an error marker) when the collector has not written it yet.
+  if (!VIEW_GET[view]) return null;
+  if (S.docs[view]) return S.docs[view];
+  try {
+    S.docs[view] = await VIEW_GET[view]();
+  } catch {
+    S.docs[view] = { status: "error" };
+  }
+  return S.docs[view];
+}
+
+// Category colours (warm-dark) for the quadrant scatter.
+const CAT_COLOR = {
+  "Volatility": "#e8c96a", "Credit": "#c97436", "Funding": "#7fc9b5",
+  "Treasury plumbing": "#8ab8d8", "Equity internals": "#b48ad8",
+  "Banks": "#d88a9e", "Global": "#8ad8c0", "Market activity": "#d8c98a",
+  "Hedge fund leverage": "#9e8ad8", "Official refs": "#a89a83",
+};
+const catColor = (c) => CAT_COLOR[c] ?? "#a89a83";
 
 // --- color scales (fixed, warm-dark adapted) --------------------------------
 // Level: 0-25 deep green, 25-50 pale green, 50-75 yellow, 75-90 orange, 90-100 red.
@@ -221,6 +258,275 @@ function heatmapHtml(view) {
   return `<table class="stress-grid">${head}${rows}</table>`;
 }
 
+function buildingHtml(label) {
+  return `<div class="empty-state">${label} VIEW BUILDING — the collector stress job has not written this doc yet.</div>`;
+}
+
+// --- Phase-2 views ------------------------------------------------------------
+// All read their cached doc (S.docs[view]); nothing is invented client-side:
+// a missing doc renders the building placeholder.
+
+function visibleListFrom(indObj) {
+  // tier filter + search over any {id: indicator} object (matrix or horizon).
+  let list = Object.values(indObj ?? {});
+  if (!S.showExtended) list = list.filter((i) => (i?.tier ?? "core") !== "extended");
+  const q = S.search.trim().toLowerCase();
+  if (q) list = list.filter((i) =>
+    `${i?.name ?? ""} ${i?.id ?? ""} ${i?.category ?? ""}`.toLowerCase().includes(q));
+  return list;
+}
+
+function horizonCell(ind, win) {
+  const p = ind?.[`pctl_${win}`];
+  const bg = scoreBg(p);
+  const n = ind?.[`n_${win}`];
+  if (!bg) return `<td class="num stress-cell hatched" title="no data in ${win} window"><span class="muted">n/a</span></td>`;
+  return `<td class="num stress-cell clickable" data-ind="${esc(ind?.id)}" ` +
+    `style="background:${bg};color:${scoreFg(p)}" title="${esc(ind?.name ?? "")} — ${win} percentile ${fmtN(p, 0)} (n=${n ?? "?"})"><b>${fmtN(p, 0)}</b></td>`;
+}
+
+function horizonHtml() {
+  const hz = S.docs.horizon;
+  if (!hz || hz.status === "building" || hz.status === "error") return buildingHtml("HORIZON");
+  const list = visibleListFrom(hz.indicators);
+  if (!list.length) return `<div class="empty-state">NO INDICATORS MATCH (docs may still be building)</div>`;
+  const l = [...list];
+  if (S.sort === "stress") l.sort((a, b) => (b?.pctl_5Y ?? -1) - (a?.pctl_5Y ?? -1));
+  else if (S.sort === "change") l.sort((a, b) =>
+    ((b?.pctl_1M ?? 0) - (b?.pctl_5Y ?? 0)) - ((a?.pctl_1M ?? 0) - (a?.pctl_5Y ?? 0)));
+  const rowFn = (ind) => {
+    const tag = ind?.tag ? `<span class="stress-tag" style="border-color:${TAG_CHIP[ind.tag] ?? "#a89a83"};color:${TAG_CHIP[ind.tag] ?? "#a89a83"}">${esc(ind.tag)}</span>` : "";
+    return `<tr><td class="sym stress-label">${esc(ind?.name ?? ind?.id ?? "?")} ${tag}</td>` +
+      `${horizonCell(ind, "1M")}${horizonCell(ind, "3M")}${horizonCell(ind, "1Y")}${horizonCell(ind, "5Y")}</tr>`;
+  };
+  let rows;
+  if (S.sort === "category" && !S.search.trim()) {
+    const cats = {};
+    for (const i of l) (cats[catOf(i)] ??= []).push(i);
+    rows = Object.keys(cats).sort().map((c) => {
+      const h = catHeaderRow(c, "horizon");
+      if (S.collapsed.has(c)) return h;
+      return h + cats[c].map(rowFn).join("");
+    }).join("");
+  } else {
+    rows = l.map(rowFn).join("");
+  }
+  return `<table class="stress-grid"><tr><th>Indicator</th><th>1M %ile</th><th>3M %ile</th><th>1Y %ile</th><th>5Y %ile</th></tr>${rows}</table>` +
+    `<p class="muted stress-note">Direction-adjusted percentile of the latest observation vs its own trailing window (or the longest window that exists). Sort "4-week change" ranks by 1M minus 5Y percentile — the spike versus the long-run extreme.</p>`;
+}
+
+// correlation cell: deep blue (-1) -> neutral dark (0) -> deep red (+1)
+function corrBg(c) {
+  if (c == null || !isFinite(c)) return null;
+  const t = Math.max(-1, Math.min(1, c));
+  const rgb = t < 0 ? lerp(VEL_MID, VEL_NEG, -t) : lerp(VEL_MID, VEL_POS, t);
+  return `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
+}
+
+function contagionHtml() {
+  const cg = S.docs.contagion;
+  if (!cg || cg.status === "building" || cg.status === "error") return buildingHtml("CONTAGION");
+  const cats = cg.categories ?? [];
+  if (!cats.length) return `<div class="empty-state">NO CATEGORY DATA (docs may still be building)</div>`;
+  const flag = cg.flagged
+    ? `<div class="stress-flag" style="border:1px solid #c97436;border-radius:8px;padding:8px 10px;margin:8px 0;color:#e8c96a">` +
+      `<b>CONTAGION FLAG</b> — mean cross-category correlation ${fmtN(cg.mean_cross_corr, 2)} ` +
+      `above its 1Y 90th percentile (${fmtN(cg.mean_cross_corr_p90_1y, 2)})</div>`
+    : `<div class="muted stress-note">mean cross-category correlation ${fmtN(cg.mean_cross_corr, 2)} ` +
+      `(1Y 90th %ile ${fmtN(cg.mean_cross_corr_p90_1y, 2)}) — no flag</div>`;
+  const head = `<tr><th></th>${cats.map((c) => `<th title="${esc(c)}">${esc(c.slice(0, 10))}</th>`).join("")}</tr>`;
+  const rows = cats.map((r) => `<tr><td class="sym stress-label">${esc(r)}</td>` + cats.map((c) => {
+    const v = cg.matrix?.[r]?.[c];
+    const bg = corrBg(v);
+    if (!bg) return `<td class="num stress-cell hatched"><span class="muted">n/a</span></td>`;
+    return `<td class="num stress-cell" style="background:${bg};color:${Math.abs(v) > 0.6 ? "#f5efe0" : "#a89a83"}" ` +
+      `title="${esc(r)} × ${esc(c)}: ${fmtN(v, 2)}">${fmtN(v, 2)}</td>`;
+  }).join("") + `</tr>`).join("");
+  // stress breadth line: weekly share of indicators scoring > 75
+  const bd = cg.breadth?.dates ?? [], bv = cg.breadth?.share_above_75 ?? [];
+  let breadthSvg = "";
+  if (bd.length > 1) {
+    const W = 600, H = 110, P = 24;
+    const X = (i) => P + (i / (bd.length - 1)) * (W - 2 * P);
+    const Y = (v) => H - P - v * (H - 2 * P);
+    const pts = bv.map((v, i) => `${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(" ");
+    breadthSvg = `<div style="margin-top:10px"><b>STRESS BREADTH</b> <span class="muted">share of indicators scoring &gt;75, weekly</span>` +
+      `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block" role="img" aria-label="stress breadth">` +
+      `<line x1="${P}" y1="${Y(0.3)}" x2="${W - P}" y2="${Y(0.3)}" stroke="#c97436" stroke-dasharray="4 3" stroke-width="1"/>` +
+      `<text x="${W - P}" y="${Y(0.3) - 4}" fill="#a89a83" font-size="10" text-anchor="end">30% alert line</text>` +
+      `<polyline points="${pts}" fill="none" stroke="#e8c96a" stroke-width="2"/>` +
+      `<text x="${P}" y="${H - 6}" fill="#a89a83" font-size="10">${esc(bd[0])}</text>` +
+      `<text x="${W - P}" y="${H - 6}" fill="#a89a83" font-size="10" text-anchor="end">${esc(bd[bd.length - 1])}</text>` +
+      `<text x="${P}" y="${Y(bv[bv.length - 1]) - 5}" fill="#e8c96a" font-size="11">${fmtN(bv[bv.length - 1] * 100, 0)}%</text>` +
+      `</svg></div>`;
+  }
+  return `${flag}<div class="stress-scroll"><table class="stress-grid">${head}${rows}</table></div>` +
+    `<p class="muted stress-note">${esc(cg.window ?? "")}</p>${breadthSvg}`;
+}
+
+function divergenceHtml() {
+  const dv = S.docs.divergence;
+  if (!dv || dv.status === "building" || dv.status === "error") return buildingHtml("DIVERGENCE");
+  let pairs = [...(dv.pairs ?? [])];
+  const q = S.search.trim().toLowerCase();
+  if (q) pairs = pairs.filter((p) =>
+    `${p.a_name ?? ""} ${p.b_name ?? ""} ${p.a_id ?? ""} ${p.b_id ?? ""}`.toLowerCase().includes(q));
+  if (!S.showExtended) pairs = pairs.filter((p) =>
+    !((p.a_tier ?? "core") === "extended" && (p.b_tier ?? "core") === "extended"));
+  if (!pairs.length) return `<div class="empty-state">NO DIVERGENT PAIRS (or none match the filter)</div>`;
+  const rows = pairs.map((p) => {
+    const bg = scoreBg(p.gap_pctl_1y);
+    const gc = bg ? ` style="background:${bg};color:${scoreFg(p.gap_pctl_1y)}"` : "";
+    return `<tr class="clickable" data-ind="${esc(p.a_id)}">` +
+      `<td class="sym">${esc(p.a_name ?? p.a_id)}<br><span class="muted">vs</span> ${esc(p.b_name ?? p.b_id)}</td>` +
+      `<td class="muted">${esc(p.category ?? "")}</td>` +
+      `<td class="num">${fmtN(p.corr_1y, 2)}</td>` +
+      `<td class="num"><b>${fmtScore(p.score_a)}</b></td>` +
+      `<td class="num"><b>${fmtScore(p.score_b)}</b></td>` +
+      `<td class="num stress-cell"${gc} title="gap ${fmtN(p.gap, 1)} — 1Y percentile ${fmtN(p.gap_pctl_1y, 0)} (n=${p.n_weeks ?? "?"})"><b>${fmtN(p.gap, 0)}</b></td>` +
+      `<td class="num">${p.gap_pctl_1y == null ? "n/a" : `p${fmtN(p.gap_pctl_1y, 0)}`}</td></tr>`;
+  }).join("");
+  return `<table class="stress-grid"><tr><th>Pair</th><th>Category</th><th>1Y corr</th><th>Score A</th><th>Score B</th><th>Gap</th><th>Gap 1Y %ile</th></tr>${rows}</table>` +
+    `<p class="muted stress-note">${esc(dv.note ?? "")}</p>`;
+}
+
+function replayHtml() {
+  const rp = S.docs.replay;
+  if (!rp || rp.status === "building" || rp.status === "error") return buildingHtml("REPLAY");
+  const dates = rp.dates ?? [], overall = rp.overall ?? [];
+  const n = dates.length;
+  if (n < 2) return `<div class="empty-state">NOT ENOUGH REPLAY HISTORY YET</div>`;
+  if (S.replayPos == null || S.replayPos >= n) S.replayPos = n - 1;
+  const W = 600, H = 240, P = 30;
+  const X = (i) => P + (i / (n - 1)) * (W - 2 * P);
+  const Y = (v) => v == null ? null : H - P - (v / 100) * (H - 2 * P);
+  // episode bands
+  let bands = "";
+  for (const e of (rp.episodes ?? [])) {
+    const i0 = dates.findIndex((d) => d >= e.start);
+    const i1 = dates.findIndex((d) => d > e.finish);
+    const j0 = i0 < 0 ? 0 : i0, j1 = i1 < 0 ? n - 1 : Math.max(j0, i1 - 1);
+    bands += `<rect x="${X(j0)}" y="${P}" width="${Math.max(2, X(j1) - X(j0))}" height="${H - 2 * P}" ` +
+      `fill="#7fc9b5" opacity="0.12"><title>${esc(e.name)}: ${esc(e.start)} → ${esc(e.finish)} — ${esc(e.trigger)}</title></rect>`;
+  }
+  const pts = overall.map((v, i) => (v == null ? null : `${X(i).toFixed(1)},${Y(v).toFixed(1)}`)).filter(Boolean).join(" ");
+  const regime = (s) => s == null ? "—" : s < 30 ? "Calm" : s < 50 ? "Normal" : s < 70 ? "Elevated" : s <= 85 ? "High" : "Acute";
+  return `<div class="stress-replay">` +
+    `<div class="muted stress-note">Scrub 5Y of weekly Overall + composite scores. Shaded bands = confirmed stress episodes (hover for trigger).</div>` +
+    `<input type="range" class="stress-slider" min="0" max="${n - 1}" value="${S.replayPos}" style="width:100%" aria-label="scrub through time">` +
+    `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block" role="img" aria-label="overall stress replay">` +
+    `${bands}` +
+    `<line x1="${P}" y1="${Y(50)}" x2="${W - P}" y2="${Y(50)}" stroke="#3a332a" stroke-width="1"/>` +
+    `<polyline points="${pts}" fill="none" stroke="#e8c96a" stroke-width="2"/>` +
+    `<line id="rq-cursor" x1="${X(S.replayPos)}" y1="${P}" x2="${X(S.replayPos)}" y2="${H - P}" stroke="#f5efe0" stroke-width="1.5"/>` +
+    `<text x="${P}" y="${H - 8}" fill="#a89a83" font-size="10">${esc(dates[0])}</text>` +
+    `<text x="${W - P}" y="${H - 8}" fill="#a89a83" font-size="10" text-anchor="end">${esc(dates[n - 1])}</text>` +
+    `</svg>` +
+    `<div id="rq-readout"></div>` +
+    `</div>`;
+}
+
+function updateReplayDom() {
+  // Slider moved: reposition cursor + readout without rebuilding the slider
+  // (keeps drag focus intact).
+  const rp = S.docs.replay;
+  if (!rp) return;
+  const dates = rp.dates ?? [], overall = rp.overall ?? [], n = dates.length;
+  const pos = Math.max(0, Math.min(n - 1, S.replayPos ?? n - 1));
+  const W = 600, P = 30;
+  const X = (i) => P + (i / (n - 1)) * (W - 2 * P);
+  const cur = document.querySelector("#rq-cursor");
+  if (cur) { cur.setAttribute("x1", X(pos)); cur.setAttribute("x2", X(pos)); }
+  const regime = (s) => s == null ? "—" : s < 30 ? "Calm" : s < 50 ? "Normal" : s < 70 ? "Elevated" : s <= 85 ? "High" : "Acute";
+  const o = overall[pos];
+  const rc = REGIME_COLOR[regime(o)] ?? "#a89a83";
+  const comps = Object.entries(rp.composites ?? {})
+    .map(([c, arr]) => ({ c, v: arr?.[pos] }))
+    .filter((r) => r.v != null)
+    .sort((a, b) => b.v - a.v);
+  const ro = document.querySelector("#rq-readout");
+  if (ro) ro.innerHTML =
+    `<div style="margin:6px 0"><b>${esc(dates[pos])}</b> — Overall <b style="color:${rc}">${fmtScore(o)}</b> ` +
+    `<span style="color:${rc}">${esc(regime(o))}</span></div>` +
+    `<table class="stress-grid"><tr><th>Category</th><th>Score</th></tr>` +
+    comps.map((r) => `<tr><td class="sym">${esc(r.c)}</td><td class="num"><b>${fmtScore(r.v)}</b></td></tr>`).join("") +
+    `</table>`;
+}
+
+function quadrantPoints() {
+  const qd = S.docs.quadrant;
+  let pts = [...(qd?.points ?? [])];
+  if (!S.showExtended) pts = pts.filter((p) => (p?.tier ?? "core") !== "extended");
+  const q = S.search.trim().toLowerCase();
+  if (q) pts = pts.filter((p) =>
+    `${p?.name ?? ""} ${p?.id ?? ""} ${p?.category ?? ""}`.toLowerCase().includes(q));
+  return pts;
+}
+
+function quadrantHtml() {
+  const qd = S.docs.quadrant;
+  if (!qd || qd.status === "building" || qd.status === "error") return buildingHtml("QUADRANT");
+  const counts = qd.counts ?? {};
+  const pts = quadrantPoints().filter((p) => p.quadrant !== "n/a" && p.score != null && p.sigma5 != null);
+  const W = 400, P = 34;
+  const X = (s) => P + (s / 100) * (W - 2 * P);
+  const Y = (v) => W - P - ((Math.max(-3, Math.min(3, v)) + 3) / 6) * (W - 2 * P);
+  const dots = pts.map((p) => {
+    const r = 4 + Math.min(10, Math.abs(p.accel ?? 0) * 6);
+    return `<g class="clickable" data-ind="${esc(p.id)}">` +
+      `<title>${esc(p.name ?? p.id)} — score ${fmtScore(p.score)}, 5d ${fmtSigned(p.sigma5)}σ, ${esc(p.quadrant)}</title>` +
+      `<circle cx="${X(p.score).toFixed(1)}" cy="${Y(p.sigma5).toFixed(1)}" r="22" fill="transparent"/>` +
+      `<circle cx="${X(p.score).toFixed(1)}" cy="${Y(p.sigma5).toFixed(1)}" r="${r.toFixed(1)}" fill="${catColor(p.category)}" opacity="0.9" pointer-events="none"/></g>`;
+  }).join("");
+  const counter = (label, color) =>
+    `<span style="margin-right:12px"><span class="stress-dot" style="background:${color}"></span><b>${counts[label] ?? 0}</b> ${label}</span>`;
+  // list fallback below the scatter
+  const l = [...quadrantPoints()];
+  if (S.sort === "stress") l.sort((a, b) => (b?.score ?? -1) - (a?.score ?? -1));
+  else if (S.sort === "change") l.sort((a, b) => Math.abs(b?.sigma5 ?? -1) - Math.abs(a?.sigma5 ?? -1));
+  const rows = l.map((p) => {
+    const qc = { Escalating: "#cf4a42", Unwinding: "#d9a93b", Emerging: "#e8c96a", Calm: "#7fc9b5", "n/a": "#a89a83" }[p.quadrant] ?? "#a89a83";
+    return `<tr class="clickable" data-ind="${esc(p.id)}" style="min-height:44px">` +
+      `<td class="sym">${esc(p.name ?? p.id)}</td><td class="muted">${esc(p.category ?? "")}</td>` +
+      `<td class="num"><b>${fmtScore(p.score)}</b></td>` +
+      `<td class="num">${p.sigma5 == null ? "n/a" : fmtSigned(p.sigma5) + "σ"}</td>` +
+      `<td class="num" style="color:${qc}"><b>${esc(p.quadrant)}</b></td></tr>`;
+  }).join("");
+  const legend = Object.keys(CAT_COLOR).map((c) =>
+    `<span style="margin-right:10px;white-space:nowrap"><span class="stress-dot" style="background:${CAT_COLOR[c]}"></span>${esc(c)}</span>`).join("");
+  return `<div style="margin:4px 0 8px">${counter("Escalating", "#cf4a42")}${counter("Emerging", "#e8c96a")}` +
+    `<span class="muted">Unwinding ${counts.Unwinding ?? 0} · Calm ${counts.Calm ?? 0} · n/a ${counts["n/a"] ?? 0}</span></div>` +
+    `<svg viewBox="0 0 ${W} ${W}" style="width:100%;max-width:520px;height:auto;display:block;margin:0 auto" role="img" aria-label="level vs velocity quadrant">` +
+    `<rect x="${P}" y="${P}" width="${W - 2 * P}" height="${W - 2 * P}" fill="#211d16" rx="6"/>` +
+    `<line x1="${X(50)}" y1="${P}" x2="${X(50)}" y2="${W - P}" stroke="#3a332a" stroke-width="1"/>` +
+    `<line x1="${P}" y1="${Y(0)}" x2="${W - P}" y2="${Y(0)}" stroke="#3a332a" stroke-width="1"/>` +
+    `<text x="${X(75)}" y="${P + 14}" fill="#a89a83" font-size="11" text-anchor="middle">ESCALATING</text>` +
+    `<text x="${X(25)}" y="${P + 14}" fill="#a89a83" font-size="11" text-anchor="middle">UNWINDING</text>` +
+    `<text x="${X(75)}" y="${W - P - 8}" fill="#a89a83" font-size="11" text-anchor="middle">EMERGING</text>` +
+    `<text x="${X(25)}" y="${W - P - 8}" fill="#a89a83" font-size="11" text-anchor="middle">CALM</text>` +
+    `<text x="${W - P}" y="${W - 8}" fill="#a89a83" font-size="10" text-anchor="end">score →</text>` +
+    `<text x="${P + 4}" y="${P + 12}" fill="#a89a83" font-size="10">+3σ</text>` +
+    `<text x="${P + 4}" y="${W - P - 6}" fill="#a89a83" font-size="10">−3σ</text>` +
+    `${dots}</svg>` +
+    `<div class="muted stress-note" style="margin-top:6px">${legend}<br>x = 0–100 score · y = 5d normalized velocity · dot size = |acceleration| · tap a dot for detail</div>` +
+    `<table class="stress-grid" style="margin-top:8px"><tr><th>Indicator</th><th>Category</th><th>Score</th><th>5d σ</th><th>Quadrant</th></tr>${rows}</table>`;
+}
+
+function viewBodyHtml(view) {
+  switch (view) {
+    case "horizon": return horizonHtml();
+    case "contagion": return contagionHtml();
+    case "divergence": return divergenceHtml();
+    case "replay": return replayHtml();
+    case "quadrant": return quadrantHtml();
+    case "velocity": return `<div class="stress-scroll">${heatmapHtml("velocity")}` +
+      `<p class="muted stress-note">Normalized velocity: k-day raw change ÷ trailing-1Y σ of k-day changes. Q-series show no velocity.</p></div>`;
+    case "time":
+    default: return `<div class="stress-scroll">${heatmapHtml("time")}` +
+      `<p class="muted stress-note">Phase-1 docs carry current scores only — the 26-week weekly history replay arrives in Phase 2.</p></div>`;
+  }
+}
+
 // --- Top 20 movers ------------------------------------------------------------
 function moversHtml() {
   const m = S.matrix;
@@ -266,6 +572,14 @@ function popoverHtml(id) {
   const v = S.velocity?.indicators?.[id] ?? {};
   const tag = ind?.tag ? `<span class="stress-tag" style="border-color:${TAG_CHIP[ind.tag] ?? "#a89a83"};color:${TAG_CHIP[ind.tag] ?? "#a89a83"}">${esc(ind.tag)}</span>` : "";
   const kv = (k, val) => `<div class="stress-kv"><span class="muted">${k}</span><b>${val}</b></div>`;
+  const hz = S.docs.horizon?.indicators?.[id];
+  const hzRow = hz && hz.status === "ok"
+    ? kv("1M/3M/1Y/5Y %ile", `${fmtN(hz.pctl_1M, 0)} / ${fmtN(hz.pctl_3M, 0)} / ${fmtN(hz.pctl_1Y, 0)} / ${fmtN(hz.pctl_5Y, 0)}`)
+    : "";
+  const qd = (S.docs.quadrant?.points ?? []).find((p) => p?.id === id);
+  const qdRow = qd && qd.quadrant !== "n/a"
+    ? kv("quadrant", `${esc(qd.quadrant)}${qd.sigma5 != null ? ` · 5d ${fmtSigned(qd.sigma5)}σ` : ""}${qd.accel != null ? ` · accel ${fmtSigned(qd.accel)}` : ""}`)
+    : "";
   return `<div class="stress-pop-head"><b>${esc(ind?.name ?? id)}</b> ${tag}
       <button type="button" class="stress-pop-x" aria-label="close">✕</button></div>
     <div class="muted">${esc(ind?.id ?? "")} · ${esc(catOf(ind))} · tier ${esc(ind?.tier ?? "core")}</div>
@@ -280,6 +594,7 @@ function popoverHtml(id) {
     ${kv("source", esc(ind?.source ?? "—"))}
     ${kv("window", esc(ind?.window_used ?? "—"))}
     ${kv("confidence", esc(ind?.confidence ?? "—"))}
+    ${hzRow}${qdRow}
     ${sparklineHtml(ind)}`;
 }
 
@@ -345,13 +660,20 @@ export async function renderStress() {
     body.innerHTML = `<div class="empty-state">STRESS MATRIX BUILDING — first stress-job run has not written the docs yet.</div>`;
     return;
   }
+  // Phase-2 view docs are fetched lazily and cached; a missing doc renders
+  // the view's building placeholder, never invented values.
+  await viewDoc(S.view);
 
   const segBtn = (id, label) =>
     `<button type="button" data-view="${id}" class="${S.view === id ? "on" : ""}">${label}</button>`;
+  const moreSel = MORE_VIEWS.map((v) =>
+    `<option value="${v}"${S.view === v ? " selected" : ""}>${VIEW_LABEL[v]}</option>`).join("");
+  const showMovers = S.view === "time" || S.view === "velocity";
   body.innerHTML =
     headerHtml(m, v) +
     `<div class="stress-ctl">
-      <div class="seg" role="tablist">${segBtn("time", "Time")}${segBtn("velocity", "Velocity")}</div>
+      <div class="seg" role="tablist">${segBtn("time", "Time")}${segBtn("velocity", "Velocity")}${segBtn("quadrant", "Quadrant")}` +
+      `<select class="stress-more" aria-label="more views"><option value="">More…</option>${moreSel}</select></div>
       <select class="stress-sort" aria-label="sort">
         <option value="category"${S.sort === "category" ? " selected" : ""}>Sort: category</option>
         <option value="stress"${S.sort === "stress" ? " selected" : ""}>Sort: current stress</option>
@@ -360,20 +682,26 @@ export async function renderStress() {
       <button type="button" class="stress-tier">${S.showExtended ? "Hide extended" : "Show extended"}</button>
       <input type="search" class="stress-search" placeholder="Search indicators…" value="${esc(S.search)}" aria-label="search indicators">
     </div>` +
-    moversHtml() +
-    `<div class="stress-scroll">${heatmapHtml(S.view)}
-      ${S.view === "time" ? `<p class="muted stress-note">Phase-1 docs carry current scores only — the 26-week weekly history replay arrives in Phase 2.</p>` : `<p class="muted stress-note">Normalized velocity: k-day raw change ÷ trailing-1Y σ of k-day changes. Q-series show no velocity.</p>`}
-    </div>` +
+    (showMovers ? moversHtml() : "") +
+    viewBodyHtml(S.view) +
     legendHtml() +
     footerHtml();
 
   // wire controls (re-render from cached docs, no refetch)
   body.querySelectorAll(".seg button").forEach((b) =>
-    b.addEventListener("click", () => { S.view = b.dataset.view; renderStress(); }));
+    b.addEventListener("click", () => { S.view = b.dataset.view; S.replayPos = null; renderStress(); }));
+  body.querySelector(".stress-more")?.addEventListener("change", (e) => {
+    if (e.target.value) { S.view = e.target.value; S.replayPos = null; renderStress(); }
+  });
   body.querySelector(".stress-sort")?.addEventListener("change", (e) => { S.sort = e.target.value; renderStress(); });
   body.querySelector(".stress-tier")?.addEventListener("click", () => { S.showExtended = !S.showExtended; renderStress(); });
   body.querySelector(".stress-search")?.addEventListener("input", (e) => { S.search = e.target.value; renderStress(); });
   body.querySelector(".stress-movers")?.addEventListener("toggle", (e) => { S.moversOpen = e.target.open; });
+  // replay slider: update cursor + readout in place (keeps drag focus)
+  body.querySelector(".stress-slider")?.addEventListener("input", (e) => {
+    S.replayPos = +e.target.value; updateReplayDom();
+  });
+  updateReplayDom();
   body.querySelectorAll("[data-cat]").forEach((el) =>
     el.addEventListener("click", () => {
       const c = el.dataset.cat;
