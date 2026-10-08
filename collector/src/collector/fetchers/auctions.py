@@ -19,18 +19,32 @@ Stored as auction:<Type>-<Tenor>:<metric>, e.g. auction:Note-10Y:bid_to_cover.
 
 Two docs are also maintained: ``auction_results`` (per-auction detail records
 with high yield, bid-to-cover and takedown splits, upserted by
-(auction_date, cusip) so announced auctions gain their results in place) and
-``upcoming_auctions`` (announced but not yet held, sorted by auction date).
+(auction_date, cusip) so announced auctions gain their results in place; full
+history is kept, never pruned) and ``upcoming_auctions`` (announced but not
+yet held, sorted by auction date).
+
+History policy: the Fiscal Data API carries auction records back to 1979, so
+the fetcher keeps everything it can. The pull cutoff is incremental from the
+earliest stored auction: with no stored data (or history shallower than one
+revision window) there is no date filter, so the first post-deploy run
+performs the full deep backfill in one shot; once a no-filter pull pages to
+completion a ``history_complete`` marker is stored and later runs only pull
+the recent revision window (``lookback_days``) for new auctions and late
+corrections. The (auction_date, cusip) upsert is idempotent, so an
+interrupted deep pull simply resumes on the next run.
 """
 from __future__ import annotations
 
 import json
+import logging
 import re
 from datetime import date, timedelta
 
 from collector.config import AuctionsCfg
 from collector.http import GetText
 from collector.store import Store
+
+log = logging.getLogger(__name__)
 
 BASE = (
     "https://api.fiscaldata.treasury.gov/services/api/fiscal_service"
@@ -156,17 +170,21 @@ def parse_detail(r: dict) -> dict | None:
     return det
 
 
-async def fetch_page_raw(page: int, cutoff: str, get_text: GetText) -> list[dict]:
-    """Raw API records for one page (includes announced-but-not-held)."""
-    text = await get_text(
-        BASE,
-        params={
-            "filter": f"record_date:gte:{cutoff}",
-            "sort": "-record_date",
-            "page[size]": str(PAGE_SIZE),
-            "page[number]": str(page),
-        },
-    )
+async def fetch_page_raw(page: int, cutoff: str | None,
+                       get_text: GetText) -> list[dict]:
+    """Raw API records for one page (includes announced-but-not-held).
+
+    ``cutoff`` is a ``record_date >= YYYY-MM-DD`` filter, or None for no
+    date filter (full history pull).
+    """
+    params: dict[str, str] = {
+        "sort": "-record_date",
+        "page[size]": str(PAGE_SIZE),
+        "page[number]": str(page),
+    }
+    if cutoff is not None:
+        params["filter"] = f"record_date:gte:{cutoff}"
+    text = await get_text(BASE, params=params)
     return json.loads(text).get("data", [])
 
 
@@ -186,32 +204,71 @@ def _bucket_metrics(det: dict) -> dict:
     return metrics
 
 
-RESULTS_KEEP_DAYS = 180
-RESULTS_CAP = 1000
+def _results_payload(store: Store) -> dict:
+    """Payload of the stored ``auction_results`` doc ({} when absent)."""
+    doc = store.doc("auction_results")
+    if doc is None or not isinstance(doc.payload, dict):
+        return {}
+    return doc.payload
 
 
-def _store_auction_docs(store: Store, details: list[dict], upcoming: list[dict]) -> None:
+def _pull_cutoff(store: Store, lookback_days: int) -> str | None:
+    """Oldest ``record_date`` to request; None means no filter (pull all).
+
+    Incremental-from-earliest history policy:
+    - history marked complete -> recent revision window only
+      (``today - lookback_days``): cheap daily pull for new auctions and
+      late corrections;
+    - no stored data, or stored history shallower than one revision window
+      (no deep pull has ever completed) -> None: the first post-deploy run
+      performs the full deep backfill in one shot;
+    - otherwise -> earliest stored auction date minus the revision window,
+      so a partial history keeps extending backward while overlapping
+      enough to catch corrections.
+
+    The (auction_date, cusip) upsert is idempotent, so an interrupted deep
+    pull simply resumes on the next run.
+    """
+    payload = _results_payload(store)
+    if payload.get("history_complete"):
+        return (date.today() - timedelta(days=lookback_days)).isoformat()
+    dates = [r.get("auction_date") for r in payload.get("results", [])
+             if isinstance(r, dict) and r.get("auction_date")]
+    if not dates:
+        return None
+    earliest = min(dates)
+    recent_floor = (date.today() - timedelta(days=lookback_days)).isoformat()
+    if earliest >= recent_floor:
+        return None
+    return (date.fromisoformat(earliest) - timedelta(days=lookback_days)).isoformat()
+
+
+def _store_auction_docs(store: Store, details: list[dict], upcoming: list[dict],
+                        history_complete: bool) -> None:
     """Incrementally merge per-auction records.
 
     Completed results upsert by (auction_date, cusip) so a re-fetched record
     (e.g. an announced auction whose results later posted) overwrites in
-    place; pruned to RESULTS_KEEP_DAYS. The upcoming list is rebuilt from the
-    current fetch, sorted by auction date.
+    place. Full history is kept: nothing is pruned and there is no record
+    cap. ``history_complete`` records whether a no-filter pull paged to
+    completion, marking the deep backfill done. The upcoming list is rebuilt
+    from the current fetch, sorted by auction date.
     """
     today_iso = date.today().isoformat()
-    existing: list[dict] = []
-    doc = store.doc("auction_results")
-    if doc is not None:
-        existing = doc.payload.get("results", [])
-    by_key = {(r.get("auction_date"), r.get("cusip")): r for r in existing}
+    payload = _results_payload(store)
+    existing = payload.get("results", [])
+    if not isinstance(existing, list):
+        existing = []
+    by_key = {(r.get("auction_date"), r.get("cusip")): r for r in existing
+              if isinstance(r, dict)}
     for d in details:
         by_key[(d["auction_date"], d["cusip"])] = d
-    cutoff = (date.today() - timedelta(days=RESULTS_KEEP_DAYS)).isoformat()
-    merged = [r for r in by_key.values() if (r.get("auction_date") or "") >= cutoff]
-    merged.sort(key=lambda r: r.get("auction_date", ""), reverse=True)
+    merged = sorted(by_key.values(),
+                    key=lambda r: r.get("auction_date", ""), reverse=True)
     store.put_doc(
         "auction_results",
-        {"results": merged[:RESULTS_CAP]},
+        {"results": merged,
+         "history_complete": bool(history_complete or payload.get("history_complete"))},
         source="fiscaldata.treasury.gov",
     )
     upcoming_sorted = sorted(
@@ -226,22 +283,26 @@ def _store_auction_docs(store: Store, details: list[dict], upcoming: list[dict])
 
 
 async def fetch_auctions(cfg: AuctionsCfg, store: Store, get_text: GetText) -> str:
-    """Daily job: page through recent auctions, upsert per-bucket metric series.
+    """Daily job: page through auctions, upsert per-bucket metric series.
 
+    The pull cutoff is incremental from the earliest stored auction (see
+    ``_pull_cutoff``): the first run with no deep history performs the full
+    backfill in one shot, later runs only pull the recent revision window.
     Also maintains two docs: ``auction_results`` (per-auction detail records,
     upserted by (auction_date, cusip) so announced auctions gain their results
-    in place) and ``upcoming_auctions`` (announced but not yet held, rebuilt
-    each run). Buckets not in cfg.buckets are ignored. One bad page must not
-    starve the others; per-bucket isolation comes free since each bucket is
-    its own series.
+    in place; full history kept) and ``upcoming_auctions`` (announced but not
+    yet held, rebuilt each run). Buckets not in cfg.buckets are ignored. One
+    bad page must not starve the others; per-bucket isolation comes free since
+    each bucket is its own series.
     """
-    cutoff = (date.today() - timedelta(days=cfg.lookback_days)).isoformat()
+    cutoff = _pull_cutoff(store, cfg.lookback_days)
     wanted = set(cfg.buckets)
     today_iso = date.today().isoformat()
     collected: dict[str, dict[str, list]] = {}
     details: list[dict] = []
     upcoming: list[dict] = []
-    page, errors = 1, []
+    page, errors, total_raw = 1, [], 0
+    log.info("auctions pull starting (cutoff=%s)", cutoff or "none/full history")
     while True:
         try:
             raw = await fetch_page_raw(page, cutoff, get_text)
@@ -250,6 +311,7 @@ async def fetch_auctions(cfg: AuctionsCfg, store: Store, get_text: GetText) -> s
             break
         if not raw:
             break
+        total_raw += len(raw)
         for r in raw:
             det = parse_detail(r)
             if det is None or det["bucket"] not in wanted:
@@ -266,11 +328,23 @@ async def fetch_auctions(cfg: AuctionsCfg, store: Store, get_text: GetText) -> s
         if len(raw) < PAGE_SIZE:
             break
         page += 1
+        if page % 25 == 0:
+            log.info("auctions pull in progress: %d pages, %d raw records",
+                     page, total_raw)
+    log.info("auctions pull finished: %d pages, %d raw records, %d completed",
+             page, total_raw, len(details))
+    batch: list[tuple[str, date, float]] = []
     for bucket, metrics in collected.items():
         for metric, pts in metrics.items():
             pts.sort(key=lambda p: p[0])
-            store.upsert_points(f"auction:{bucket}:{metric}", pts)
-    _store_auction_docs(store, details, upcoming)
+            sid = f"auction:{bucket}:{metric}"
+            batch.extend((sid, d, v) for d, v in pts)
+    if batch:
+        store.upsert_points_batch(batch)
+    # A no-filter pull that paged to completion has seen every record the
+    # API holds: the deep backfill is done.
+    history_complete = cutoff is None and not errors
+    _store_auction_docs(store, details, upcoming, history_complete)
     if errors:
         raise RuntimeError(f"auctions paging failures: {'; '.join(errors)}")
     return "auctions"
