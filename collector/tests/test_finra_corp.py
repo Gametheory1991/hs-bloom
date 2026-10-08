@@ -376,3 +376,52 @@ def test_merge_cusip_registry_keeps_every_cusip_no_cap():
     assert len(reg) == 5100
     assert reg["CUSIP00000"]["last_seen"] == day
     assert reg["CUSIP05099"]["issuer"] == "ISSUER"
+
+
+def _seed_sample():
+    seed = finra_corp._load_seed_registry()
+    assert seed, "seed registry must ship with the repo"
+    return next(iter(seed.items()))
+
+
+def test_restore_seed_registry_adds_missing():
+    cusip, s = _seed_sample()
+    reg = {}
+    added = finra_corp.restore_seed_registry(reg)
+    assert added == len(finra_corp._load_seed_registry())
+    assert cusip in reg
+    e = reg[cusip]
+    for k in ("issuer", "coupon", "maturity", "moodys", "sp", "cat",
+              "last_seen"):
+        if s.get(k) not in (None, ""):
+            assert e[k] == s[k], k
+    assert e["seed_restored"] is True
+    # live fields stay absent until the bond reappears in daily lists
+    assert "yield" not in e and "price" not in e and "spread_bps" not in e
+
+
+def test_restore_seed_registry_never_overwrites():
+    seed = finra_corp._load_seed_registry()
+    cusip = next(iter(seed))
+    # registry already holds every seed CUSIP with fresher live data
+    reg = {c: {"issuer": "LIVE", "coupon": 9.9, "maturity": "2035-01-01",
+               "moodys": "Aaa", "sp": "AAA", "cat": "ig",
+               "yield": 4.1, "price": 101.5, "spread_bps": 120,
+               "last_seen": "2026-10-07"} for c in seed}
+    added = finra_corp.restore_seed_registry(reg)
+    assert added == 0
+    e = reg[cusip]
+    assert e["issuer"] == "LIVE"  # untouched
+    assert e["yield"] == 4.1 and e["price"] == 101.5
+    assert e["last_seen"] == "2026-10-07"
+    assert "seed_restored" not in e
+
+
+def test_restore_seed_registry_idempotent():
+    reg = {}
+    first = finra_corp.restore_seed_registry(reg)
+    assert first > 0
+    n = len(reg)
+    second = finra_corp.restore_seed_registry(reg)
+    assert second == 0
+    assert len(reg) == n  # second run changes nothing
