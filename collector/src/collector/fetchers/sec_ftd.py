@@ -96,6 +96,7 @@ def parse_ftd_text(text: str) -> dict[date, list[float]]:
     """
     agg: dict[date, list[float]] = {}
     skipped = 0
+    no_price = 0
     for line in text.splitlines():
         if not line.strip():
             continue
@@ -108,15 +109,22 @@ def parse_ftd_text(text: str) -> dict[date, list[float]]:
         try:
             dt = date(int(sdate[:4]), int(sdate[4:6]), int(sdate[6:8]))
             qty = int(parts[3].strip().replace(",", ""))
-            price = float(parts[-1].strip().replace(",", ""))
         except (ValueError, IndexError):
             skipped += 1
             continue
+        try:
+            price = float(parts[-1].strip().replace(",", ""))
+        except (ValueError, IndexError):
+            price = None  # '.' = no price (warrants/foreign ords): count shares anyway
+            no_price += 1
         cell = agg.setdefault(dt, [0.0, 0.0])
-        cell[0] += qty * price
+        if price is not None:
+            cell[0] += qty * price
         cell[1] += qty
     if skipped:
         log.warning("sec-ftd: skipped %d malformed data rows", skipped)
+    if no_price:
+        log.info("sec-ftd: %d rows had no price (shares counted, $ skipped)", no_price)
     return agg
 
 

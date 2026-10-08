@@ -24,6 +24,7 @@ FIXTURE = """SETTLEMENT DATE|CUSIP|SYMBOL|QUANTITY (FAILS)|DESCRIPTION|PRICE
 20260817|D18190898|DB|3382|DEUTSCHE BANK AG NAMEN AKT (DE|38.56
 20260818|B5950S113|MDXH|500000|MDXHEALTH SA SHS NEW(BELGIUM) |1.00
 20260818|XXXX|BAD|notanint|BROKEN ROW|1.00
+20260818|Q3972M127|FYIRF|98|CADOUX LTD SHS (AUSTRALIA)|.
 Trailer record count 5
 Trailer total quantity of shares 1710570
 """
@@ -45,9 +46,10 @@ def test_parse_aggregates_by_settlement_date():
     assert agg[date(2026, 8, 17)][0] == pytest.approx(
         1206826 * 0.81 + 362 * 16.04 + 3382 * 38.56)
     assert agg[date(2026, 8, 17)][1] == 1206826 + 362 + 3382
-    # 2026-08-18: 500000*1.00 ; shares 500000 (malformed row + trailers skipped)
+    # 2026-08-18: 500000*1.00 ; shares 500000 + 98 (the '.'-price row counts
+    # shares but contributes no $; malformed row + trailers skipped)
     assert agg[date(2026, 8, 18)][0] == pytest.approx(500000.0)
-    assert agg[date(2026, 8, 18)][1] == 500000
+    assert agg[date(2026, 8, 18)][1] == 500000 + 98
     assert len(agg) == 2
 
 
