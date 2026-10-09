@@ -553,6 +553,12 @@ cycle_series:      # market-cycle series (spec 2026-08-24); exactly one source k
   - { id: etf-priv, name: "PRIV (IG public+private credit)", unit: px, yahoo: PRIV }
   - { id: etf-bizd, name: "BIZD (BDCs)",              unit: px, yahoo: BIZD }
   - { id: etf-aiq,  name: "AIQ (AI & tech)",         unit: px, yahoo: AIQ }
+  - { id: etf-grid, name: "GRID (AI infrastructure)", unit: px, yahoo: GRID }
+  - { id: etf-mbb,  name: "MBB (MBS)",               unit: px, yahoo: MBB }
+  - { id: etf-lqd,  name: "LQD (IG corporate)",      unit: px, yahoo: LQD }
+  - { id: etf-hyg,  name: "HYG (HY corporate)",      unit: px, yahoo: HYG }
+  - { id: etf-mdy,  name: "MDY (mid caps)",          unit: px, yahoo: MDY }
+  - { id: etf-xrt,  name: "XRT (retail)",            unit: px, yahoo: XRT }
   - { id: etf-smh,  name: "SMH (semis)",            unit: px, yahoo: SMH }
   # ---- batch 7: derived spreads/ratios (computed from existing fetches, no new HTTP) ----
   # DE 10Y via FRED IRLTLT01DEM156N (monthly; verified live) — the bond matrix uses
@@ -1524,6 +1530,12 @@ cycle_tabs:        # layout only; rows reference cycle_series ids
           - { series: etf-jbbb }
           - { series: etf-priv }
           - { series: etf-bizd }
+          - { series: etf-grid }
+          - { series: etf-mbb }
+          - { series: etf-lqd }
+          - { series: etf-hyg }
+          - { series: etf-mdy }
+          - { series: etf-xrt }
           - { series: etf-aiq }
           - { series: etf-iai }
           - { series: etf-smh }
@@ -1849,6 +1861,12 @@ scorecard:          # briefing-style 1D/1M/3M/1Y + 1Y z-score table (GET /api/sc
   - { series: etf-jbbb,         kind: pct }
   - { series: etf-priv,         kind: pct }
   - { series: etf-bizd,         kind: pct }
+  - { series: etf-grid,         kind: pct }
+  - { series: etf-mbb,         kind: pct }
+  - { series: etf-lqd,         kind: pct }
+  - { series: etf-hyg,         kind: pct }
+  - { series: etf-mdy,         kind: pct }
+  - { series: etf-xrt,         kind: pct }
   - { series: etf-aiq,         kind: pct }
   - { series: etf-iai,         kind: pct }
   - { series: etf-smh,         kind: pct }
