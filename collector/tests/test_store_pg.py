@@ -31,12 +31,15 @@ class FakeConn:
         self.points = {}   # (series_id, d) -> value
         self.docs = {}     # key -> (payload, updated_at, source)
         self.status = {}   # name -> dict
+        self.meta = {}     # key -> value (data_version)
         self.seen_sql = []
         self.commits = 0
 
     def execute(self, sql, args=()):
         self.seen_sql.append(sql)
-        s = " ".join(sql.split())
+        # Postgres ignores leading "--" comment lines; so does the fake.
+        body = "\n".join(l for l in sql.splitlines() if not l.strip().startswith("--"))
+        s = " ".join(body.split())
         if s.startswith("CREATE TABLE"):
             return FakeCursor([])
         if s.startswith("CREATE INDEX"):
@@ -73,6 +76,12 @@ class FakeConn:
             else:
                 row["last_error"], row["last_error_at"] = args[1], args[2]
             return FakeCursor([])
+        if s.startswith("INSERT INTO meta"):  # data_version counter (+1 upsert)
+            self.meta["data_version"] = self.meta.get("data_version", 0) + 1
+            return FakeCursor([])
+        if s.startswith("SELECT value FROM meta"):
+            v = self.meta.get("data_version")
+            return FakeCursor([] if v is None else [(v,)])
         if s.startswith("SELECT name, last_success"):
             rows = [(r["name"], r["last_success"], r["last_error"],
                      r["last_error_at"], r["active_source"])

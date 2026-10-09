@@ -70,7 +70,9 @@ export function renderCycle(cycle) {
     root.querySelectorAll("td[data-range-for]").forEach(async (cell) => {
       const sid = cell.dataset.rangeFor;
       try {
-        const s = await getSeries("cycle:" + sid, "1y");
+        // Bare id: /api/series resolves config cycle series by id (and applies
+        // the same transform as the row). A "cycle:" prefix matches no branch → 404.
+        const s = await getSeries(sid, "1y");
         const vals = (s.points ?? []).map((p) => p[1]).filter((v) => v != null && isFinite(v));
         if (vals.length >= 12) {
           const tmp = document.createElement("tr");

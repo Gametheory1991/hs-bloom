@@ -46,7 +46,7 @@ import { renderRefs } from "./panels/refs.js";
 import { renderInsights } from "./panels/insights.js";
 import { initNotifications, notifyInsights } from "./notifications.js";
 import { initChat } from "./chat.js";
-import { initTabs, HUBS } from "./tabs.js";
+import { initTabs, HUBS, currentRoute } from "./tabs.js";
 import { renderDebtCube } from "./panels/debtcube.js";
 import { renderRegwatchNews, renderRegwatchRules, renderRegwatchTopics } from "./panels/regwatch.js";
 
@@ -56,6 +56,11 @@ const STALE_MINUTES = { equity: 20, bonds: 130, macro: 390, auctions: 2880, news
 const EMPTY = { rows: [], updated_at: null, source: null };
 
 let lastDash = null; // last successful payload, for the view-toggle re-render (no re-fetch)
+let lastHub = null;  // hub whose filtered panels lastDash holds (or is being fetched)
+
+// The hub actually on screen: same resolution as tabs.js (legacy hashes and
+// moved routes redirect, unknown hubs fall back to pulse).
+const currentHub = () => currentRoute().hub;
 
 // Command-palette index: hubs + panels + series, rebuilt from live payloads
 // (never hardcoded). Series entries deep-link to their hub/sub route.
@@ -145,8 +150,12 @@ async function tick() {
     try { fn(); } catch (err) { console.error(`[tick] ${name} failed:`, err); }
   }
   try {
-    const hub = (location.hash.match(/^#\/([^\/]+)/) || [null, "pulse"])[1];
+    const hub = currentHub();
+    lastHub = hub;
     const dash = await getDashboard(hub);
+    // A hub switch while this request was in flight started a newer tick;
+    // drop this stale payload so it can't overwrite the new hub's panels.
+    if (hub !== lastHub) return;
     lastDash = dash;
     const p = dash.panels;
     safeRender("equity", () => renderEquity(p.equity));
@@ -257,13 +266,22 @@ renderBriefcheck();
 renderStress();
 renderUsage();
 refreshSearchIndex();
-setInterval(() => { renderFutures(); renderFlows(); renderScorecard(); renderStressHeatmaps(); renderCentral(); renderBriefcheck(); renderKoi(); refreshSearchIndex(); }, 15 * 60_000);
-setInterval(() => { renderFutures(); renderFlows(); renderScorecard(); renderCentral(); renderBriefcheck(); renderKoi(); renderStress(); refreshSearchIndex(); }, 15 * 60_000);initDefiViewToggle(() => {
+// One 15-min refresh for the panels that fetch their own endpoints. (Two
+// overlapping intervals used to run most of these twice.)
+setInterval(() => { renderFutures(); renderFlows(); renderScorecard(); renderStressHeatmaps(); renderCentral(); renderBriefcheck(); renderKoi(); renderStress(); refreshSearchIndex(); }, 15 * 60_000);
+initDefiViewToggle(() => {
   if (lastDash) renderDefiPanel(lastDash.panels);
 });
-// A chart drawn while its tab is hidden sees clientWidth 0 and falls back to
-// 300px; redraw on tab switch so it sizes to the now-visible panel.
 window.addEventListener("hashchange", () => {
+  // /api/dashboard is filtered per hub, so the cached payload only holds the
+  // previous hub's panels. Refetch as soon as the hub changes instead of
+  // leaving the new hub empty until the next poll.
+  if (currentHub() !== lastHub) {
+    tick();
+    return;
+  }
+  // Same hub, new sub-tab: a chart drawn while hidden sees clientWidth 0 and
+  // falls back to 300px; redraw so it sizes to the now-visible panel.
   if (lastDash) renderMidnight(lastDash.panels.midnight ?? EMPTY);
 });
 tick();
