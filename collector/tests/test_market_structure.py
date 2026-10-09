@@ -50,6 +50,9 @@ class FakeStore:
     def points(self, key, since=None):
         return self.series.get(key, {})
 
+    def points_many(self, keys):  # mirrors Store.points_many (batched dashboard reads)
+        return {k: self.series.get(k, {}) for k in dict.fromkeys(keys) if k}
+
     def put_doc(self, key, payload, source=None):
         self.docs[key] = payload
 

@@ -68,7 +68,8 @@ CREATE TABLE IF NOT EXISTS meta(
   value INTEGER NOT NULL
 );
 -- FINRA equity completeness (2026-10-06): full-universe detail tables.
--- One row per (settlement, ticker); ~22.6k tickers x ~160 settlements.
+-- One row per (settlement, ticker), ~22.6k tickers x ~160 settlements.
+-- Never put a semicolon in these comments: the Postgres path splits SCHEMA on it.
 CREATE TABLE IF NOT EXISTS short_interest(
   settlement_date TEXT NOT NULL,
   symbol          TEXT NOT NULL,
@@ -316,8 +317,10 @@ class Store:
         self._execute(
             "INSERT INTO fetcher_status(name, last_success, active_source) VALUES(?,?,?) "
             "ON CONFLICT(name) DO UPDATE SET last_success=excluded.last_success, "
-            "active_source=excluded.active_source, "
-          "last_error=NULL, last_error_at=NULL",
+            "active_source=excluded.active_source",
+            # last_error/last_error_at are kept on purpose: health is
+            # last_success >= last_error_at, and the UI shows "recovered
+            # after an error" (warn) from that history.
             (name, _now(), active_source),
         )
 

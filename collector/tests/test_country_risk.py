@@ -190,9 +190,10 @@ async def test_refresh_writes_doc_and_history():
     assert result == "country-risk"
     doc = store.doc("country_risk")
     assert doc.payload["asof"] == asof.isoformat()
-    assert len(doc.payload["countries"]) == 13
+    assert len(doc.payload["countries"]) == 15
     codes = {c["code"] for c in doc.payload["countries"]}
-    assert codes == {"US", "DE", "FR", "IT", "ES", "NL", "BE", "UK", "JP", "CA", "AU", "CH", "SE"}
+    assert codes == {"US", "DE", "FR", "IT", "ES", "NL", "BE", "UK", "JP", "CA", "AU", "CH", "SE",
+                     "MX", "KR"}
     us = next(c for c in doc.payload["countries"] if c["code"] == "US")
     assert us["bucket"] == "red"
     assert us["trend"] in ("improving", "deteriorating", "flat", "unknown")
