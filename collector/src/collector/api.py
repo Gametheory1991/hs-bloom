@@ -1098,6 +1098,23 @@ def create_app(store: Store, cfg: Config) -> FastAPI:
             raise HTTPException(status_code=404, detail="no briefcheck report yet")
         return doc.payload
 
+    @app.post("/api/admin/repair-etf-collision")
+    async def repair_etf_collision_endpoint(request: Request) -> dict:
+        """One-time repair: remove quarterly XBRL points contaminating the daily
+        iShares ETF series. Gate-protected (Bearer). Returns deletion report."""
+        import httpx
+        from collector.fetchers.sec_xbrl_etf import repair_etf_collision
+        ua = os.environ.get("SEC_USER_AGENT", "hs-bloom/1.0 contact@example.com")
+
+        async def _get_text(url: str, headers: dict | None = None) -> str:
+            async with httpx.AsyncClient(timeout=30) as client:
+                r = await client.get(url, headers=headers or {})
+                r.raise_for_status()
+                return r.text
+
+        report = await repair_etf_collision(store, _get_text, ua)
+        return report
+
     # ---- built-in usage analytics (no third-party service) ----------------
     @app.middleware("http")
     async def usage_log(request: Request, call_next):  # noqa: ANN001,ANN202

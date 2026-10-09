@@ -131,3 +131,38 @@ async def fetch_sec_xbrl_etf(store, get_text: GetText,
         await asyncio.sleep(0.3)  # SEC fair access: well under 10 req/s
     return (f"sec_xbrl_etf: {done}/{len(ETF_CIKS)} funds, "
             f"{pts_total} quarterly checkpoints, {fell} failed")
+
+
+async def repair_etf_collision(store, get_text: GetText,
+                               user_agent: str) -> dict:
+    """One-time repair: remove quarterly XBRL points that were written into the
+    daily iShares series (cycle:etf-{t}-{metric}) before the -q- namespace fix.
+    Only deletes a date when the stored value exactly matches the XBRL value,
+    so legitimate daily iShares points are never touched. Returns a report."""
+    from collector.store import Store
+    assert isinstance(store, Store)
+    headers = {"User-Agent": user_agent}
+    report: dict = {"tickers": {}, "total_deleted": 0, "failed": []}
+    for ticker, cik in ETF_CIKS.items():
+        try:
+            payload = json.loads(
+                await get_text(FACTS_URL.format(cik10=cik), headers=headers))
+        except Exception as exc:  # noqa: BLE001
+            report["failed"].append(ticker)
+            continue
+        hist = extract_history(payload)
+        deleted_here = 0
+        for metric, pts in hist.items():
+            if not pts:
+                continue
+            sid = f"cycle:etf-{ticker}-{metric}"
+            daily = store.points(sid)
+            # Only delete dates where the stored value IS the XBRL value.
+            kill = [d for d, v in pts
+                    if d in daily and daily[d] == v]
+            if kill:
+                deleted_here += store.delete_points(sid, kill)
+        report["tickers"][ticker] = deleted_here
+        report["total_deleted"] += deleted_here
+        await asyncio.sleep(0.3)
+    return report

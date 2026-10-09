@@ -215,6 +215,19 @@ class Store:
         )
         self._bump_data_version()
 
+    def delete_points(self, series_id: str, dates: Iterable[date]) -> int:
+        """Delete specific dates from a series. Returns rows deleted."""
+        dates = list(dates)
+        if not dates:
+            return 0
+        cur = self._execute(
+            "DELETE FROM series_points WHERE series_id=? AND d IN "
+            f"({','.join('?' * len(dates))})",
+            [series_id] + [d.isoformat() for d in dates],
+        )
+        self._bump_data_version()
+        return cur.rowcount or 0
+
     def points(self, series_id: str, since: date | None = None) -> dict[date, float]:
         q = "SELECT d, value FROM series_points WHERE series_id=?"
         args: list[Any] = [series_id]
