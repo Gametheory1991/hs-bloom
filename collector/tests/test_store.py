@@ -48,6 +48,22 @@ def test_fetcher_status(tmp_path):
     assert by_name["news"]["last_success"] is None
 
 
+def test_prune_stale_fetcher_status(tmp_path):
+    s = make_store(tmp_path)
+    s.record_error("ici_flows", "HTTP 403")  # renamed -> mf_flows
+    s.record_success("mf_flows", active_source="fred-z1-mf-flows")
+    s.record_success("equity", active_source="yahoo")
+    n = s.prune_stale_fetcher_status(["mf_flows", "equity"])
+    assert n == 1
+    names = {st["name"] for st in s.statuses()}
+    assert names == {"mf_flows", "equity"}
+    # second call is a no-op
+    assert s.prune_stale_fetcher_status(["mf_flows", "equity"]) == 0
+    # empty keep-list never wipes the table
+    assert s.prune_stale_fetcher_status([]) == 0
+    assert len(s.statuses()) == 2
+
+
 def test_concurrent_reads_and_writes_are_serialized(tmp_path):
     import threading
 

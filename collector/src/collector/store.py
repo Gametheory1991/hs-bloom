@@ -370,6 +370,29 @@ class Store:
         cols = ["name", "last_success", "last_error", "last_error_at", "active_source"]
         return [dict(zip(cols, r)) for r in rows]
 
+    def prune_stale_fetcher_status(self, keep: Iterable[str]) -> int:
+        """Delete fetcher_status rows for jobs that are no longer registered.
+
+        Renaming/removing a scheduler job (e.g. ici_flows -> mf_flows,
+        2026-10-09) would otherwise leave its last error row behind forever,
+        pinning /healthz ok=false for a job that can never run again.
+        Returns the number of rows deleted.
+        """
+        keep = list(keep)
+        if not keep:
+            return 0
+        with self._lock:
+            cur = self.conn.execute(
+                self._q(
+                    "DELETE FROM fetcher_status WHERE name NOT IN "
+                    f"({','.join('?' * len(keep))})"
+                ),
+                keep,
+            )
+            n = cur.rowcount or 0
+            self.conn.commit()
+        return n
+
     # -- FINRA short-interest full universe ---------------------------------
     def upsert_short_interest(self, rows: list[tuple]) -> None:
         """Idempotent bulk insert of full-universe rows.

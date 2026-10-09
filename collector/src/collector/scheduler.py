@@ -623,6 +623,11 @@ def register_jobs(
     # Boot catch-up (see _catchup_first_runs): overdue staggered jobs run
     # soon after boot instead of waiting out their full stagger offsets.
     _catchup_first_runs(fetchers, store, start)
+    # Drop health rows for jobs that no longer exist (renamed/removed):
+    # their stale last-error would otherwise pin /healthz ok=false forever.
+    pruned = store.prune_stale_fetcher_status(fetchers.keys())
+    if pruned:
+        log.info("pruned %d stale fetcher_status row(s)", pruned)
     for name, (seconds, fn, next_run_time) in fetchers.items():
         scheduler.add_job(
             partial(run_fetcher, name, store, fn),
