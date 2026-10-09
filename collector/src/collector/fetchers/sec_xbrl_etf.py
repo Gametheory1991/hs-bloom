@@ -106,7 +106,14 @@ def extract_history(payload: dict) -> dict[str, list[tuple[date, float]]]:
 
 async def fetch_sec_xbrl_etf(store, get_text: GetText,
                              user_agent: str) -> str:
-    """Backfill quarterly ETF checkpoints from SEC XBRL. Returns status."""
+    """Backfill quarterly ETF checkpoints from SEC XBRL. Returns status.
+
+    Design: quarterly XBRL points (shares/AUM/NAV) are written into the SAME
+    daily series (cycle:etf-{ticker}-{metric}) that ishares_etf writes daily,
+    but ONLY for dates before the first daily point. This backfills history
+    from before daily collection started without ever overwriting daily data
+    on overlapping quarter-end dates.
+    """
     from collector.store import Store
     assert isinstance(store, Store)
     headers = {"User-Agent": user_agent}
@@ -122,47 +129,19 @@ async def fetch_sec_xbrl_etf(store, get_text: GetText,
             continue
         hist = extract_history(payload)
         for metric, pts in hist.items():
+            if not pts:
+                continue
+            sid = f"cycle:etf-{ticker}-{metric}"
+            existing = store.points(sid)
+            if existing:
+                first_daily = min(existing)
+                # Only backfill dates before daily coverage starts; never
+                # overwrite daily points on overlapping quarter-ends.
+                pts = [p for p in pts if p[0] < first_daily]
             if pts:
-                # Quarterly XBRL checkpoints live in their own -q- namespace so they
-                # never collide with the daily iShares series (cycle:etf-{t}-{metric}).
-                store.upsert_points(f"cycle:etf-{ticker}-q-{metric}", pts)
+                store.upsert_points(sid, pts)
                 pts_total += len(pts)
         done += 1
         await asyncio.sleep(0.3)  # SEC fair access: well under 10 req/s
     return (f"sec_xbrl_etf: {done}/{len(ETF_CIKS)} funds, "
             f"{pts_total} quarterly checkpoints, {fell} failed")
-
-
-async def repair_etf_collision(store, get_text: GetText,
-                               user_agent: str) -> dict:
-    """One-time repair: remove quarterly XBRL points that were written into the
-    daily iShares series (cycle:etf-{t}-{metric}) before the -q- namespace fix.
-    Only deletes a date when the stored value exactly matches the XBRL value,
-    so legitimate daily iShares points are never touched. Returns a report."""
-    from collector.store import Store
-    assert isinstance(store, Store)
-    headers = {"User-Agent": user_agent}
-    report: dict = {"tickers": {}, "total_deleted": 0, "failed": []}
-    for ticker, cik in ETF_CIKS.items():
-        try:
-            payload = json.loads(
-                await get_text(FACTS_URL.format(cik10=cik), headers=headers))
-        except Exception as exc:  # noqa: BLE001
-            report["failed"].append(ticker)
-            continue
-        hist = extract_history(payload)
-        deleted_here = 0
-        for metric, pts in hist.items():
-            if not pts:
-                continue
-            sid = f"cycle:etf-{ticker}-{metric}"
-            daily = store.points(sid)
-            # Only delete dates where the stored value IS the XBRL value.
-            kill = [d for d, v in pts
-                    if d in daily and daily[d] == v]
-            if kill:
-                deleted_here += store.delete_points(sid, kill)
-        report["tickers"][ticker] = deleted_here
-        report["total_deleted"] += deleted_here
-        await asyncio.sleep(0.3)
-    return report

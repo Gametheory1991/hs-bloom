@@ -347,15 +347,14 @@ def create_app(store: Store, cfg: Config) -> FastAPI:
         elif series_id.startswith("etf:"):
             # ETF snapshots: etf:{TICKER}:{metric} — aum ($), nav ($),
             # shares (sh), price ($), expense (%), divyield (%).
-            # Written daily by the ishares_etf job. Quarterly XBRL checkpoints
-            # use the q- prefix (etf:{TICKER}:q-aum etc.) to avoid collisions.
+            # Written daily by the ishares_etf job; quarterly XBRL backfill
+            # fills pre-daily history in the same series (sec_xbrl_etf).
             _em = series_id.split(":", 2)
             key = f"cycle:etf-{_em[1]}-{_em[2]}" if len(_em) == 3 else None
             if not key:
                 raise HTTPException(status_code=404, detail=f"unknown series: {series_id}")
             points = store.points(key)
             _mu = {"aum": "$", "nav": "$", "shares": "sh",
-                   "q-aum": "$", "q-nav": "$", "q-shares": "sh",
                    "flow7d": "$", "price": "$", "expense": "%",
                    "divyield": "%"}.get(_em[2], "")
             name, unit = f"{_em[1]} {_em[2]}", _mu
@@ -1098,13 +1097,15 @@ def create_app(store: Store, cfg: Config) -> FastAPI:
             raise HTTPException(status_code=404, detail="no briefcheck report yet")
         return doc.payload
 
-    @app.post("/api/admin/repair-etf-collision")
-    async def repair_etf_collision_endpoint(request: Request) -> dict:
-        """One-time repair: remove quarterly XBRL points contaminating the daily
-        iShares ETF series. Gate-protected (Bearer). Returns deletion report."""
+    @app.post("/api/admin/run-xbrl-backfill")
+    async def run_xbrl_backfill(request: Request) -> dict:
+        """One-time: re-run the SEC XBRL quarterly backfill to restore history.
+        Gate-protected. Remove after use."""
         import httpx
-        from collector.fetchers.sec_xbrl_etf import repair_etf_collision
-        ua = os.environ.get("SEC_USER_AGENT", "hs-bloom/1.0 contact@example.com")
+        from collector.fetchers.sec_xbrl_etf import fetch_sec_xbrl_etf
+        ua = os.environ.get("SEC_USER_AGENT", "")
+        if not ua:
+            raise HTTPException(status_code=500, detail="SEC_USER_AGENT not set")
 
         async def _get_text(url: str, headers: dict | None = None) -> str:
             async with httpx.AsyncClient(timeout=30) as client:
@@ -1112,9 +1113,8 @@ def create_app(store: Store, cfg: Config) -> FastAPI:
                 r.raise_for_status()
                 return r.text
 
-        report = await repair_etf_collision(store, _get_text, ua)
-        return report
-
+        result = await fetch_sec_xbrl_etf(store, _get_text, ua)
+        return {"result": result}
     # ---- built-in usage analytics (no third-party service) ----------------
     @app.middleware("http")
     async def usage_log(request: Request, call_next):  # noqa: ANN001,ANN202
