@@ -38,7 +38,10 @@ async def run_fetcher(name: str, store: Store, fn: FetchFn) -> None:
             doc = store.doc(JOB_RUNS_DOC)
             runs = dict(doc.payload) if doc and isinstance(doc.payload, dict) else {}
             runs[name] = _now()
-            store.put_doc(JOB_RUNS_DOC, runs, "scheduler")
+            # quiet write: a heartbeat must not invalidate the dashboard cache
+            # (a data_version bump on every job success defeated memoization).
+            # getattr keeps duck-typed test stores without the method working.
+            getattr(store, "put_doc_quiet", store.put_doc)(JOB_RUNS_DOC, runs, "scheduler")
         except Exception as exc:  # noqa: BLE001 — isolation is the contract
             msg = f"{type(exc).__name__}: {exc}"
             log.warning("fetcher %s failed: %s", name, msg, exc_info=exc)

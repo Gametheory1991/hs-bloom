@@ -365,7 +365,9 @@ export async function renderPulse() {
   let dash = {};
   let scoreRows = [];
   try {
-    dash = await getDashboard();
+    // Pulse reads only pulse-hub panels (movers, radar); the unfiltered
+    // payload re-downloaded every hub's panels on every tick.
+    dash = await getDashboard("pulse");
     if (req !== pulseReq) return;
     scoreRows = (await getScorecard()).rows ?? [];
     if (req !== pulseReq) return;

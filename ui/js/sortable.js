@@ -64,6 +64,13 @@ export function parseSortVal(raw, forceType) {
     if (type === "date") return { v: null, t: "" };
   }
 
+  // Delta cell "nominal (pct%)", e.g. "+5.20 (+1.2%)" or "+1.2B (−0.4%)":
+  // standing rule — sort on the % change, not the nominal. "(—)" = no %.
+  if (type === "num" || type === "auto") {
+    const pm = text.match(/\(\s*([+-]?(?:\d[\d,]*\.?\d*|\.\d+))\s*%\s*\)\s*$/);
+    if (pm) return { v: parseFloat(pm[1].replace(/,/g, "")), t: text.toLowerCase() };
+    if (/\(\s*(—|–|-|n\/a)\s*\)\s*$/i.test(text) && /^[+-]?[$\d.]/.test(text)) return { v: null, t: "" };
+  }
   // Number: strip $, commas, %, bp, and magnitude suffixes.
   let t = text;
   let mult = 1;

@@ -15,6 +15,7 @@ dependencies = [
     "xlrd>=2",  # AAII sentiment survey ships as legacy .xls
     "lxml>=5",  # finance_dirs.py scrapes FINRA ATS/MPID lists
     "pydantic>=2",  # api.py imports BaseModel directly; not only via fastapi
+    "starlette>=0.36",  # gate.py imports BaseHTTPMiddleware directly; version is still governed by fastapi's pin
     "google-auth>=2.30",  # fetchers/imf.py: Sheets API service-account JWT (no google-api-python-client; REST via httpx)
     "python-multipart>=0.0.9",  # Starlette request.form() for the /login passphrase POST
 ]

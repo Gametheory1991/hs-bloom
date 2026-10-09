@@ -273,13 +273,19 @@ class Store:
 
     # -- docs -----------------------------------------------------------
     def put_doc(self, key: str, payload: Any, source: str) -> None:
+        self.put_doc_quiet(key, payload, source)
+        self._bump_data_version()
+
+    def put_doc_quiet(self, key: str, payload: Any, source: str) -> None:
+        """put_doc without bumping data_version — for bookkeeping docs the
+        dashboard never renders (e.g. the scheduler's job_runs heartbeat),
+        so they don't invalidate the dashboard cache on every job run."""
         self._execute(
             "INSERT INTO docs(key, payload, updated_at, source) VALUES(?,?,?,?) "
             "ON CONFLICT(key) DO UPDATE SET payload=excluded.payload, "
             "updated_at=excluded.updated_at, source=excluded.source",
             (key, json.dumps(payload), _now(), source),
         )
-        self._bump_data_version()
 
     def doc(self, key: str) -> Doc | None:
         rows = self._execute(

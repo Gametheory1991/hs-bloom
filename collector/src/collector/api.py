@@ -126,9 +126,11 @@ _DASH_CACHE_TTL = 120.0
 HUB_PANELS: dict[str, set[str]] = {
     "pulse": {"insights", "radar", "riskmap", "movers", "cycle", "equity", "bonds", "macro"},
     "macro": {"insights", "macro", "auctions", "bonds", "cycle", "usaspending", "worldbank", "refs"},
-    "markets": {"insights", "equity", "movers", "voldash", "xcorr", "gse", "options", "defi", "midnight", "morpho", "refs"},
+    # "cycle" in markets/structure: markets/etfs (#cycle-etf) and the
+    # structure/trace STRUCT block (#cycle-struct) render from the cycle panel.
+    "markets": {"insights", "equity", "movers", "voldash", "xcorr", "gse", "options", "defi", "midnight", "morpho", "refs", "cycle"},
     "positioning": {"insights", "tff", "predict", "riskmap", "finnhub", "cycle"},
-    "structure": {"insights", "finra", "factbook", "ai_flow", "ai_financials", "ms_flow", "bank_flow", "tech_flow", "vendor_flow", "etf_flow", "crypto_flow", "pc_flow", "chain_financials", "tsv", "hyper", "etfflows", "etfholders", "finance"},
+    "structure": {"insights", "cycle", "finra","factbook", "ai_flow", "ai_financials", "ms_flow", "bank_flow", "tech_flow", "vendor_flow", "etf_flow", "crypto_flow", "pc_flow", "chain_financials", "tsv", "hyper", "etfflows", "etfholders", "finance"},
     "desk": {"insights", "news"},
     "regwatch": {"insights", "regwatch", "news"},
     "equity": {"insights", "shortinterest", "finra", "tape", "otc", "equity"},
@@ -138,8 +140,9 @@ HUB_PANELS: dict[str, set[str]] = {
 def _dashboard_panels(store: Store, cfg: Config) -> tuple[int, dict]:
     """(data_version, panels dict), rebuilding only when data changed.
 
-    Torn-read guard: if a write lands mid-build, the fresh build is served
-    but NOT cached, so the next request rebuilds cleanly on the new version.
+    Torn-read guard: if a write lands mid-build, the build is cached under
+    the pre-build version, so at most one rebuild happens per TTL and the
+    next one picks up the newer data.
 
     TTL guard: a full build is at most _DASH_CACHE_TTL old before we even
     consider rebuilding. Without this, the constantly-churning data version
@@ -167,9 +170,12 @@ def _dashboard_panels(store: Store, cfg: Config) -> tuple[int, dict]:
             store, cfg.indexes, now=datetime.now(timezone.utc),
             cycle_series=cfg.cycle_series, cycle_tabs=cfg.cycle_tabs,
         )["panels"]
-        if store.data_version() == version:
-            _DASH_CACHE.update(version=version, panels=panels,
-                               built_at=time.monotonic())
+        # Cache even a torn build (a write landed mid-build). It is tagged
+        # with the pre-build version, so the next post-TTL request sees the
+        # newer version and rebuilds. Not caching it meant every request
+        # rebuilt while writes kept landing — the post-deploy rebuild storm.
+        _DASH_CACHE.update(version=version, panels=panels,
+                           built_at=time.monotonic())
     return version, panels
 
 
