@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from collector.fetchers.cboe import fetch_ratio_history, parse_daily
+from collector.fetchers.cboe import fetch_daily_ratios, fetch_ratio_history, parse_daily
 
 FIXTURE = (Path(__file__).parent / "fixtures" / "cboe_daily.json").read_text()
 
@@ -16,6 +16,31 @@ def test_parse_daily_extracts_named_ratio():
 def test_parse_daily_unknown_name_raises():
     with pytest.raises(ValueError):
         parse_daily(FIXTURE, "NO SUCH RATIO")
+
+
+async def test_fetch_daily_ratios_one_file_for_all_ratios():
+    seen = []
+
+    async def fake_get(url, params=None, headers=None):
+        seen.append(url)
+        return FIXTURE
+
+    # Sat 2026-08-22: skips the weekend, one fetch of Friday's file
+    out = await fetch_daily_ratios(
+        ["TOTAL PUT/CALL RATIO", "EQUITY PUT/CALL RATIO"],
+        fake_get, today=date(2026, 8, 22),
+    )
+    assert len(seen) == 1 and "2026-08-21_daily_options" in seen[0]
+    assert out["TOTAL PUT/CALL RATIO"] == (date(2026, 8, 21), 0.72)
+    assert out["EQUITY PUT/CALL RATIO"] == (date(2026, 8, 21), 0.51)
+
+
+async def test_fetch_daily_ratios_missing_ratio_raises():
+    async def fake_get(url, params=None, headers=None):
+        return FIXTURE
+
+    with pytest.raises(ValueError, match="missing ratio"):
+        await fetch_daily_ratios(["NO SUCH RATIO"], fake_get, today=date(2026, 8, 24))
 
 
 async def test_fetch_ratio_history_walks_weekdays_and_skips_holidays():

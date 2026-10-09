@@ -187,3 +187,96 @@ async def test_fetch_cycle_retries_yahoo_on_429(tmp_path):
     assert calls["n"] == 2  # one retry happened
     assert 15 in sleeps  # backoff was taken
     assert store.points("cycle:spx") != {}
+
+
+async def test_cboe_ratios_share_one_daily_file_when_history_populated(tmp_path):
+    store = Store(tmp_path / "t.db")
+    urls = []
+
+    async def get_text(url, params=None, headers=None):
+        urls.append(url)
+        return CBOE
+
+    async def get_bytes(url, params=None, headers=None):
+        raise AssertionError("unused")
+
+    series = [
+        CycleSeriesCfg(id="pc1", name="PC1", unit="ratio", cboe="TOTAL PUT/CALL RATIO"),
+        CycleSeriesCfg(id="pc2", name="PC2", unit="ratio", cboe="EQUITY PUT/CALL RATIO"),
+    ]
+    # populate: > CBOE_THIN_POINTS stored points so both series take the
+    # incremental (one-file) path instead of the 30-day backfill walk
+    from datetime import timedelta
+
+    base = date(2026, 6, 1)
+    pts = [(base + timedelta(days=i), 0.7) for i in range(25)]
+    store.upsert_points("cycle:pc1", pts)
+    store.upsert_points("cycle:pc2", pts)
+
+    label = await fetch_cycle(series, store, "k", get_text, get_bytes,
+                              today=date(2026, 8, 24))
+    assert label == "cycle"
+    cboe_urls = [u for u in urls if "cdn.cboe.com" in u]
+    assert len(cboe_urls) == 1  # one file, not one walk per ratio
+    assert store.points("cycle:pc1")[date(2026, 8, 24)] == 0.72
+    assert store.points("cycle:pc2")[date(2026, 8, 24)] == 0.51
+
+
+async def test_cboe_thin_history_falls_back_to_backfill_walk(tmp_path):
+    store = Store(tmp_path / "t.db")
+    urls = []
+
+    async def get_text(url, params=None, headers=None):
+        urls.append(url)
+        return CBOE
+
+    async def get_bytes(url, params=None, headers=None):
+        raise AssertionError("unused")
+
+    series = [
+        CycleSeriesCfg(id="pc1", name="PC1", unit="ratio", cboe="TOTAL PUT/CALL RATIO"),
+    ]
+    label = await fetch_cycle(series, store, "k", get_text, get_bytes,
+                              today=date(2026, 8, 24))
+    assert label == "cycle"
+    cboe_urls = [u for u in urls if "cdn.cboe.com" in u]
+    # 1 daily-file probe + 30-day backfill walk (22 weekdays in 2026-08)
+    assert len(cboe_urls) > 10
+    assert len(store.points("cycle:pc1")) >= 20  # full history bar preserved
+
+
+async def test_yahoo_uses_5d_incremental_once_populated(tmp_path):
+    store = Store(tmp_path / "t.db")
+    params_seen = []
+
+    async def get_text(url, params=None, headers=None):
+        params_seen.append(params or {})
+        return YAHOO
+
+    async def get_bytes(url, params=None, headers=None):
+        raise AssertionError("unused")
+
+    from datetime import timedelta
+
+    base = date(2025, 1, 2)
+    store.upsert_points("cycle:spx", [(base + timedelta(days=i), 6000.0) for i in range(150)])
+    series = [CycleSeriesCfg(id="spx", name="SPX", unit="idx", yahoo="^GSPC")]
+    await fetch_cycle(series, store, "k", get_text, get_bytes)
+    assert params_seen and all(p.get("range") == "5d" for p in params_seen)
+
+
+async def test_yahoo_bootstrap_uses_10y_when_thin(tmp_path):
+    store = Store(tmp_path / "t.db")
+    params_seen = []
+
+    async def get_text(url, params=None, headers=None):
+        params_seen.append(params or {})
+        return YAHOO
+
+    async def get_bytes(url, params=None, headers=None):
+        raise AssertionError("unused")
+
+    series = [CycleSeriesCfg(id="spx", name="SPX", unit="idx", yahoo="^GSPC")]
+    await fetch_cycle(series, store, "k", get_text, get_bytes)
+    assert params_seen and all(p.get("range") == "10y" for p in params_seen)
+    assert store.points("cycle:spx") != {}
