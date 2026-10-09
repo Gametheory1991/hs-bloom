@@ -70,6 +70,7 @@ SERIES = {
     "FTD Shares": ("ftd-share-count", "sh", "{:,.0f}", 1, False),
     "STLFSI": ("stlfsi", "idx", "{:.2f}", 1, False),
     "KRE": ("etf-kre", "px", "{:.1f}", 1, False),
+    "IAI": ("etf-iai", "px", "{:.1f}", 1, False),
 }
 
 MATRICES = ["lvl7", "lvl30", "vel7", "vel30", "velz7", "velz30", "lvlz1y", "lvlzfull"]
