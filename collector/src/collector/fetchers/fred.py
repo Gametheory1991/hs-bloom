@@ -1,4 +1,10 @@
-"""FRED observations API. Used for macro series history and the US 10Y yield."""
+"""FRED observations API. Used for macro series history and the US 10Y yield.
+
+Series whose config carries ``fanout_cycle`` are pulled ONCE here and the
+points are upserted to both ``macro:<id>`` and each ``cycle:<cid>`` — the
+matching cycle_series entries are marked external so the cycle job skips
+them instead of pulling the same FRED ids a second time.
+"""
 from __future__ import annotations
 
 import json
@@ -37,7 +43,12 @@ async def fetch_macro_history(
     errors: list[str] = []
     for cfg in series:
         try:
-            store.upsert_points(f"macro:{cfg.id}", await fetch_series(cfg.fred, api_key, get_text))
+            pts = await fetch_series(cfg.fred, api_key, get_text)
+            store.upsert_points(f"macro:{cfg.id}", pts)
+            # Fan out: one FRED pull feeds both namespaces. The cycle job
+            # skips these ids (external: true in cycle_series).
+            for cid in cfg.fanout_cycle:
+                store.upsert_points(f"cycle:{cid}", pts)
         except Exception as exc:  # noqa: BLE001 — per-series isolation
             errors.append(f"{cfg.id}: {exc}")
     if errors:

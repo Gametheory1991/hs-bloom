@@ -14,6 +14,46 @@ from collector.fetchers import aaii, cboe, cftc, dbnomics, eia, fred, oecd, ofr,
 from collector.http import GetBytes, GetText
 from collector.store import Store
 
+# Thin-history bootstrap thresholds: a full pull runs only when the stored
+# series has fewer points than this (preserves the full-history bar); once
+# populated, incremental pulls keep it topped up idempotently.
+CBOE_THIN_POINTS = 20   # ~one month of weekdays; 30d walk yields ~22
+YAHOO_THIN_POINTS = 100  # ~5 months of daily closes
+
+
+def _yahoo_range(cfg: CycleSeriesCfg, store: Store | None) -> str:
+    """Incremental '5d' once the series is populated; full '10y' bootstrap
+    when stored history is thin/missing (preserves the full-history bar)."""
+    if store is not None:
+        try:
+            if len(store.points(f"cycle:{cfg.id}")) >= YAHOO_THIN_POINTS:
+                return "5d"
+        except Exception:  # noqa: BLE001 — degrade to bootstrap on store errors
+            pass
+    return "10y"
+
+
+async def _cboe_points(
+    cfg: CycleSeriesCfg,
+    get_text: GetText,
+    store: Store | None,
+    cboe_daily: dict[str, tuple[date, float]] | None,
+    today: date | None,
+) -> list[tuple[date, float]]:
+    """Derive this ratio from the once-per-run daily file; run the 30-day
+    backfill walk only when stored history is thin/missing (the daily-file
+    fetch may also have failed — the walk is the fallback for that)."""
+    daily = (cboe_daily or {}).get(cfg.cboe)
+    thin = True
+    if store is not None:
+        try:
+            thin = len(store.points(f"cycle:{cfg.id}")) < CBOE_THIN_POINTS
+        except Exception:  # noqa: BLE001 — degrade to bootstrap on store errors
+            thin = True
+    if thin or daily is None:
+        return await cboe.fetch_ratio_history(cfg.cboe, get_text, today=today)
+    return [daily]
+
 
 async def _fred_pair(
     ids: list[str], fred_api_key: str, get_text: GetText, op: str
@@ -52,6 +92,7 @@ async def _fetch_one(
     get_bytes: GetBytes,
     store: Store | None = None,
     today: date | None = None,
+    cboe_daily: dict[str, tuple[date, float]] | None = None,
 ) -> list[tuple[date, float]]:
     if cfg.store:
         # Externally maintained series (written by another job, e.g. the
@@ -70,17 +111,18 @@ async def _fetch_one(
     if cfg.cftc_oi:
         return await cftc.fetch_open_interest(cfg.cftc_oi, get_text)
     if cfg.cboe:
-        return await cboe.fetch_ratio_history(cfg.cboe, get_text, today=today)
+        return await _cboe_points(cfg, get_text, store, cboe_daily, today)
     if cfg.aaii:
         return await aaii.fetch_spread(get_bytes)
     if cfg.ofr:
         return await ofr.fetch_mnemonic(cfg.ofr, get_text)
     if cfg.yahoo:
-        return (await yahoo.fetch_chart(cfg.yahoo, get_text, range_="10y")).closes
+        return (await yahoo.fetch_chart(cfg.yahoo, get_text, range_=_yahoo_range(cfg, store))).closes
     if cfg.yahoo_ratio:
+        rng = _yahoo_range(cfg, store)
         num, den = cfg.yahoo_ratio
-        a = await yahoo.fetch_chart(num, get_text, range_="10y")
-        b = await yahoo.fetch_chart(den, get_text, range_="10y")
+        a = await yahoo.fetch_chart(num, get_text, range_=rng)
+        b = await yahoo.fetch_chart(den, get_text, range_=rng)
         return yahoo.ratio_points(a.closes, b.closes)
     if cfg.fred_spread:
         return await _fred_pair(cfg.fred_spread, fred_api_key, get_text, "spread")
@@ -103,6 +145,17 @@ async def fetch_cycle(
 ) -> str:
     errors: list[str] = []
     last_was_yahoo = False
+    # CBOE ratios all live in the SAME daily file: fetch it once per run and
+    # fan out to the 6 ratio series below (the 30-day backfill walk only runs
+    # for series whose stored history is thin/missing).
+    cboe_daily: dict[str, tuple[date, float]] = {}
+    cboe_cfgs = [c for c in series if not c.external and c.cboe]
+    if cboe_cfgs:
+        try:
+            cboe_daily = await cboe.fetch_daily_ratios(
+                sorted({c.cboe for c in cboe_cfgs}), get_text, today=today)
+        except Exception as exc:  # noqa: BLE001 — per-series fallback walk covers it
+            log.warning("cycle: cboe daily-file fetch failed, falling back to per-series walks: %s", exc)
     for cfg in series:
         if cfg.external:
             continue  # a dedicated job owns cycle:<id> for these
@@ -113,13 +166,15 @@ async def fetch_cycle(
             await asyncio.sleep(0.6)
         last_was_yahoo = is_yahoo
         try:
-            pts = await _fetch_one(cfg, fred_api_key, get_text, get_bytes, store, today)
+            pts = await _fetch_one(cfg, fred_api_key, get_text, get_bytes, store, today,
+                                   cboe_daily=cboe_daily)
         except Exception as exc:  # noqa: BLE001 — per-series isolation
             # one retry on rate-limit after a backoff, before recording failure
             if "HTTP 429" in str(exc):
                 await asyncio.sleep(15)
                 try:
-                    pts = await _fetch_one(cfg, fred_api_key, get_text, get_bytes, store, today)
+                    pts = await _fetch_one(cfg, fred_api_key, get_text, get_bytes, store, today,
+                                           cboe_daily=cboe_daily)
                 except Exception as exc2:  # noqa: BLE001
                     errors.append(f"{cfg.id}: {exc2}")
                     continue

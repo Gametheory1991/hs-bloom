@@ -28,7 +28,7 @@ panel data (rolling ~300-week history per curated row) so the UI grid loads
 in one fetch instead of a 150-series fan-out.
 
 OFR asks clients not to poll more than daily; the series are weekly, so the
-job runs daily and upserts whatever is new (idempotent).
+job runs weekly and upserts whatever is new (idempotent).
 """
 from __future__ import annotations
 
@@ -125,7 +125,7 @@ async def _fetch_mnemonics(get_text: GetText) -> list[dict]:
 
 
 async def fetch_ofr_tff(store: Store, get_text: GetText) -> str:
-    """Daily-max job: full history for all 153 TFF mnemonics + derived nets.
+    """Weekly job: full history for all 153 TFF mnemonics + derived nets.
 
     Stored as cycle:tff-<slug>. Each mnemonic fetched independently — one
     bad mnemonic must not starve the others. Doc 'tff' carries curated panel

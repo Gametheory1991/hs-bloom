@@ -252,3 +252,91 @@ async def test_fetch_all_cached_no_network():
     assert "SPY" in agg.payload["symbols"]
     # series points written
     assert store.series["cycle:etfhold-SPY-n"][date(2026, 6, 30)] == 1.0
+
+
+# ---------------------------------------------------------------------------
+# FIX 12(b): guards against storing 200-with-error responses as zero-holder
+# quarters. fetch_filer_quarter_holdings must return None (skip, never
+# store) when the filing XML is an error payload or parses to zero rows,
+# and when the submissions JSON is an error envelope.
+# ---------------------------------------------------------------------------
+
+def _filing_fake_get(monkeypatch, tmp_path, xml_body, subs_body=None):
+    """Stub get_text for fetch_filer_quarter_holdings: submissions JSON
+    (13F-HR with reportDate == 2026-06-30, i.e. 2026 Q2) + index.json +
+    the given XML body."""
+    monkeypatch.setenv("EDGAR_XML_CACHE_DIR", str(tmp_path / "xml-cache"))
+    subs = subs_body if subs_body is not None else json.dumps({
+        "filings": {"recent": {
+            "form": ["13F-HR", "10-Q"],
+            "reportDate": ["2026-06-30", "2026-06-30"],
+            "accessionNumber": ["0001193125-26-352200",
+                                "0000000000-26-000001"],
+            "filingDate": ["2026-08-14", "2026-07-30"],
+        }}
+    })
+    index = json.dumps({"directory": {"item": [
+        {"name": "primary_doc.xml"}, {"name": "info.xml"}]}})
+
+    async def fake_get(url, params=None, headers=None):
+        if "data.sec.gov" in url:
+            return subs
+        if url.endswith("index.json"):
+            return index
+        assert url.endswith("/info.xml")
+        return xml_body
+
+    async def _noop(_):
+        return None
+
+    monkeypatch.setattr(e13.asyncio, "sleep", _noop)
+    return fake_get
+
+
+async def test_quarter_holdings_happy_path(tmp_path, monkeypatch):
+    fake_get = _filing_fake_get(monkeypatch, tmp_path, SAMPLE_XML)
+    payload = await e13.fetch_filer_quarter_holdings(
+        "1067983", "Berkshire Hathaway", 2026, 2, fake_get)
+    assert payload is not None
+    assert payload["accession"] == "0001193125-26-352200"
+    assert len(payload["holdings"]) == 3
+
+
+async def test_quarter_holdings_rejects_json_error_xml(tmp_path, monkeypatch):
+    """A 200-with-JSON-error body for the filing XML must not be stored:
+    the shared cache raises, so the filer is skipped (never zero-stored)."""
+    fake_get = _filing_fake_get(monkeypatch, tmp_path,
+                                '{"error": "Request blocked", "code": 403}')
+    with pytest.raises(ValueError, match="error payload"):
+        await e13.fetch_filer_quarter_holdings(
+            "1067983", "Berkshire Hathaway", 2026, 2, fake_get)
+
+
+async def test_quarter_holdings_rejects_html_error_xml(tmp_path, monkeypatch):
+    fake_get = _filing_fake_get(
+        monkeypatch, tmp_path,
+        "<!DOCTYPE html><html><body>Access Denied</body></html>")
+    with pytest.raises(ValueError, match="error payload"):
+        await e13.fetch_filer_quarter_holdings(
+            "1067983", "Berkshire Hathaway", 2026, 2, fake_get)
+
+
+async def test_quarter_holdings_skips_empty_infotable(tmp_path, monkeypatch):
+    """Valid XML with zero infoTable rows -> None (skip, never store a
+    fabricated zero-holder quarter; the filer is retried next run)."""
+    empty = ('<?xml version="1.0" encoding="UTF-8"?>'
+             '<informationTable xmlns="http://www.sec.gov/edgar/document/'
+             'thirteenf/informationtable"></informationTable>')
+    fake_get = _filing_fake_get(monkeypatch, tmp_path, empty)
+    assert await e13.fetch_filer_quarter_holdings(
+        "1067983", "Berkshire Hathaway", 2026, 2, fake_get) is None
+
+
+async def test_quarter_holdings_rejects_error_submissions_json(tmp_path,
+                                                              monkeypatch):
+    """A 200-with-error-JSON submissions body -> None (skip, not crash)."""
+    fake_get = _filing_fake_get(
+        monkeypatch, tmp_path, SAMPLE_XML,
+        subs_body='{"message": "rate limit exceeded", "status": 429}')
+    assert await e13.fetch_filer_quarter_holdings(
+        "1067983", "Berkshire Hathaway", 2026, 2, fake_get) is None

@@ -22,7 +22,7 @@ def test_load_real_config():
     # UK via FRED monthly OECD MEI is fine (the old exclusion was about
     # scraping the BoE IADB daily CSV, whose path robots.txt disallows).
     assert any(b.country == "UK" and b.fred == "IRLTLT01GBM156N" for b in cfg.bonds)
-    assert cfg.cadences["equity"] == 300
+    assert cfg.cadences["equity"] == 900
     assert cfg.max_news == 15
     ids = [s.id for s in cfg.series]
     assert "us-cpi-yoy" in ids and "ez-hicp-yoy" in ids

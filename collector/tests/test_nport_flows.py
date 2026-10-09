@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from collector.fetchers import nport_flows
+from collector.fetchers import nport_cache, nport_flows
 from collector.fetchers.nport_flows import (
     derive_net_flow,
     parse_nport_flows_zip,
@@ -134,12 +134,11 @@ async def test_fetch_nport_flows_stores_per_fund_and_aggregate(tmp_path, monkeyp
                        SALES_FLOW_MON3="200", REDEMPTION_FLOW_MON3="50")]
     zip_path = make_zip(tmp_path, subs, infos)
 
-    async def fake_download(url, dest, headers):
-        assert "2026q2_nport.zip" in url  # probe newest-first from April 2026
-        Path(dest).write_bytes(Path(zip_path).read_bytes())
-        return 60_000_000
+    async def fake_acquire(year, q, headers):
+        assert (year, q) == (2026, 2)  # probe newest-first from April 2026
+        return zip_path
 
-    monkeypatch.setattr(nport_flows, "_download", fake_download)
+    monkeypatch.setattr(nport_cache, "nport_zip_path", fake_acquire)
 
     class Cfg:
         user_agent = "test-agent"

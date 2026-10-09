@@ -102,7 +102,9 @@ def test_thirteenf_parse_holdings_aggregates_issuer_and_skips_bad_row():
     assert apple["cusip"] == "037833100"  # CUSIP of the largest row kept
 
 
-async def test_thirteenf_fetch_filer_flow(monkeypatch):
+async def test_thirteenf_fetch_filer_flow(monkeypatch, tmp_path):
+    # isolate the shared EDGAR XML cache so the run is hermetic
+    monkeypatch.setenv("EDGAR_XML_CACHE_DIR", str(tmp_path / "xml-cache"))
     subs = (FIX / "thirteenf_submissions.json").read_text()
     index = (FIX / "thirteenf_index.json").read_text()
     xml = (FIX / "thirteenf_infotable.xml").read_text()

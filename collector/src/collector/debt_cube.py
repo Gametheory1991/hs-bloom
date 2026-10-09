@@ -27,6 +27,7 @@ import logging
 from datetime import date
 
 from collector.store import Store
+from collector.fetchers.mspd import total_public_debt_outstanding
 
 log = logging.getLogger(__name__)
 
@@ -150,10 +151,11 @@ def query_cube(
 
 
 def _table1_total(table1_rows: list[dict]) -> float:
-    for r in table1_rows:
-        if str(r.get("security_class") or "").lower() == "total public debt outstanding":
-            return float(r["total_mn"])
-    raise RuntimeError("mspd_table1 doc missing 'Total Public Debt Outstanding' row")
+    # Resilient lookup shared with the mspd fetcher: exact match on the
+    # "Total Public Debt Outstanding" row, then fuzzy match, then the
+    # Marketable + Nonmarketable sum as a last resort. Behavior is
+    # identical to the old exact-match when the literal row exists.
+    return total_public_debt_outstanding(table1_rows)
 
 
 def refresh_debt_cube(store: Store) -> str:

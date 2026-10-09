@@ -114,3 +114,39 @@ async def test_all_failed_raises(tmp_path):
         raise AssertionError("expected RuntimeError")
     except RuntimeError as exc:
         assert "all bonds failed" in str(exc)
+
+
+async def test_shared_fred_id_fetched_once_and_fanned_out(tmp_path):
+    store = Store(tmp_path / "t.db")
+    calls = []
+
+    async def counting_get(url, params=None, headers=None):
+        calls.append(url)
+        return FRED_JSON
+
+    # DE/FR/IT policy rates all share ECBDFR: one upstream fetch, three rows
+    cbs = [CbRateCfg(country=c, label="ECB", fred="ECBDFR")
+           for c in ("DE", "FR", "IT")]
+    label = await run([], store, cb_rates=cbs, get=counting_get)
+    assert label == "fred"
+    fred_calls = [u for u in calls if "stlouisfed" in u]
+    assert len(fred_calls) == 1  # not one fetch per row
+    quotes = store.doc("bond_quotes").payload
+    for c in ("DE", "FR", "IT"):
+        assert quotes[f"{c}CB"]["yield_pct"] == 4.12
+        assert store.points(f"cb:{c}")  # each row got the shared series
+
+
+async def test_fresh_ids_skipped_on_second_run(tmp_path):
+    store = Store(tmp_path / "t.db")
+    label = await run([make_cfg(country="US", fred="DGS10", bundesbank=None)], store)
+    assert label == "fred"
+
+    async def no_network(url, params=None, headers=None):
+        raise AssertionError("no HTTP expected on a fresh run")
+
+    # second run immediately after: id already pulled, no re-fetch
+    label = await run([make_cfg(country="US", fred="DGS10", bundesbank=None)],
+                      store, get=no_network)
+    assert label == "bonds (fresh)"
+    assert store.doc("bond_quotes").payload["US10Y"]["yield_pct"] == 4.12

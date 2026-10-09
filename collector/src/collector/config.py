@@ -38,6 +38,11 @@ class SeriesCfg:
     fred: str
     unit: str
     transform: str
+    # Extra series ids (resolved as cycle:<id>) that receive the same
+    # points from this FRED pull, so one pull can feed both the macro and
+    # the cycle namespaces. The cycle_series entries for these ids are
+    # marked external: true (the cycle job skips them).
+    fanout_cycle: list[str] = field(default_factory=list)
 
 
 @dataclass(frozen=True)

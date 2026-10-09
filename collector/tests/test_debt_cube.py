@@ -19,6 +19,22 @@ from collector.store import Store
 ASOF = "2026-08-31"
 
 
+def test_table1_total_reuses_mspd_resilient_lookup():
+    # identical when the literal row exists
+    assert debt_cube._table1_total(
+        [{"security_class": "Total Public Debt Outstanding", "total_mn": 3700.0}]
+    ) == 3700.0
+    # renamed label: fuzzy match on "total public debt" instead of RuntimeError
+    assert debt_cube._table1_total(
+        [{"security_type": "Totals", "security_class": "Total Public Debt", "total_mn": 1000.0}]
+    ) == 1000.0
+    # total row gone entirely: Marketable + Nonmarketable sum fallback
+    assert debt_cube._table1_total([
+        {"security_type": "Marketable", "security_class": "x", "total_mn": 600.0},
+        {"security_type": "Nonmarketable", "security_class": "y", "total_mn": 400.0},
+    ]) == 1000.0
+
+
 def _m(cusip, product_raw, maturity, outstanding_mn, marketable=True):
     return {
         "cusip": cusip,

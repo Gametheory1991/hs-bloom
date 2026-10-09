@@ -111,3 +111,33 @@ async def test_one_call_per_symbol_when_yahoo_succeeds(tmp_path):
     label = await fetch_equity([cfg("SPX")], store, counting_get)
     assert label == "yahoo"
     assert len(calls) == 1
+
+
+async def test_yahoo_incremental_5d_when_history_populated(tmp_path):
+    store = Store(tmp_path / "t.db")
+    ranges = []
+
+    async def counting_get(url, params=None, headers=None):
+        ranges.append((params or {}).get("range"))
+        return YAHOO_SPX
+
+    from datetime import timedelta
+
+    base = date(2026, 1, 2)
+    store.upsert_points("idx:SPX", [(base + timedelta(days=i), 6000.0) for i in range(50)])
+    label = await fetch_equity([cfg("SPX")], store, counting_get)
+    assert label == "yahoo"
+    assert ranges == ["5d"]  # incremental, not the full-year pull
+
+
+async def test_yahoo_full_year_bootstrap_when_history_thin(tmp_path):
+    store = Store(tmp_path / "t.db")
+    ranges = []
+
+    async def counting_get(url, params=None, headers=None):
+        ranges.append((params or {}).get("range"))
+        return YAHOO_SPX
+
+    label = await fetch_equity([cfg("SPX")], store, counting_get)
+    assert label == "yahoo"
+    assert ranges == ["1y"]  # full-history bootstrap on thin/missing history

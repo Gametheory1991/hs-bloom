@@ -44,22 +44,17 @@ import calendar
 import csv
 import io
 import logging
-import os
-import tempfile
 import zipfile
 from datetime import date, datetime
 
-import httpx
-
 from collector.config import SecDataCfg
 from collector.dates import quarter_end
+from collector.fetchers import nport_cache
 from collector.fetchers.sec_ncen import REQUEST_GAP, probe_batches
 from collector.store import Store
 
 log = logging.getLogger(__name__)
 
-ZIP_URL = ("https://www.sec.gov/files/dera/data/form-n-port-data-sets/"
-           "{year}q{q}_nport.zip")
 SOURCE = "sec-nport-flows"
 
 SUBMISSION_TSV = "SUBMISSION.TSV"
@@ -226,26 +221,6 @@ def parse_nport_flows_zip(path: str) -> dict:
     }
 
 
-async def _download(url: str, dest: str, headers: dict) -> int:
-    """Stream a URL to a file in chunks; returns bytes written.
-
-    httpx directly (not the injected get_bytes): the N-PORT zip is ~420 MB
-    and must never sit fully in RAM. Not unit-testable (network); the parse
-    path above is the tested unit.
-    """
-    size = 0
-    async with httpx.AsyncClient(timeout=600, follow_redirects=True,
-                                 headers=headers) as client:
-        async with client.stream("GET", url) as resp:
-            if resp.status_code >= 400:
-                raise RuntimeError(f"HTTP {resp.status_code} for {url}")
-            with open(dest, "wb") as fh:
-                async for chunk in resp.aiter_bytes(1 << 20):  # 1 MB chunks
-                    fh.write(chunk)
-                    size += len(chunk)
-    return size
-
-
 async def fetch_nport_flows(
     cfg: SecDataCfg, store: Store, today: date | None = None,
     max_batches: int = 1,
@@ -263,15 +238,11 @@ async def fetch_nport_flows(
     for year, q in probe_batches(today):
         if done >= max_batches:
             break
-        url = ZIP_URL.format(year=year, q=q)
-        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".zip",
-                                          prefix="nport-flows-")
-        tmp.close()
         try:
-            size = await _download(url, tmp.name, headers)
-            if size < 50_000_000:
-                raise ValueError(f"suspiciously small ({size}B)")
-            parsed = parse_nport_flows_zip(tmp.name)
+            # Shared download: sec_nport.py caches this same ~420 MB zip;
+            # this call reuses it instead of downloading it a second time.
+            zip_path = await nport_cache.nport_zip_path(year, q, headers)
+            parsed = parse_nport_flows_zip(zip_path)
             asof = quarter_end(year, q)
             items: list[tuple[str, date, float]] = []
             for f in parsed["funds"]:
@@ -296,11 +267,6 @@ async def fetch_nport_flows(
         except Exception as exc:  # noqa: BLE001  -  probe next older quarter
             errors.append(f"{year}q{q}: {exc}")
             await asyncio.sleep(REQUEST_GAP)
-        finally:
-            try:
-                os.unlink(tmp.name)
-            except OSError:
-                pass
     if done == 0:
         raise RuntimeError("no N-PORT batch in probe window: " + "; ".join(errors[:4]))
     store.put_doc("sec_nport_flows", {

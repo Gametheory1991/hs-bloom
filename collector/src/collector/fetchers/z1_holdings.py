@@ -1,7 +1,12 @@
-"""FRED Z.1 holdings-by-holder fetcher (keyless FRED CSV).
+"""FRED Z.1 holdings-by-holder fetcher (FRED API, api-key authenticated).
 
-Endpoint: https://fred.stlouisfed.org/graph/fredgraph.csv?id=<ID>
-  -> DATE,VALUE  (quarters; "." = missing; levels in $ millions)
+Endpoint: https://api.stlouisfed.org/fred/series/observations?series_id=<ID>
+  (api_key + file_type=json; same auth pattern as fetchers.fred)
+  -> {"observations": [{"date": ..., "value": ...}]} ("." = missing;
+  quarterly levels in $ millions)
+
+Keyless fredgraph.csv is blocked from our hosts (FRED WAF), so this fetcher
+uses the API-key path exactly like fetch_macro_history.
 
 Series verified live 2026-10-05 from the Board's official DDP-FRED crosswalk
 (https://www.federalreserve.gov/data/documents/DDP-FRED%20Data%20Series%20Crosswalk.csv):
@@ -33,20 +38,18 @@ METHODOLOGY / double-counting traps — read before consuming these series:
 from __future__ import annotations
 
 import asyncio
-import csv
-import io
 import logging
 from datetime import date
 from typing import NamedTuple
 
+from collector.fetchers import fred as _fred
 from collector.http import GetText
 from collector.store import Store
 
 log = logging.getLogger(__name__)
 
-FRED_CSV = "https://fred.stlouisfed.org/graph/fredgraph.csv"
 SOURCE = "fred-z1"
-REQUEST_GAP = 0.5  # FRED keyless CSV is generous; a short polite gap is enough
+REQUEST_GAP = 0.5  # polite gap between series fetches
 
 
 class Z1Series(NamedTuple):
@@ -132,29 +135,17 @@ def store_key(cfg: Z1Series) -> str:
     return f"cycle:z1-{cfg.asset}-{cfg.sector}"
 
 
-def parse_fred_csv(text: str) -> list[tuple[date, float]]:
-    """Parse a fredgraph.csv payload (DATE,VALUE). "." rows = missing."""
-    reader = csv.DictReader(io.StringIO(text))
-    out: list[tuple[date, float]] = []
-    for row in reader:
-        try:
-            d = date.fromisoformat(row["DATE"].strip())
-            v = float(row["VALUE"].strip())
-        except (TypeError, ValueError, KeyError, AttributeError):
-            continue  # "." = missing, or a malformed point: skip, don't fail
-        out.append((d, v))
-    if not out:
-        raise ValueError("fredgraph CSV contained no usable points")
-    out.sort(key=lambda p: p[0])
-    return out
+async def fetch_series(fred_id: str, api_key: str, get_text: GetText) -> list[tuple[date, float]]:
+    """Fetch full series history via the FRED API — same auth path as
+    fetchers.fred.fetch_series (api_key + file_type=json params)."""
+    return await _fred.fetch_series(fred_id, api_key, get_text)
 
 
-async def fetch_series(fred_id: str, get_text: GetText) -> list[tuple[date, float]]:
-    return parse_fred_csv(await get_text(FRED_CSV, params={"id": fred_id}))
-
-
-async def fetch_z1_holdings(store: Store, get_text: GetText) -> str:
+async def fetch_z1_holdings(store: Store, api_key: str, get_text: GetText) -> str:
     """Full-history upsert for every Z.1 holdings series.
+
+    FRED API (keyed) — no `observation_start`, so each call pulls the full
+    available history, upserted idempotently.
 
     Per-series isolation: one bad ID or fetch failure is recorded in the
     error list and must not starve the other series. Returns the source tag.
@@ -166,7 +157,7 @@ async def fetch_z1_holdings(store: Store, get_text: GetText) -> str:
         key = store_key(cfg)
         keys.append(key)
         try:
-            pts = await fetch_series(cfg.fred_id, get_text)
+            pts = await fetch_series(cfg.fred_id, api_key, get_text)
             store.upsert_points(key, pts)
         except Exception as exc:  # noqa: BLE001 — per-series isolation
             errors.append(f"{cfg.fred_id}: {exc}")
@@ -175,7 +166,7 @@ async def fetch_z1_holdings(store: Store, get_text: GetText) -> str:
     for key, fred_id, _label in EXTRA_SERIES:
         keys.append(key)
         try:
-            pts = await fetch_series(fred_id, get_text)
+            pts = await fetch_series(fred_id, api_key, get_text)
             store.upsert_points(key, pts)
         except Exception as exc:  # noqa: BLE001 — per-series isolation
             errors.append(f"{fred_id}: {exc}")

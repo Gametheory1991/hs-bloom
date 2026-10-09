@@ -20,6 +20,11 @@ from collector.store import Store
 
 log = logging.getLogger(__name__)
 
+# Thin-history bootstrap: the per-run pull is a 5d incremental range; a full
+# 1y pull runs only when the stored series has fewer points than this
+# (preserves the full-history bar), then idempotent upserts keep it topped up.
+EQUITY_THIN_POINTS = 30
+
 
 async def fetch_equity(indexes: list[IndexCfg], store: Store, get_text: GetText) -> str:
     sources_used: set[str] = set()
@@ -37,7 +42,14 @@ async def fetch_equity(indexes: list[IndexCfg], store: Store, get_text: GetText)
     for idx in indexes:
         if idx.yahoo:
             try:
-                chart = await yahoo.fetch_chart(idx.yahoo, get_text)
+                # Incremental 5d pull once the series is populated; full 1y
+                # bootstrap when stored history is thin/missing.
+                try:
+                    thin = len(store.points(f"idx:{idx.symbol}")) < EQUITY_THIN_POINTS
+                except Exception:  # noqa: BLE001 — degrade to bootstrap
+                    thin = True
+                chart = await yahoo.fetch_chart(
+                    idx.yahoo, get_text, range_="1y" if thin else "5d")
                 store.upsert_points(f"idx:{idx.symbol}", chart.closes)
                 last_d, last_v = chart.closes[-1]
                 quotes[idx.symbol] = {

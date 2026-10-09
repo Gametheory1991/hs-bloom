@@ -4,6 +4,16 @@ Source: https://www.ici.org/research/stats/flows ("Estimated Long-Term Mutual
 Fund Flows", released most Wednesdays for the week ended the prior Wednesday).
 Machine-readable workbook (verified live 2026-10-07):
   https://www.ici.org/flows_data_<YEAR>.xls
+
+BLOCK STATUS 2026-10-09: ici.org serves an Akamai edge "Access Denied" to
+our hosts regardless of URL — https://www.ici.org/flows_data_2026.xls,
+..._2025.xls and ..._2024.xls all return HTTP 403 (browser User-Agent,
+~1.4s; reference: errors.edgesuite.net, so this is an IP/host block, not
+a missing-file 404). Alternate URL https://www.ici.org/estimated_flows_data_2026.xls
+also 403s, the landing page https://www.ici.org/research/stats/flows also
+403s, and https://ici.org/flows_data_2026.xls (no www) gets an empty
+reply. Do not fake data from this source; resolve_workbook keeps raising
+honestly ("no ICI flows workbook available") until the block lifts.
 Only the CURRENT-year workbook is published; prior-year URLs 404/403, so
 history is whatever the current workbook carries (monthly back to Jan 2024,
 weekly for the current year only). The workbook is a legacy .xls with one
