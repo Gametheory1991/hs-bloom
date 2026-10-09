@@ -347,13 +347,15 @@ def create_app(store: Store, cfg: Config) -> FastAPI:
         elif series_id.startswith("etf:"):
             # ETF snapshots: etf:{TICKER}:{metric} — aum ($), nav ($),
             # shares (sh), price ($), expense (%), divyield (%).
-            # Written daily by the ishares_etf job.
+            # Written daily by the ishares_etf job. Quarterly XBRL checkpoints
+            # use the q- prefix (etf:{TICKER}:q-aum etc.) to avoid collisions.
             _em = series_id.split(":", 2)
             key = f"cycle:etf-{_em[1]}-{_em[2]}" if len(_em) == 3 else None
             if not key:
                 raise HTTPException(status_code=404, detail=f"unknown series: {series_id}")
             points = store.points(key)
             _mu = {"aum": "$", "nav": "$", "shares": "sh",
+                   "q-aum": "$", "q-nav": "$", "q-shares": "sh",
                    "flow7d": "$", "price": "$", "expense": "%",
                    "divyield": "%"}.get(_em[2], "")
             name, unit = f"{_em[1]} {_em[2]}", _mu

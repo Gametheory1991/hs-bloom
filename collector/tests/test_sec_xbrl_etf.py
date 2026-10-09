@@ -95,8 +95,8 @@ async def test_fetch_sec_xbrl_etf(tmp_path):
                                    "hs-bloom/1.0 contact harrysugamakc@gmail.com")
     assert "quarterly checkpoints" in res
     # same series the daily job writes
-    assert store.points("cycle:etf-IBIT-shares")[date(2024, 3, 31)] == 442400000.0
-    assert store.points("cycle:etf-IBIT-aum")[date(2023, 12, 31)] == 100000.0
-    assert store.points("cycle:etf-GBTC-aum")[date(2024, 12, 31)] == pytest.approx(211920100 * 85.0)
+    assert store.points("cycle:etf-IBIT-q-shares")[date(2024, 3, 31)] == 442400000.0
+    assert store.points("cycle:etf-IBIT-q-aum")[date(2023, 12, 31)] == 100000.0
+    assert store.points("cycle:etf-GBTC-q-aum")[date(2024, 12, 31)] == pytest.approx(211920100 * 85.0)
     # failed CIKs don't fail the job
     assert "failed" in res

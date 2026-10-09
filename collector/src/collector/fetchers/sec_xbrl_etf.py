@@ -123,7 +123,9 @@ async def fetch_sec_xbrl_etf(store, get_text: GetText,
         hist = extract_history(payload)
         for metric, pts in hist.items():
             if pts:
-                store.upsert_points(f"cycle:etf-{ticker}-{metric}", pts)
+                # Quarterly XBRL checkpoints live in their own -q- namespace so they
+                # never collide with the daily iShares series (cycle:etf-{t}-{metric}).
+                store.upsert_points(f"cycle:etf-{ticker}-q-{metric}", pts)
                 pts_total += len(pts)
         done += 1
         await asyncio.sleep(0.3)  # SEC fair access: well under 10 req/s
