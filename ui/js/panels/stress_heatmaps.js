@@ -59,9 +59,13 @@ function fmtCell(panel, v, text) {
   return `${v >= 0 ? "+" : "−"}${Math.abs(v).toFixed(0)}`;
 }
 
-function overallScoreBar(data) {
-  // Mean z-score per column across all series (from H8 full-history z-scores).
-  const m = data.matrices["lvlzfull"];
+function overallScoreBar(data, panelKey) {
+  // Mean z-score per column, using the z-scored matrix that matches each panel:
+  // H1/H2 (native levels) → H8; H3/H5 (7d vel) → H5; H4/H6 (30d vel) → H6;
+  // H7 → H7; H8 → H8. Native-unit matrices can't be averaged across units.
+  const srcKey = { lvl7: "lvlzfull", lvl30: "lvlzfull", vel7: "velz7", vel30: "velz30",
+                   velz7: "velz7", velz30: "velz30", lvlz1y: "lvlz1y", lvlzfull: "lvlzfull" }[panelKey] || "lvlzfull";
+  const m = data.matrices[srcKey];
   if (!m) return "";
   const cols = data.columns;
   const perCol = cols.map((_, j) => {
@@ -70,7 +74,9 @@ function overallScoreBar(data) {
     return vals.reduce((a, b) => a + b, 0) / vals.length;
   });
   // reuse the green→amber→red ramp: |z| 0 → 2.5σ maps to t 0 → 1
-  let html = `<div class="stress-overall"><div class="stress-overall-title">OVERALL STRESS SCORE — mean z-score across all series (vs full history)</div><div class="stress-overall-bar">`;
+  const srcLabel = { lvl7: "H8", lvl30: "H8", vel7: "H5", vel30: "H6",
+                   velz7: "H5", velz30: "H6", lvlz1y: "H7", lvlzfull: "H8" }[panelKey] || "H8";
+  let html = `<div class="stress-overall"><div class="stress-overall-title">OVERALL STRESS SCORE — mean z-score across all series (${srcLabel})</div><div class="stress-overall-bar">`;
   perCol.forEach((s, j) => {
     const now = cols[j] === "NOW";
     if (s == null) {
@@ -137,11 +143,10 @@ export async function renderStressHeatmaps() {
   const asof = data.asof ? ` · as of ${esc(data.asof)}` : "";
   body.innerHTML =
     `<div class="stress-intro muted">Levels in native units · velocity signed · z-scores in σ — columns: 8 stress episodes + NOW. n/a = no history.${asof}</div>` +
-    overallScoreBar(data) +
     `<div class="stress-legend"><span class="sl-sw" style="background:#d42a1e"></span>stressed` +
     ` <span class="sl-sw" style="background:#c78a00"></span>elevated` +
     ` <span class="sl-sw" style="background:#1a8f3c"></span>calm</div>` +
-    PANELS.map((p) => renderOne(p, data)).join("");
+    PANELS.map((p) => overallScoreBar(data, p.key) + renderOne(p, data)).join("");
   if (foot) {
     const upd = data.updated_at ? new Date(data.updated_at).toLocaleString() : "—";
     foot.textContent = `DATA: STRESS_HEATMAPS · UPDATED ${upd}`;
