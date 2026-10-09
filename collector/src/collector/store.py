@@ -220,13 +220,18 @@ class Store:
         dates = list(dates)
         if not dates:
             return 0
-        cur = self._execute(
-            "DELETE FROM series_points WHERE series_id=? AND d IN "
-            f"({','.join('?' * len(dates))})",
-            [series_id] + [d.isoformat() for d in dates],
-        )
+        with self._lock:
+            cur = self.conn.execute(
+                self._q(
+                    "DELETE FROM series_points WHERE series_id=? AND d IN "
+                    f"({','.join('?' * len(dates))})"
+                ),
+                [series_id] + [d.isoformat() for d in dates],
+            )
+            n = cur.rowcount or 0
+            self.conn.commit()
         self._bump_data_version()
-        return cur.rowcount or 0
+        return n
 
     def points(self, series_id: str, since: date | None = None) -> dict[date, float]:
         q = "SELECT d, value FROM series_points WHERE series_id=?"
