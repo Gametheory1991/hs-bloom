@@ -1103,9 +1103,8 @@ def create_app(store: Store, cfg: Config) -> FastAPI:
         Gate-protected. Remove after use."""
         import httpx
         from collector.fetchers.sec_xbrl_etf import fetch_sec_xbrl_etf
-        ua = os.environ.get("SEC_USER_AGENT", "")
-        if not ua:
-            raise HTTPException(status_code=500, detail="SEC_USER_AGENT not set")
+        # Same UA the scheduler uses (config.yaml sec_data.user_agent).
+        ua = "hs-bloom/1.0 contact harrysugamakc@gmail.com"
 
         async def _get_text(url: str, headers: dict | None = None) -> str:
             async with httpx.AsyncClient(timeout=30) as client:
