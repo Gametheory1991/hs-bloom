@@ -36,4 +36,19 @@ jobs:
         run: python scripts/check_imports.py
 
       - name: Run test suite
-        run: python -m pytest collector/tests -q
+        shell: bash
+        run: |
+          set -o pipefail
+          python -m pytest collector/tests -q -rfE --tb=line 2>&1 | tee pytest.log
+
+      # Surface failing test ids as a job annotation + step summary, so they
+      # are visible on the PR (and via the checks API) without opening logs.
+      - name: Report test failures
+        if: failure()
+        shell: bash
+        run: |
+          [ -f pytest.log ] || exit 0
+          grep -E '^(FAILED|ERROR) ' pytest.log > failures.txt || true
+          { echo '### Failing tests'; echo '```'; cat failures.txt; tail -n 3 pytest.log; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          msg=$( { head -n 60 failures.txt; tail -n 1 pytest.log; } | sed -e 's/%/%25/g' -e 's/\r//g' | sed -e ':a;N;$!ba;s/\n/%0A/g')
+          echo "::error title=pytest failures::${msg}"
