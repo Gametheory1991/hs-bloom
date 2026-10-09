@@ -78,7 +78,7 @@ from collector.fetchers.frb_ddp import fetch_frb_ddp
 from collector.fetchers.sec_ncen import fetch_sec_ncen
 from collector.fetchers.sec_nport import fetch_sec_nport
 from collector.fetchers.nport_flows import fetch_nport_flows
-from collector.fetchers.ici_mutual_flows import fetch_ici_mutual_flows
+from collector.fetchers.fred_mf_flows import fetch_mf_flows
 from collector.fetchers.sec_pfs import fetch_sec_pfs
 from collector.fetchers.sec_ftd import fetch_sec_ftd
 from collector.fetchers.sifma_issuance import fetch_sifma_issuance
@@ -563,10 +563,13 @@ def register_jobs(
         # batch. Monthly poll; staggers after sec_nport's ~420 MB download.
         "nport_flows": (cfg.cadences.get("nport_flows", 2592000), partial(fetch_nport_flows, cfg.sec_data, store),
                  start + timedelta(seconds=9450)),
-        # mutual-fund flows phase 1: ICI estimated long-term mutual fund
-        # flows — weekly (estimated, ~1wk lag) + monthly (actual) aggregates.
-        # Keyless 58 KB .xls; weekly poll. Aggregate only, no per-fund detail.
-        "ici_flows": (cfg.cadences.get("ici_flows", 604800), partial(fetch_ici_mutual_flows, store, get_bytes),
+        # mutual-fund flows: FRED Z.1 quarterly transactions (net share
+        # issuance, $M, NSA) — the official quarterly analog of net new cash
+        # flow. Replaces the ICI weekly workbook: ici.org serves Akamai 403
+        # to our hosts on every URL/header variant (2026-10-09), so
+        # fetch_ici_mutual_flows is dormant until the block lifts. Monthly
+        # poll; quarterly data with ~1 quarter publication lag.
+        "mf_flows": (cfg.cadences.get("mf_flows", 2592000), partial(fetch_mf_flows, store, fred_api_key, get_text),
                  start + timedelta(seconds=9750)),
         # batch 13: SEC Private Fund Statistics supporting XLSX — latest quarter
         # resolved at runtime from the index page; anchor-driven table parse.

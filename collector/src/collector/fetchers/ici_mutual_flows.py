@@ -11,8 +11,11 @@ our hosts regardless of URL — https://www.ici.org/flows_data_2026.xls,
 ~1.4s; reference: errors.edgesuite.net, so this is an IP/host block, not
 a missing-file 404). Alternate URL https://www.ici.org/estimated_flows_data_2026.xls
 also 403s, the landing page https://www.ici.org/research/stats/flows also
-403s, and https://ici.org/flows_data_2026.xls (no www) gets an empty
-reply. Do not fake data from this source; resolve_workbook keeps raising
+403s, https://ici.org/flows_data_2026.xls (no www) gets an empty
+reply, the full browser-navigation header set (Sec-Fetch-*) still 403s,
+and staging domain https://ici-dev.ici.org also 403s. DORMANT as of
+2026-10-09: replaced in the scheduler by fetchers.fred_mf_flows (FRED Z.1
+quarterly net share issuance, same economic concept, official source). Do not fake data from this source; resolve_workbook keeps raising
 honestly ("no ICI flows workbook available") until the block lifts.
 Only the CURRENT-year workbook is published; prior-year URLs 404/403, so
 history is whatever the current workbook carries (monthly back to Jan 2024,

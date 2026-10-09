@@ -52,7 +52,7 @@ def test_register_jobs_creates_all_jobs_with_config_cadences(tmp_path):
         "regwatch",
         "cboe_options", "ishares_etf",
         "nyfed_cmdi", "nasdaq_tape", "sec_xbrl_etf", "ofr_tff",
-        "ici_flows", "nport_flows",
+        "mf_flows", "nport_flows",
         "etf_holders_13f",
         "bdc_financials", "bdc_universe",
         "sec_ftd", "short_metrics", "stress_heatmaps",
