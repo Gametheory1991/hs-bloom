@@ -7,15 +7,16 @@ fetching the wrong FRED series.
 """
 from __future__ import annotations
 
+import json
 from datetime import date
 
+from collector.fetchers import fred as fred_mod
 from collector.fetchers import z1_holdings
 from collector.fetchers.z1_holdings import (
     EXTRA_SERIES,
     SERIES,
     fetch_series,
     fetch_z1_holdings,
-    parse_fred_csv,
     store_key,
 )
 from collector.store import Store
@@ -82,24 +83,28 @@ def test_extra_series_ids_verbatim():
     assert keys["cycle:fed-soma-weekly"][0] == "TREAST"
 
 
-def test_parse_fred_csv_skips_dot_missing():
-    text = "DATE,VALUE\n2026-03-31,4082700.0\n2026-06-30,.\n2026-09-30,4100000.0\n"
-    pts = parse_fred_csv(text)
-    assert pts == [(date(2026, 3, 31), 4082700.0), (date(2026, 9, 30), 4100000.0)]
-
-
-def test_parse_fred_csv_sorts_and_raises_on_empty():
-    text = "DATE,VALUE\n2026-06-30,2.0\n2026-03-31,1.0\n"
-    assert parse_fred_csv(text) == [
-        (date(2026, 3, 31), 1.0),
-        (date(2026, 6, 30), 2.0),
+def test_parse_observations_skips_dot_missing():
+    text = json.dumps({
+        "observations": [
+            {"date": "2026-03-31", "value": "4082700.0"},
+            {"date": "2026-06-30", "value": "."},
+            {"date": "2026-09-30", "value": "4100000.0"},
+        ]
+    })
+    pts = fred_mod.parse_observations(text)
+    assert pts == [
+        (date(2026, 3, 31), 4082700.0),
+        (date(2026, 9, 30), 4100000.0),
     ]
+
+
+def test_parse_observations_handles_missing_observations_key():
     try:
-        parse_fred_csv("DATE,VALUE\n2026-06-30,.\n")
-    except ValueError:
+        fred_mod.parse_observations('{"error_code":400}')
+    except KeyError:
         pass
     else:  # pragma: no cover
-        raise AssertionError("expected ValueError on all-missing CSV")
+        raise AssertionError("expected KeyError on FRED error payload")
 
 
 def test_store_key_format():
@@ -122,22 +127,34 @@ async def test_fetch_series_passes_id_and_parses():
 
     async def fake_get(url, params=None, headers=None):
         seen.update(params or {})
-        return "DATE,VALUE\n2026-06-30,4082700.0\n"
+        assert url == "https://api.stlouisfed.org/fred/series/observations"
+        return json.dumps({
+            "observations": [{"date": "2026-06-30", "value": "4082700.0"}]
+        })
 
-    pts = await fetch_series("BOGZ1FL713061103Q", fake_get)
-    assert seen["id"] == "BOGZ1FL713061103Q"
+    pts = await fetch_series("BOGZ1FL713061103Q", "TESTKEY", fake_get)
+    assert seen["series_id"] == "BOGZ1FL713061103Q"
+    assert seen["api_key"] == "TESTKEY"
+    assert seen["file_type"] == "json"
     assert pts == [(date(2026, 6, 30), 4082700.0)]
 
 
 async def test_fetch_z1_holdings_upserts_two_series_no_network(tmp_path, monkeypatch):
     store = Store(tmp_path / "t.db")
 
+    def obs_json(*pairs):
+        return json.dumps({
+            "observations": [
+                {"date": d, "value": v} for d, v in pairs
+            ]
+        })
+
     async def fake_get(url, params=None, headers=None):
-        fred_id = (params or {}).get("id")
+        fred_id = (params or {}).get("series_id")
         if fred_id == "BOGZ1FL713061103Q":
-            return "DATE,VALUE\n2026-03-31,4082700.0\n2026-06-30,.\n"
+            return obs_json(("2026-03-31", "4082700.0"), ("2026-06-30", "."))
         if fred_id == "TREAST":
-            return "DATE,VALUE\n2026-09-23,4564161.0\n"
+            return obs_json(("2026-09-23", "4564161.0"))
         raise RuntimeError("unexpected series")
 
     # Restrict to two series so the fake covers everything, and kill the
@@ -155,7 +172,7 @@ async def test_fetch_z1_holdings_upserts_two_series_no_network(tmp_path, monkeyp
         [row for row in EXTRA_SERIES if row[0] == "cycle:fed-soma-weekly"],
     )
     monkeypatch.setattr(z1_holdings.asyncio, "sleep", lambda *a, **k: _noop())
-    result = await fetch_z1_holdings(store, fake_get)
+    result = await fetch_z1_holdings(store, "TESTKEY", fake_get)
 
     assert result == "fred-z1"
     assert store.points("cycle:z1-ust-fed") == {date(2026, 3, 31): 4082700.0}
@@ -179,7 +196,7 @@ async def test_fetch_z1_holdings_raises_on_bad_series(tmp_path, monkeypatch):
     monkeypatch.setattr(z1_holdings, "EXTRA_SERIES", [])
     monkeypatch.setattr(z1_holdings.asyncio, "sleep", lambda *a, **k: _noop())
     try:
-        await fetch_z1_holdings(store, fake_get)
+        await fetch_z1_holdings(store, "TESTKEY", fake_get)
     except RuntimeError as exc:
         assert "BOGZ1FL713061103Q" in str(exc)
     else:  # pragma: no cover

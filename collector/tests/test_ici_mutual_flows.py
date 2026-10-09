@@ -64,6 +64,16 @@ async def test_resolve_workbook_falls_back_to_prior_year_in_january():
     assert url == "https://www.ici.org/flows_data_2026.xls"
 
 
+async def test_resolve_workbook_raises_honestly_when_blocked():
+    # 2026-10-09: Akamai edge 403s every ICI URL from our hosts — the job
+    # must fail loudly, not fabricate flows.
+    async def blocked_get_bytes(url, params=None, headers=None):
+        raise RuntimeError(f"403 Access Denied for {url}")
+
+    with pytest.raises(RuntimeError, match="no ICI flows workbook available"):
+        await resolve_workbook(blocked_get_bytes, today=date(2026, 10, 9))
+
+
 async def test_fetch_ici_mutual_flows_upserts_and_docs(tmp_path):
     from collector.fetchers.ici_mutual_flows import fetch_ici_mutual_flows
 
