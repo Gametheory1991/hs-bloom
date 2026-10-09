@@ -127,29 +127,39 @@ def parse_table1(payload: dict | str) -> tuple[str, list[dict]]:
 
 def total_public_debt_outstanding(table1_rows: list[dict]) -> float:
     """Total Public Debt Outstanding ($mn) from Table 1 summary rows."""
+    def _label(r: dict, key: str) -> str:
+        return (r.get(key) or "").lower()
+
     # Try exact match first (case-insensitive)
     for r in table1_rows:
         # Fiscal Data puts total-row labels in security_type_desc with
         # security_class_desc == '_', not in security_class_desc.
         if (
-            r.get("security_class", "").lower() == "total public debt outstanding"
-            or r.get("security_type", "").lower() == "total public debt outstanding"
+            _label(r, "security_class") == "total public debt outstanding"
+            or _label(r, "security_type") == "total public debt outstanding"
         ):
             return r["total_mn"]
     # Fallback: partial match for "total public debt" (Treasury may rename labels)
     # Harry 2026-10-09: MSPD Table 1 format changed, exact label missing.
+    # Collect ALL candidates first, then prefer "outstanding" over
+    # "subject to limit" — never silently return the wrong one.
+    candidates = []
     for r in table1_rows:
-        st = r.get("security_type", "").lower()
-        sc = r.get("security_class", "").lower()
+        st = _label(r, "security_type")
+        sc = _label(r, "security_class")
         if "total public debt" in st or "total public debt" in sc:
-            # Prefer the "outstanding" row over "subject to limit" if both exist
-            if "outstanding" in st or "outstanding" in sc:
-                return r["total_mn"]
-    for r in table1_rows:
-        st = r.get("security_type", "").lower()
-        sc = r.get("security_class", "").lower()
-        if "total public debt" in st or "total public debt" in sc:
+            candidates.append((r, st, sc))
+    for r, st, sc in candidates:
+        if "outstanding" in st or "outstanding" in sc:
             return r["total_mn"]
+    if candidates:
+        # Only "subject to limit" (or similar) found — warn loudly, don't
+        # silently return a different number.
+        r, st, sc = candidates[0]
+        log.warning(
+            "MSPD Table 1: no 'Outstanding' row; using '%s/%s' — verify this "
+            "is the right total", r.get("security_type"), r.get("security_class"))
+        return r["total_mn"]
     # Last resort: sum Marketable + Nonmarketable
     total = 0.0
     found = False

@@ -51,7 +51,7 @@ import { renderDebtCube } from "./panels/debtcube.js";
 import { renderRegwatchNews, renderRegwatchRules, renderRegwatchTopics } from "./panels/regwatch.js";
 
 const POLL_MS = 300_000; // Harry 2026-10-09: 5min (was 60s) — most data is daily/quarterly; saves 5x bandwidth
-const STALE_MINUTES = { equity: 20, bonds: 130, macro: 390, auctions: 2880, news: 40, defi: 35, midnight: 35, refs: 35, insights: 70, riskmap: 2880, xcorr: 2880, gse: 86400, vol: 2880, movers: 10080, radar: 2880, hyper: 10080, tsv: 10080, usaspending: 20160, finnhub: 2880, worldbank: 20160, coingecko: 2880, predict: 120, finra: 2880, star: 2880, shortvol: 2880, margin: 43200, shortint: 2880, tape: 2880, ats: 10080, otc: 2880, tff: 2880, factbook: 43200, regwatch: 120, usage: 60, finance: 10080 };  // ~2x cadence
+const STALE_MINUTES = { equity: 35, bonds: 130, macro: 390, auctions: 2880, news: 40, defi: 35, midnight: 35, refs: 35, insights: 70, riskmap: 2880, xcorr: 2880, gse: 86400, vol: 2880, movers: 10080, radar: 2880, hyper: 10080, tsv: 10080, usaspending: 20160, finnhub: 2880, worldbank: 20160, coingecko: 2880, predict: 120, finra: 2880, star: 2880, shortvol: 2880, margin: 43200, shortint: 2880, tape: 2880, ats: 10080, otc: 2880, tff: 2880, factbook: 43200, regwatch: 120, usage: 60, finance: 10080 };  // ~2x cadence
 
 const EMPTY = { rows: [], updated_at: null, source: null };
 

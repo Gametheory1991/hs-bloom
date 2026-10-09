@@ -12,6 +12,7 @@ Writes daily closes to series 'idx:{symbol}' and the latest quotes to the
 from __future__ import annotations
 
 import logging
+from datetime import date
 
 from collector.config import IndexCfg
 from collector.fetchers import yahoo
@@ -43,13 +44,20 @@ async def fetch_equity(indexes: list[IndexCfg], store: Store, get_text: GetText)
         if idx.yahoo:
             try:
                 # Incremental 5d pull once the series is populated; full 1y
-                # bootstrap when stored history is thin/missing.
+                # bootstrap when stored history is thin/missing. If the last
+                # stored date is stale (>7d gap, e.g. after an outage), pull
+                # 3mo to fill the gap instead of leaving it permanent.
                 try:
-                    thin = len(store.points(f"idx:{idx.symbol}")) < EQUITY_THIN_POINTS
+                    pts = store.points(f"idx:{idx.symbol}")
+                    thin = len(pts) < EQUITY_THIN_POINTS
+                    if not thin and pts:
+                        gap_days = (date.today() - max(pts)).days
+                        range_ = "3mo" if gap_days > 7 else "5d"
+                    else:
+                        range_ = "1y" if thin else "5d"
                 except Exception:  # noqa: BLE001 — degrade to bootstrap
-                    thin = True
-                chart = await yahoo.fetch_chart(
-                    idx.yahoo, get_text, range_="1y" if thin else "5d")
+                    range_ = "1y"
+                chart = await yahoo.fetch_chart(idx.yahoo, get_text, range_=range_)
                 store.upsert_points(f"idx:{idx.symbol}", chart.closes)
                 last_d, last_v = chart.closes[-1]
                 quotes[idx.symbol] = {
