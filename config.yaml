@@ -173,6 +173,13 @@ series:            # macro click-through charts; transform per changes.apply_tra
   - { id: us-prime-age-lfpr,        name: "US Prime-Age LFPR %",              fred: LNS11300060,     unit: "%",   transform: none }
   - { id: us-quits-rate,            name: "US Quits Rate %",                  fred: JTSQUR,          unit: "%",   transform: none }
   - { id: fed-total-assets,         name: "Fed Total Assets $m",              fred: WALCL,           unit: "$m",  transform: none }
+  - { id: us-core-pce-yoy,          name: "US Core PCE YoY %",              fred: PCEPILFE,        unit: "%",   transform: yoy }
+  - { id: us-fed-funds-daily,       name: "Fed Funds Effective (daily) %",  fred: DFF,             unit: "%",   transform: none }
+  - { id: us-continuing-claims,     name: "US Continuing Claims k",         fred: CCSA,            unit: "k",   transform: none }
+  - { id: us-ted-spread,            name: "TED Spread %",                   fred: TEDRATE,         unit: "%",   transform: none }
+  - { id: us-baa-spread-10y,        name: "Baa Spread over 10Y %",          fred: BAA10Y,          unit: "%",   transform: none }
+  - { id: us-industrial-prod-yoy,   name: "US Industrial Production YoY %", fred: INDPRO,          unit: "%",   transform: yoy }
+  - { id: us-ppi-yoy,               name: "US PPI YoY %",                   fred: PPIACO,          unit: "%",   transform: yoy }
   - { id: fed-reserve-balances,     name: "Fed Reserve Balances $m",          fred: WRESBAL,         unit: "$m",  transform: none }
   - { id: fed-on-rrp,               name: "Fed ON RRP $bn",                   fred: RRPONTSYD,       unit: "$bn", transform: none }
   - { id: us-federal-debt,          name: "US Federal Debt $m",               fred: GFDEBTN,         unit: "$m",  transform: none }
