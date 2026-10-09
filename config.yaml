@@ -547,6 +547,12 @@ cycle_series:      # market-cycle series (spec 2026-08-24); exactly one source k
   - { id: etf-xlv,  name: "XLV (healthcare)",       unit: px, yahoo: XLV }
   - { id: etf-kre,  name: "KRE (regionals)",        unit: px, yahoo: KRE }
   - { id: etf-iai,  name: "IAI (broker-dealers)",   unit: px, yahoo: IAI }
+  - { id: etf-agg,  name: "AGG (US aggregate bonds)", unit: px, yahoo: AGG }
+  - { id: etf-jaaa, name: "JAAA (AAA CLOs)",         unit: px, yahoo: JAAA }
+  - { id: etf-jbbb, name: "JBBB (BBB CLOs)",         unit: px, yahoo: JBBB }
+  - { id: etf-priv, name: "PRIV (IG public+private credit)", unit: px, yahoo: PRIV }
+  - { id: etf-bizd, name: "BIZD (BDCs)",              unit: px, yahoo: BIZD }
+  - { id: etf-aiq,  name: "AIQ (AI & tech)",         unit: px, yahoo: AIQ }
   - { id: etf-smh,  name: "SMH (semis)",            unit: px, yahoo: SMH }
   # ---- batch 7: derived spreads/ratios (computed from existing fetches, no new HTTP) ----
   # DE 10Y via FRED IRLTLT01DEM156N (monthly; verified live) — the bond matrix uses
@@ -1513,6 +1519,12 @@ cycle_tabs:        # layout only; rows reference cycle_series ids
           - { series: etf-xli }
           - { series: etf-xlv }
           - { series: etf-kre }
+          - { series: etf-agg }
+          - { series: etf-jaaa }
+          - { series: etf-jbbb }
+          - { series: etf-priv }
+          - { series: etf-bizd }
+          - { series: etf-aiq }
           - { series: etf-iai }
           - { series: etf-smh }
       - title: "RATIOS"
@@ -1832,6 +1844,12 @@ scorecard:          # briefing-style 1D/1M/3M/1Y + 1Y z-score table (GET /api/sc
   - { series: etf-xli,         kind: pct }
   - { series: etf-xlv,         kind: pct }
   - { series: etf-kre,         kind: pct }
+  - { series: etf-agg,         kind: pct }
+  - { series: etf-jaaa,         kind: pct }
+  - { series: etf-jbbb,         kind: pct }
+  - { series: etf-priv,         kind: pct }
+  - { series: etf-bizd,         kind: pct }
+  - { series: etf-aiq,         kind: pct }
   - { series: etf-iai,         kind: pct }
   - { series: etf-smh,         kind: pct }
   - { series: cu-au-ratio,     kind: pct }
