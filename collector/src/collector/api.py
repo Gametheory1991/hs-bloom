@@ -1097,23 +1097,6 @@ def create_app(store: Store, cfg: Config) -> FastAPI:
             raise HTTPException(status_code=404, detail="no briefcheck report yet")
         return doc.payload
 
-    @app.post("/api/admin/run-xbrl-backfill")
-    async def run_xbrl_backfill(request: Request) -> dict:
-        """One-time: re-run the SEC XBRL quarterly backfill to restore history.
-        Gate-protected. Remove after use."""
-        import httpx
-        from collector.fetchers.sec_xbrl_etf import fetch_sec_xbrl_etf
-        # Same UA the scheduler uses (config.yaml sec_data.user_agent).
-        ua = "hs-bloom/1.0 contact harrysugamakc@gmail.com"
-
-        async def _get_text(url: str, headers: dict | None = None) -> str:
-            async with httpx.AsyncClient(timeout=30) as client:
-                r = await client.get(url, headers=headers or {})
-                r.raise_for_status()
-                return r.text
-
-        result = await fetch_sec_xbrl_etf(store, _get_text, ua)
-        return {"result": result}
     # ---- built-in usage analytics (no third-party service) ----------------
     @app.middleware("http")
     async def usage_log(request: Request, call_next):  # noqa: ANN001,ANN202
