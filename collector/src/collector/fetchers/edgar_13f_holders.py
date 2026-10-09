@@ -61,6 +61,10 @@ import os
 import xml.etree.ElementTree as ET
 from datetime import date
 
+from collector.fetchers.edgar_filing_cache import (
+    detect_error_payload,
+    get_filing_xml,
+)
 from collector.fetchers.etf_holders_13f import (
     quarter_end,
     target_quarter,
@@ -323,7 +327,12 @@ async def fetch_filer_quarter_holdings(
     )
     await asyncio.sleep(PAUSE)
 
-    filings = subs["filings"]["recent"]
+    # Guard: a 200-with-error-JSON body must not be mistaken for filings.
+    filings = subs.get("filings", {}).get("recent") if isinstance(subs, dict) else None
+    if not isinstance(filings, dict):
+        log.warning("edgar_13f_holders: %s: submissions JSON has no "
+                    "filings.recent (error envelope?); skipping", name)
+        return None
     # Find 13F-HR with reportDate == quarter-end (not just latest filing)
     target_idx = None
     for i, form in enumerate(filings["form"]):
@@ -350,34 +359,25 @@ async def fetch_filer_quarter_holdings(
     filing_date = filings["filingDate"][target_idx]
     report_date = filings.get("reportDate", [""])[target_idx]
 
-    nodash = accession.replace("-", "")
-    cik_nopad = str(int(cik10))
-    index = json.loads(
-        await get_text(
-            f"https://www.sec.gov/Archives/edgar/data/{cik_nopad}/{nodash}/index.json",
-            headers=headers,
-        )
-    )
+    # Shared cache with thirteenf.py: the same 13F-HR filing XML is
+    # downloaded once per accession; the second fetcher reuses it.
+    holdings_xml = await get_filing_xml(cik10, accession, get_text, headers)
     await asyncio.sleep(PAUSE)
 
-    items = index["directory"]["item"]
-    xml_name = next(
-        (
-            it["name"]
-            for it in items
-            if it["name"].endswith(".xml") and it["name"] != "primary_doc.xml"
-        ),
-        None,
-    )
-    if xml_name is None:
-        log.warning("edgar_13f_holders: no holdings XML for %s %s", name, accession)
+    # Guard (FIX 12b): a 200-with-error body must never be stored as a
+    # zero-holder quarter. The cache helper already refuses to cache error
+    # payloads; this is defense-in-depth before parsing.
+    reason = detect_error_payload(holdings_xml)
+    if reason is not None:
+        log.warning("edgar_13f_holders: %s %s: discarding error payload "
+                    "(%s); not storing", name, accession, reason)
         return None
-
-    holdings_xml = await get_text(
-        f"https://www.sec.gov/Archives/edgar/data/{cik_nopad}/{nodash}/{xml_name}",
-        headers=headers,
-    )
-    await asyncio.sleep(PAUSE)
+    holdings = parse_holdings_xml_all(holdings_xml)
+    if not holdings:
+        log.warning("edgar_13f_holders: %s %s: XML parsed but contained no "
+                    "infoTable rows; not storing (never fabricate zeros)",
+                    name, accession)
+        return None
 
     return {
         "name": name,
@@ -385,7 +385,7 @@ async def fetch_filer_quarter_holdings(
         "filing_date": filing_date,
         "report_date": report_date,
         "accession": accession,
-        "holdings": parse_holdings_xml_all(holdings_xml),
+        "holdings": holdings,
     }
 
 

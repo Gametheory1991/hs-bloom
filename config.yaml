@@ -3,7 +3,7 @@ calendar_url: https://nfs.faireconomy.media/ff_calendar_thisweek.json
 max_news: 15
 
 cadences:          # seconds between fetcher runs
-  equity: 300
+  equity: 900       # equity indexes via Yahoo; 15-min cadence, 5d incremental pulls
   bonds: 3600
   macro: 3600      # job runs hourly; refresh decision logic inside (spec: 6h, hourly on release days)
   news: 600
@@ -53,7 +53,7 @@ cadences:          # seconds between fetcher runs
   finra_ats: 604800      # FINRA ATS Transparency (dark pools): keyless monthly blocksSummary + weekly ATS_W_* (OAuth2 keyed; graceful skip)
   finra_otc: 86400      # FINRA OTC Market (otce.finra.org): keyless api.finra.org; daily list/threshold/halts + monthly/annual stats, full history then incremental
   ofr_stfm: 86400      # OFR Short-Term Funding Monitor (SOFR, cleared repo, MMF, dealer fails/financing); daily
-  ofr_tff: 86400       # OFR Traders in Financial Futures (153 mnemonics, weekly since 2013); daily-max per OFR guidance
+  ofr_tff: 604800      # OFR Traders in Financial Futures (153 mnemonics, weekly since 2013); weekly (data is weekly, idempotent upserts)
   frb_ddp: 604800      # FRB SLOOS (quarterly) + Commercial Paper (weekly) via FRED (DDP retiring); weekly poll, idempotent
   sec_ncen: 2592000    # SEC N-CEN registered-fund census; monthly poll, quarterly receipt batches (~8-16MB)
   sec_nport: 2592000   # SEC N-PORT holdings aggregates (selective ZIP extraction); monthly poll, quarterly batches
@@ -188,12 +188,12 @@ series:            # macro click-through charts; transform per changes.apply_tra
   - { id: sek-usd,                  name: "SEK/USD",                          fred: DEXSDUS,          unit: "fx",  transform: none }
   - { id: mxn-usd,                  name: "MXN/USD",                          fred: DEXMXUS,          unit: "fx",  transform: none }
   - { id: krw-usd,                  name: "KRW/USD",                          fred: DEXKOUS,          unit: "fx",  transform: none }
-  - { id: us-2y-yield,              name: "US 2Y Yield %",                    fred: DGS2,             unit: "%",   transform: none }
-  - { id: us-3y-yield,              name: "US 3Y Yield %",                    fred: DGS3,             unit: "%",   transform: none }
-  - { id: us-5y-yield,              name: "US 5Y Yield %",                    fred: DGS5,             unit: "%",   transform: none }
-  - { id: us-7y-yield,              name: "US 7Y Yield %",                    fred: DGS7,             unit: "%",   transform: none }
-  - { id: us-20y-yield,             name: "US 20Y Yield %",                   fred: DGS20,            unit: "%",   transform: none }
-  - { id: us-30y-yield,             name: "US 30Y Yield %",                   fred: DGS30,            unit: "%",  transform: none }
+  - { id: us-2y-yield,              name: "US 2Y Yield %",                    fred: DGS2,             unit: "%",   transform: none, fanout_cycle: [us2y] }
+  - { id: us-3y-yield,              name: "US 3Y Yield %",                    fred: DGS3,             unit: "%",   transform: none, fanout_cycle: [us3y] }
+  - { id: us-5y-yield,              name: "US 5Y Yield %",                    fred: DGS5,             unit: "%",   transform: none, fanout_cycle: [us5y] }
+  - { id: us-7y-yield,              name: "US 7Y Yield %",                    fred: DGS7,             unit: "%",   transform: none, fanout_cycle: [us7y] }
+  - { id: us-20y-yield,             name: "US 20Y Yield %",                   fred: DGS20,            unit: "%",   transform: none, fanout_cycle: [us20y] }
+  - { id: us-30y-yield,             name: "US 30Y Yield %",                   fred: DGS30,            unit: "%",  transform: none, fanout_cycle: [ust30y] }
   - { id: us-5y-breakeven,          name: "US 5Y Breakeven %",                fred: T5YIE,            unit: "%",  transform: none }
   - { id: us-umich-infl-exp,        name: "UMich 1Y Inflation Expectations %", fred: MICH,           unit: "%",   transform: none }
 
@@ -462,14 +462,18 @@ cycle_series:      # market-cycle series (spec 2026-08-24); exactly one source k
   - { id: cu,      name: "Copper (HG=F)",             unit: px,  yahoo: "HG=F" }
   - { id: gbp-usd, name: "GBP/USD",                   unit: fx,  yahoo: "GBPUSD=X" }
   # ---- batch 4: FRED additions ----
-  - { id: ust30y,     name: "US 30Y yield",            unit: "%", fred: DGS30 }
+  # ust30y/us2y/us3y/us5y/us7y/us20y are fed by the FRED macro job's single
+  # pull (fred_series fanout_cycle) — external: true so the cycle job skips
+  # them instead of pulling the same DGS ids twice. us10y stays here:
+  # DGS10 is not in fred_series, so the cycle job still pulls it.
+  - { id: ust30y,     name: "US 30Y yield",            unit: "%", external: true }
   - { id: us10y,      name: "US 10Y yield",            unit: "%", fred: DGS10 }
   # ---- Treasury curve maturities (FRED par yields; added 2026-10-07) ----
-  - { id: us2y,       name: "US 2Y yield",             unit: "%", fred: DGS2 }
-  - { id: us3y,       name: "US 3Y yield",             unit: "%", fred: DGS3 }
-  - { id: us5y,       name: "US 5Y yield",             unit: "%", fred: DGS5 }
-  - { id: us7y,       name: "US 7Y yield",             unit: "%", fred: DGS7 }
-  - { id: us20y,      name: "US 20Y yield",            unit: "%", fred: DGS20 }
+  - { id: us2y,       name: "US 2Y yield",             unit: "%", external: true }
+  - { id: us3y,       name: "US 3Y yield",             unit: "%", external: true }
+  - { id: us5y,       name: "US 5Y yield",             unit: "%", external: true }
+  - { id: us7y,       name: "US 7Y yield",             unit: "%", external: true }
+  - { id: us20y,      name: "US 20Y yield",            unit: "%", external: true }
   - { id: cre-delinq, name: "CRE loan delinquency %",  unit: "%", fred: DRCRELEXFACBS }
   # ---- batch 4: CFTC legacy open interest (Treasury futures short-base visual) ----
   - { id: oi-ust-2y,  name: "2Y T-Note futures OI",   unit: contracts, cftc_oi: "042601" }

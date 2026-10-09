@@ -98,7 +98,6 @@ from collector.fetchers.defillama_rwa import fetch_defillama_rwa
 from collector.fetchers.cboe_options import fetch_cboe_options
 from collector.fetchers.ishares_etf import fetch_ishares_etf
 from collector.fetchers.sec_xbrl_etf import fetch_sec_xbrl_etf
-from collector.fetchers.etf_holders_13f import fetch_etf_holders_13f
 from collector.fetchers.edgar_13f_holders import fetch_edgar_13f_holders
 from collector.fetchers.bdc_financials import fetch_bdc_financials
 from collector.fetchers.bdc_universe import fetch_bdc_universe
@@ -110,7 +109,7 @@ from collector.fetchers.kalshi import fetch_kalshi
 from collector.fetchers.pred_edge import fetch_pred_edge
 from collector.fetchers.fed_meetings import fetch_fed_meetings
 from collector.fetchers.zyfai import fetch_defi
-from collector.http import GetBytes, GetText, PostJson, PostText, get_text_curl
+from collector.http import GetBytes, GetText, PostJson, PostText
 from collector.http import post_text as _default_post_text
 from collector.newsletter import SmtpCfg, deliver_newsletter
 from collector.runner import run_fetcher
@@ -537,9 +536,10 @@ def register_jobs(
         "ofr_stfm": (cfg.cadences.get("ofr_stfm", 86400), partial(fetch_ofr_stfm, cfg.ofr_stfm, store, get_text),
                  start + timedelta(seconds=8400)),
         # OFR Traders in Financial Futures (keyless; weekly). All 153 mnemonics
-        # with full history (2013 ->); stored as cycle:tff-<slug>. Daily-max job
-        # per OFR guidance; the doc 'tff' powers the POSITIONING TFF view.
-        "ofr_tff": (cfg.cadences.get("ofr_tff", 86400), partial(fetch_ofr_tff, store, get_text),
+        # with full history (2013 ->); stored as cycle:tff-<slug>. Weekly job
+        # (data is weekly; idempotent upserts); the doc 'tff' powers the
+        # POSITIONING TFF view.
+        "ofr_tff": (cfg.cadences.get("ofr_tff", 604800), partial(fetch_ofr_tff, store, get_text),
                  start + timedelta(seconds=8430)),
         # NY Fed Corporate Bond Market Distress Index — weekly xlsx (keyless,
         # browser UA). Stores cycle:cmdi-market/ig/hy; full history on first run.
@@ -579,9 +579,10 @@ def register_jobs(
         # later runs pick up only new files. Idempotent upserts.
         "sec_ftd": (cfg.cadences.get("sec_ftd", 1296000), partial(fetch_sec_ftd, cfg.sec_data, store, get_bytes),
                  start + timedelta(seconds=10350)),
-        # batch 13: FRED Z.1 holdings-by-holder (keyless FRED CSV; quarterly
-        # levels in $mn, idempotent upserts). Monthly poll; quarterly data.
-        "z1_holdings": (cfg.cadences.get("z1_holdings", 2592000), partial(fetch_z1_holdings, store, get_text_curl),
+        # batch 13: FRED Z.1 holdings-by-holder (FRED API, api-key auth like
+        # fetch_macro_history; quarterly levels in $mn, idempotent upserts).
+        # Monthly poll; quarterly data.
+        "z1_holdings": (cfg.cadences.get("z1_holdings", 2592000), partial(fetch_z1_holdings, store, fred_api_key, get_text),
                  start + timedelta(seconds=9900)),
         # batch 13: MSPD Tables 1 + 3 (keyless Fiscal Data API; ~1 MB/month
         # CUSIP detail). Monthly poll; ~5-week publication lag.

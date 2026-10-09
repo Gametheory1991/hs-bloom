@@ -58,7 +58,7 @@ def test_register_jobs_creates_all_jobs_with_config_cadences(tmp_path):
         "sec_ftd", "short_metrics", "stress_heatmaps",
         "sifma_issuance",
     }
-    assert jobs["equity"].trigger.interval.total_seconds() == 300
+    assert jobs["equity"].trigger.interval.total_seconds() == 900
     assert jobs["news"].trigger.interval.total_seconds() == 600
     assert jobs["macro"].trigger.interval.total_seconds() == 3600
     assert jobs["macro_history"].trigger.interval.total_seconds() == 86400
@@ -92,7 +92,7 @@ def test_register_jobs_creates_all_jobs_with_config_cadences(tmp_path):
     assert jobs["crypto_graph"].trigger.interval.total_seconds() == 604800
     assert jobs["cboe_options"].trigger.interval.total_seconds() == 86400
     assert jobs["ishares_etf"].trigger.interval.total_seconds() == 86400
-    assert jobs["ofr_tff"].trigger.interval.total_seconds() == 86400
+    assert jobs["ofr_tff"].trigger.interval.total_seconds() == 604800
     assert jobs["sec_xbrl_etf"].trigger.interval.total_seconds() == 604800
     assert all(j.misfire_grace_time == 30 for j in jobs.values())
 

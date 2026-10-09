@@ -32,6 +32,7 @@ import xml.etree.ElementTree as ET
 from datetime import date
 
 from collector.config import ThirteenFCfg
+from collector.fetchers.edgar_filing_cache import get_filing_xml
 from collector.http import GetText
 from collector.store import Store
 
@@ -156,25 +157,9 @@ async def fetch_filer_filing(
     accession = filings["accessionNumber"][idx]
     filing_date = filings["filingDate"][idx]
     await asyncio.sleep(PAUSE)
-    nodash = accession.replace("-", "")
-    cik_nopad = str(int(cik10))  # EDGAR archive path uses the unpadded CIK
-    index = json.loads(
-        await get_text(
-            f"https://www.sec.gov/Archives/edgar/data/{cik_nopad}/{nodash}/index.json",
-            headers=headers,
-        )
-    )
-    items = index["directory"]["item"]
-    xml_name = next(
-        it["name"]
-        for it in items
-        if it["name"].endswith(".xml") and it["name"] != "primary_doc.xml"
-    )
-    await asyncio.sleep(PAUSE)
-    holdings_xml = await get_text(
-        f"https://www.sec.gov/Archives/edgar/data/{cik_nopad}/{nodash}/{xml_name}",
-        headers=headers,
-    )
+    # Shared cache with edgar_13f_holders.py: the same 13F-HR filing XML is
+    # downloaded once per accession; the second fetcher reuses it.
+    holdings_xml = await get_filing_xml(cik10, accession, get_text, headers)
     await asyncio.sleep(PAUSE)
     return {
         "name": name,
