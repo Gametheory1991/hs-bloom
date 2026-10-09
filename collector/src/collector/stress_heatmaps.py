@@ -71,6 +71,13 @@ SERIES = {
     "STLFSI": ("stlfsi", "idx", "{:.2f}", 1, False),
     "KRE": ("etf-kre", "px", "{:.1f}", 1, False),
     "IAI": ("etf-iai", "px", "{:.1f}", 1, False),
+    "Core PCE YoY": ("us-core-pce-yoy", "%", "{:.1f}", 1, False),
+    "Fed Funds Daily": ("us-fed-funds-daily", "%", "{:.2f}", 1, False),
+    "Cont Claims": ("us-continuing-claims", "k", "{:.0f}", 1, False),
+    "TED Spread": ("us-ted-spread", "%", "{:.2f}", 1, False),
+    "Baa-10Y Spread": ("us-baa-spread-10y", "%", "{:.2f}", 1, False),
+    "INDPRO YoY": ("us-industrial-prod-yoy", "%", "{:.1f}", 1, False),
+    "PPI YoY": ("us-ppi-yoy", "%", "{:.1f}", 1, False),
 }
 
 MATRICES = ["lvl7", "lvl30", "vel7", "vel30", "velz7", "velz30", "lvlz1y", "lvlzfull"]

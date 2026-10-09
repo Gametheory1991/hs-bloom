@@ -23,6 +23,8 @@ const TILES = [
   { label: "30Y MTG",   sid: "us-mortgage-30y",fmt: "yld" },
   { label: "TGA",       sid: "tga",            fmt: "$B" },
   { label: "VIX",       sid: "vix",            fmt: "idx" },
+  { label: "CORE PCE",  sid: "us-core-pce-yoy",fmt: "yld" },
+  { label: "TED",       sid: "us-ted-spread",  fmt: "yld" },
 ];
 
 const fmtVal = (v, fmt) => {
@@ -569,10 +571,14 @@ const bpFmt = (v) => `${Math.round(v * 100).toLocaleString("en-US")}bp`;
 const bpD = (d) => `${d >= 0 ? "+" : ""}${Math.round(d * 100)}bp`;
 
 async function stressStripHtml() {
-  const [ccc, cpiY, cpiM, nfp, unrate, mtg, sahm, cmdiM, cmdiI, cmdiH] = await Promise.all([
+  const [ccc, cpiY, cpiM, nfp, unrate, mtg, sahm, cmdiM, cmdiI, cmdiH,
+         corePce, contClaims, baaSpr, indpro, ppiY, fedDaily] = await Promise.all([
     stressPts("ccc-oas"), stressPts("us-cpi-yoy"), stressPts("us-cpi-mom"),
     stressPts("us-nfp"), stressPts("us-unemployment"), stressPts("us-mortgage-30y"),
     stressPts("us-sahm"), stressPts("cmdi-market"), stressPts("cmdi-ig"), stressPts("cmdi-hy"),
+    stressPts("us-core-pce-yoy"), stressPts("us-continuing-claims"),
+    stressPts("us-baa-spread-10y"), stressPts("us-industrial-prod-yoy"),
+    stressPts("us-ppi-yoy"), stressPts("us-fed-funds-daily"),
   ]);
   const cells = [];
 
@@ -628,6 +634,48 @@ async function stressStripHtml() {
   } else {
     cells.push(stressTile({ label: "SAHM RULE", pts: null, freq: "monthly" }));
   }
+
+  // 5b. Core PCE — monthly YoY, the Fed's actual 2% target
+  cells.push(stressTile({
+    label: "CORE PCE", pts: corePce, freq: "monthly",
+    valFmt: (v) => `${v.toFixed(1)}% YoY`, dFmt: (d) => `${d >= 0 ? "+" : ""}${d.toFixed(1)}pp`,
+    horizons: [["1M", 31], ["3M", 93], ["1Y", 365]], note: "FRED PCEPILFE · Fed target 2%",
+  }));
+
+  // 5c. Continuing claims — weekly labor depth
+  cells.push(stressTile({
+    label: "CONT CLAIMS", pts: contClaims, freq: "weekly",
+    valFmt: (v) => `${Math.round(v).toLocaleString()}k`, dFmt: (d) => `${d >= 0 ? "+" : ""}${Math.round(d)}k`,
+    horizons: [["1W", 7], ["1M", 30], ["3M", 91]], note: "FRED CCSA",
+  }));
+
+  // 5d. Baa spread over 10Y — credit stress
+  cells.push(stressTile({
+    label: "BAA-10Y", pts: baaSpr, freq: "daily",
+    valFmt: (v) => `${v.toFixed(2)}%`, dFmt: bpD,
+    horizons: [["1D", 1], ["1W", 7], ["1M", 30]], note: "FRED BAA10Y",
+  }));
+
+  // 5e. Industrial production YoY
+  cells.push(stressTile({
+    label: "INDPRO", pts: indpro, freq: "monthly",
+    valFmt: (v) => `${v.toFixed(1)}% YoY`, dFmt: (d) => `${d >= 0 ? "+" : ""}${d.toFixed(1)}pp`,
+    horizons: [["1M", 31], ["3M", 93], ["1Y", 365]], note: "FRED INDPRO",
+  }));
+
+  // 5f. PPI YoY — wholesale leading indicator
+  cells.push(stressTile({
+    label: "PPI", pts: ppiY, freq: "monthly",
+    valFmt: (v) => `${v.toFixed(1)}% YoY`, dFmt: (d) => `${d >= 0 ? "+" : ""}${d.toFixed(1)}pp`,
+    horizons: [["1M", 31], ["3M", 93], ["1Y", 365]], note: "FRED PPIACO",
+  }));
+
+  // 5g. Fed funds effective (daily)
+  cells.push(stressTile({
+    label: "EFF FF", pts: fedDaily, freq: "daily",
+    valFmt: (v) => `${v.toFixed(2)}%`, dFmt: bpD,
+    horizons: [["1D", 1], ["1W", 7], ["1M", 30]], note: "FRED DFF",
+  }));
 
   // 6. CMDI — NY Fed distress index, weekly; higher = more distress
   if (cmdiM?.length) {
