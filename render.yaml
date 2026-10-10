@@ -45,3 +45,30 @@ services:
         sync: false
       - key: CHAT_MODEL
         value: gemini-flash-lite-latest
+      - key: RUN_SCHEDULER
+        value: "0"
+
+  - type: worker
+    name: hs-bloom-worker
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerCommand: python -m collector.worker
+    plan: starter
+    autoDeploy: true
+    envVars:
+      - key: CONFIG_PATH
+        value: /app/config.yaml
+      - key: RUN_SCHEDULER
+        value: "1"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: bloom-db
+          property: connectionString
+      - key: FRED_API_KEY
+        sync: false
+      - key: SMTP_ENABLED
+        value: "0"
+
+databases:
+  - name: bloom-db
+    plan: free

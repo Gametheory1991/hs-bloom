@@ -10,7 +10,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends poppler-utils \
 
 COPY collector/pyproject.toml /app/collector/pyproject.toml
 COPY collector/src /app/collector/src
-RUN pip install --no-cache-dir /app/collector
+RUN pip install --no-cache-dir "/app/collector[postgres]"
 
 COPY config.yaml /app/config.yaml
 COPY ui /app/ui

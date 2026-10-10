@@ -21,9 +21,15 @@ from collector.store import Store
 log = logging.getLogger(__name__)
 
 
+def build_store(cfg=None) -> Store:
+    """Construct the Store (shared by web app and worker)."""
+    c = cfg or load_config(os.environ.get("CONFIG_PATH", "../config.yaml"))
+    return Store(c.db_path)
+
+
 def build() -> tuple[FastAPI, AsyncIOScheduler]:
     cfg = load_config(os.environ.get("CONFIG_PATH", "../config.yaml"))
-    store = Store(cfg.db_path)
+    store = build_store(cfg)
     # One-time backfill of historical FINRA datasets (idempotent, marker-guarded)
     try:
         backfill_dir = Path(__file__).resolve().parents[3] / "backfill_data"
@@ -38,9 +44,12 @@ def build() -> tuple[FastAPI, AsyncIOScheduler]:
     app = create_app(store, cfg)
     scheduler = AsyncIOScheduler(timezone="UTC")
     smtp_cfg = load_smtp_cfg()
-    register_jobs(
-        scheduler, cfg, store, get_text, post_json, get_bytes, os.environ.get("FRED_API_KEY", ""), smtp_cfg
-    )
+    # RUN_SCHEDULER=0 disables the in-process fetcher scheduler (used on the
+    # web service when a dedicated worker handles data fetching).
+    if os.environ.get("RUN_SCHEDULER", "1") != "0":
+        register_jobs(
+            scheduler, cfg, store, get_text, post_json, get_bytes, os.environ.get("FRED_API_KEY", ""), smtp_cfg
+        )
     # FastAPI dropped add_event_handler; router.on_startup/on_shutdown lists
     # are the remaining escape hatch for wiring events onto an app built
     # elsewhere (create_app doesn't accept a lifespan callable).
