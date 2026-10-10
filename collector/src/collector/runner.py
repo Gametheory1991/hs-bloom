@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 import asyncio
+import gc
 import inspect
 import logging
+import resource
 from datetime import datetime, timezone
 from typing import Awaitable, Callable, Union
 
@@ -22,6 +24,19 @@ JOB_RUNS_DOC = "job_runs"  # doc key: {job_name: last_success_iso}
 MAX_CONCURRENT_FETCHERS = 3
 _fetcher_semaphore = asyncio.Semaphore(MAX_CONCURRENT_FETCHERS)
 
+# Memory watchdog: refuse to start a fetcher when RSS exceeds this fraction
+# of the 2GB container. Prevents the OOM-kill crash loop (exit 137) that
+# took the site down repeatedly on 2026-10-09. The skipped job retries on
+# its next cadence; the web server stays alive.
+MEMORY_LIMIT_FRACTION = 0.75  # 1.5GB of 2GB
+
+
+def _rss_fraction() -> float:
+    """Current RSS as a fraction of the 2GB container limit."""
+    # ru_maxrss is KB on Linux
+    rss_kb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    return (rss_kb * 1024) / (2 * 1024**3)
+
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
@@ -29,6 +44,14 @@ def _now() -> str:
 
 async def run_fetcher(name: str, store: Store, fn: FetchFn) -> None:
     async with _fetcher_semaphore:
+        # Memory watchdog: skip this run if we're close to the container
+        # limit. The job retries on its next cadence; the web server survives.
+        rss = _rss_fraction()
+        if rss > MEMORY_LIMIT_FRACTION:
+            log.warning("fetcher %s skipped: RSS at %.0f%% of container limit",
+                        name, rss * 100)
+            gc.collect()
+            return
         try:
             result = fn()
             # refresh_xcorr / refresh_voldash are sync; everything else is async
@@ -46,3 +69,8 @@ async def run_fetcher(name: str, store: Store, fn: FetchFn) -> None:
             msg = f"{type(exc).__name__}: {exc}"
             log.warning("fetcher %s failed: %s", name, msg, exc_info=exc)
             store.record_error(name, msg)
+        finally:
+            # Reclaim fetcher memory aggressively. Python's allocator holds
+            # freed blocks; without this, RSS ratchets up across jobs until
+            # the OOM killer fires (the 2026-10-09 crash loop).
+            gc.collect()
