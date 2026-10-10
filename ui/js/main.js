@@ -17,6 +17,7 @@ import { renderTsv } from "./panels/tsv.js";
 import { renderXcorr } from "./panels/xcorr.js";
 import { renderVol } from "./panels/vol.js";
 import { renderOptions } from "./panels/options.js";
+import { renderActivity } from "./panels/activity.js";
 import { renderEtfFlows } from "./panels/etfflows.js";
 import { renderMovers } from "./panels/movers.js";
 import { renderFutures, FUTURES } from "./panels/futures.js";
@@ -51,7 +52,7 @@ import { renderDebtCube } from "./panels/debtcube.js";
 import { renderRegwatchNews, renderRegwatchRules, renderRegwatchTopics } from "./panels/regwatch.js";
 
 const POLL_MS = 300_000; // Harry 2026-10-09: 5min (was 60s) — most data is daily/quarterly; saves 5x bandwidth
-const STALE_MINUTES = { equity: 35, bonds: 130, macro: 390, auctions: 2880, news: 40, defi: 35, midnight: 35, refs: 35, insights: 70, riskmap: 2880, xcorr: 2880, gse: 86400, vol: 2880, movers: 10080, radar: 2880, hyper: 10080, tsv: 10080, usaspending: 20160, finnhub: 2880, worldbank: 20160, coingecko: 2880, predict: 120, finra: 2880, star: 2880, shortvol: 2880, margin: 43200, shortint: 2880, tape: 2880, ats: 10080, otc: 2880, tff: 2880, factbook: 43200, regwatch: 120, usage: 60, finance: 10080 };  // ~2x cadence
+const STALE_MINUTES = { equity: 35, bonds: 130, macro: 390, auctions: 2880, news: 40, defi: 35, midnight: 35, refs: 35, insights: 70, riskmap: 2880, xcorr: 2880, gse: 86400, vol: 2880, movers: 10080, radar: 2880, hyper: 10080, tsv: 10080, usaspending: 20160, finnhub: 2880, worldbank: 20160, coingecko: 2880, predict: 120, finra: 2880, star: 2880, shortvol: 2880, margin: 43200, shortint: 2880, tape: 2880, ats: 10080, otc: 2880, tff: 2880, factbook: 43200, regwatch: 120, usage: 60, finance: 10080, activity: 2880 };  // ~2x cadence
 
 const EMPTY = { rows: [], updated_at: null, source: null };
 
@@ -76,6 +77,7 @@ const PANEL_ENTRIES = [
   ["FUTURES — FRONT-MONTH", "markets/futures"], ["FLOWS — 13F NET FLOWS", "positioning/flows"],
   ["TFF — TRADERS IN FINANCIAL FUTURES", "positioning/tff"],
   ["OPTIONS — GAMMA & FLOW", "markets/options"], ["ETF FLOWS — AUM & CREATIONS", "structure/etfflows"],
+  ["MULTI-ASSET ACTIVITY", "markets/activity"],
   ["SCORECARD — 1D/1M/3M/1Y + 1Y Z", "pulse/scorecard"],
   ["STRESS — MATRIX · VELOCITY", "pulse/stress"],
   ["CURATED VAULTS — USDC", "markets/digital"],
@@ -257,6 +259,7 @@ initPalette();
 initSortableObserver(); // click-to-sort on every table[data-sortable]
 initExportObserver(); // ⤓ CSV/XLSX/PNG/JPG export on every section + panel
 renderFutures();
+renderActivity();
 renderFlows();
 renderScorecard();
 renderStressHeatmaps();
@@ -268,7 +271,7 @@ renderUsage();
 refreshSearchIndex();
 // One 15-min refresh for the panels that fetch their own endpoints. (Two
 // overlapping intervals used to run most of these twice.)
-setInterval(() => { renderFutures(); renderFlows(); renderScorecard(); renderStressHeatmaps(); renderCentral(); renderBriefcheck(); renderKoi(); renderStress(); refreshSearchIndex(); }, 15 * 60_000);
+setInterval(() => { renderFutures(); renderActivity(); renderFlows(); renderScorecard(); renderStressHeatmaps(); renderCentral(); renderBriefcheck(); renderKoi(); renderStress(); refreshSearchIndex(); }, 15 * 60_000);
 initDefiViewToggle(() => {
   if (lastDash) renderDefiPanel(lastDash.panels);
 });
@@ -283,6 +286,7 @@ window.addEventListener("hashchange", () => {
   // Same hub, new sub-tab: a chart drawn while hidden sees clientWidth 0 and
   // falls back to 300px; redraw so it sizes to the now-visible panel.
   if (lastDash) renderMidnight(lastDash.panels.midnight ?? EMPTY);
+  if (currentRoute().sub === "activity") renderActivity();
 });
 tick();
 // Harry 2026-10-09: pause polling when tab hidden (saves bandwidth when not looking)

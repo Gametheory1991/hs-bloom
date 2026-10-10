@@ -128,7 +128,7 @@ HUB_PANELS: dict[str, set[str]] = {
     "macro": {"insights", "macro", "auctions", "bonds", "cycle", "usaspending", "worldbank", "refs"},
     # "cycle" in markets/structure: markets/etfs (#cycle-etf) and the
     # structure/trace STRUCT block (#cycle-struct) render from the cycle panel.
-    "markets": {"insights", "equity", "movers", "voldash", "xcorr", "gse", "options", "defi", "midnight", "morpho", "refs", "cycle"},
+    "markets": {"insights", "equity", "movers", "voldash", "xcorr", "gse", "options", "defi", "midnight", "morpho", "refs", "cycle", "activity"},
     "positioning": {"insights", "tff", "predict", "riskmap", "finnhub", "cycle"},
     "structure": {"insights", "cycle", "finra","factbook", "ai_flow", "ai_financials", "ms_flow", "bank_flow", "tech_flow", "vendor_flow", "etf_flow", "crypto_flow", "pc_flow", "chain_financials", "tsv", "hyper", "etfflows", "etfholders", "finance"},
     "desk": {"insights", "news"},
@@ -770,6 +770,23 @@ def create_app(store: Store, cfg: Config) -> FastAPI:
     def stress_quadrant() -> dict:
         """Stress Monitor v2 (Phase 2, View 7): cached `stress_quadrant` doc."""
         return _stress_doc("stress_quadrant")
+
+    @app.get("/api/activity")
+    def activity() -> dict:
+        """Multi-asset activity view (MARKETS -> Activity): five-leg build.
+
+        Built live from the store (tokenized / TRACE / ETFs / options /
+        futures) on every request — no scheduler cache, no 500s: a failing
+        leg degrades to nulls and the payload always carries the contract
+        shape the frontend depends on.
+        """
+        from collector.activity import build_activity
+        try:
+            return build_activity(store)
+        except Exception:  # noqa: BLE001 — never 500 the view
+            return {"asof": None, "legs": {}, "synthesis": {
+                "regime": "Build failed — retry shortly.",
+                "lead": None, "heatmap": [], "freshness": []}}
 
     def _deferred_stress_payload(mod_paths: tuple[str, ...], func: str,
                                missing_note: str) -> dict:
